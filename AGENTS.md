@@ -1,16 +1,25 @@
 # Repository Guidelines
 
+## Project Overview
+SwitchRecomp is a preservation-focused static recompilation research project. The repository now includes an exploratory Rust workspace that mirrors the intended pipeline shape (config-driven recompilation and a minimal runtime ABI) while keeping inputs and outputs cleanly separated.
+
 ## Project Structure & Module Organization
 - `specs/` holds the numbered specification series (see `specs/README.md` for ordering).
 - `specs/SPEC-TEMPLATE.md` is the template for new specs.
 - `ROADMAP.md` defines phases and exit criteria.
 - `RESEARCH.md` tracks research directions and sources.
+- `crates/` contains the exploratory Rust pipeline/runtime scaffolding.
+- `samples/` contains small, non-proprietary inputs to exercise the pipeline.
+- `docs/` holds development and design notes.
 - `README.md` is the project overview and contribution entry point.
 
-This repository is currently documentation‑only; no source code or tests exist yet.
-
 ## Build, Test, and Development Commands
-There are no build or test commands at this stage. When tooling is introduced, add the canonical commands here with short descriptions (for example: `make build`, `ctest`, or `python -m pytest`).
+- Dev shell: `devenv shell`
+- Run all tests: `cargo test`
+- Run the sample pipeline:
+  - `cargo run -p recomp-cli -- --module samples/minimal/module.json --config samples/minimal/title.toml --out-dir out/minimal`
+- Build emitted output:
+  - `cargo build --manifest-path out/minimal/Cargo.toml`
 
 ## Coding Style & Naming Conventions
 - Specs use the naming pattern `SPEC-XXX-SLUG.md` (e.g., `SPEC-030-RECOMP-PIPELINE.md`).
@@ -19,10 +28,9 @@ There are no build or test commands at this stage. When tooling is introduced, a
 - Prefer concrete, testable acceptance criteria.
 
 ## Testing Guidelines
-No testing framework is defined yet. When tests exist, document:
-- The framework (e.g., `pytest`, `ctest`).
-- Test file naming patterns (e.g., `test_*.py`).
-- How to run the full suite and targeted subsets.
+- Use `cargo test` for Rust workspace tests.
+- Test files live under `crates/*/tests/` or inline in modules.
+- Always run the full suite after changes unless the user explicitly says not to.
 
 ## Commit & Pull Request Guidelines
 No established commit conventions are present yet. Until standards are set:
@@ -39,3 +47,4 @@ No established commit conventions are present yet. Until standards are set:
 - Keep edits small and focused per change.
 - Update the appropriate spec status when making substantive changes.
 - Do not add proprietary binaries, keys, or assets to the repository.
+- Always test changes, update relevant documentation, and commit all code you modify or add.
