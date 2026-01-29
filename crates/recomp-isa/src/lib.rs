@@ -12,6 +12,10 @@ pub enum Instruction {
     Add { dst: Reg, lhs: Reg, rhs: Reg },
     Sub { dst: Reg, lhs: Reg, rhs: Reg },
     Cmp { lhs: Reg, rhs: Reg },
+    LslImm { dst: Reg, src: Reg, shift: u8 },
+    LsrImm { dst: Reg, src: Reg, shift: u8 },
+    AsrImm { dst: Reg, src: Reg, shift: u8 },
+    RorImm { dst: Reg, src: Reg, shift: u8 },
     Ret,
 }
 
@@ -83,6 +87,50 @@ pub fn execute_block(instructions: &[Instruction], regs: &mut RegisterFile) -> R
                 let (_, flags) = sub_with_flags(lhs_val, rhs_val);
                 regs.set_flags(flags);
             }
+            Instruction::LslImm { dst, src, shift } => {
+                let value = regs.get(src) as u64;
+                let (result, carry) = shift_left(value, shift);
+                regs.set(dst, result as i64);
+                regs.set_flags(Flags {
+                    n: (result as i64) < 0,
+                    z: result == 0,
+                    c: carry,
+                    v: false,
+                });
+            }
+            Instruction::LsrImm { dst, src, shift } => {
+                let value = regs.get(src) as u64;
+                let (result, carry) = shift_right_logical(value, shift);
+                regs.set(dst, result as i64);
+                regs.set_flags(Flags {
+                    n: false,
+                    z: result == 0,
+                    c: carry,
+                    v: false,
+                });
+            }
+            Instruction::AsrImm { dst, src, shift } => {
+                let value = regs.get(src);
+                let (result, carry) = shift_right_arithmetic(value, shift);
+                regs.set(dst, result);
+                regs.set_flags(Flags {
+                    n: result < 0,
+                    z: result == 0,
+                    c: carry,
+                    v: false,
+                });
+            }
+            Instruction::RorImm { dst, src, shift } => {
+                let value = regs.get(src) as u64;
+                let (result, carry) = rotate_right(value, shift);
+                regs.set(dst, result as i64);
+                regs.set_flags(Flags {
+                    n: (result as i64) < 0,
+                    z: result == 0,
+                    c: carry,
+                    v: false,
+                });
+            }
             Instruction::Ret => return Ok(()),
         }
     }
@@ -113,6 +161,43 @@ fn sub_with_flags(lhs: i64, rhs: i64) -> (i64, Flags) {
         v: overflow,
     };
     (signed, flags)
+}
+
+fn shift_left(value: u64, shift: u8) -> (u64, bool) {
+    let shift = shift.min(63) as u32;
+    if shift == 0 {
+        return (value, false);
+    }
+    let carry = ((value >> (64 - shift)) & 1) == 1;
+    (value << shift, carry)
+}
+
+fn shift_right_logical(value: u64, shift: u8) -> (u64, bool) {
+    let shift = shift.min(63) as u32;
+    if shift == 0 {
+        return (value, false);
+    }
+    let carry = ((value >> (shift - 1)) & 1) == 1;
+    (value >> shift, carry)
+}
+
+fn shift_right_arithmetic(value: i64, shift: u8) -> (i64, bool) {
+    let shift = shift.min(63) as u32;
+    if shift == 0 {
+        return (value, false);
+    }
+    let carry = (((value as u64) >> (shift - 1)) & 1) == 1;
+    (value >> shift, carry)
+}
+
+fn rotate_right(value: u64, shift: u8) -> (u64, bool) {
+    let shift = (shift as u32) & 63;
+    if shift == 0 {
+        return (value, false);
+    }
+    let result = value.rotate_right(shift);
+    let carry = (result >> 63) & 1 == 1;
+    (result, carry)
 }
 
 #[cfg(test)]
@@ -196,5 +281,86 @@ mod tests {
         let flags = regs.flags();
         assert!(flags.n);
         assert!(!flags.z);
+    }
+
+    #[test]
+    fn shifts_set_carry_and_zero() {
+        let mut regs = RegisterFile::default();
+        let block = [
+            Instruction::MovImm {
+                dst: Reg::X(0),
+                imm: i64::MIN,
+            },
+            Instruction::LslImm {
+                dst: Reg::X(1),
+                src: Reg::X(0),
+                shift: 1,
+            },
+            Instruction::LsrImm {
+                dst: Reg::X(2),
+                src: Reg::X(1),
+                shift: 1,
+            },
+            Instruction::LsrImm {
+                dst: Reg::X(3),
+                src: Reg::X(2),
+                shift: 1,
+            },
+            Instruction::Ret,
+        ];
+
+        execute_block(&block, &mut regs).expect("exec ok");
+        assert_eq!(regs.get(Reg::X(1)), 0);
+        assert_eq!(regs.get(Reg::X(2)), 0);
+        assert_eq!(regs.get(Reg::X(3)), 0);
+        let flags = regs.flags();
+        assert!(flags.z);
+        assert!(!flags.c);
+    }
+
+    #[test]
+    fn rotate_right_sets_negative() {
+        let mut regs = RegisterFile::default();
+        let block = [
+            Instruction::MovImm {
+                dst: Reg::X(0),
+                imm: 1,
+            },
+            Instruction::RorImm {
+                dst: Reg::X(1),
+                src: Reg::X(0),
+                shift: 1,
+            },
+            Instruction::Ret,
+        ];
+
+        execute_block(&block, &mut regs).expect("exec ok");
+        assert_eq!(regs.get(Reg::X(1)), i64::MIN);
+        let flags = regs.flags();
+        assert!(flags.n);
+        assert!(!flags.z);
+    }
+
+    #[test]
+    fn lsr_sets_carry_from_bit0() {
+        let mut regs = RegisterFile::default();
+        let block = [
+            Instruction::MovImm {
+                dst: Reg::X(0),
+                imm: 3,
+            },
+            Instruction::LsrImm {
+                dst: Reg::X(1),
+                src: Reg::X(0),
+                shift: 1,
+            },
+            Instruction::Ret,
+        ];
+
+        execute_block(&block, &mut regs).expect("exec ok");
+        assert_eq!(regs.get(Reg::X(1)), 1);
+        let flags = regs.flags();
+        assert!(!flags.z);
+        assert!(flags.c);
     }
 }
