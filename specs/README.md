@@ -1,0 +1,24 @@
+# Specs Index
+
+This folder contains the project specs for the Switch static recompilation preservation effort.
+
+## Order
+- SPEC-000-CHARTER.md
+- SPEC-010-TARGET-PLATFORM.md
+- SPEC-020-INPUTS-PROVENANCE.md
+- SPEC-030-RECOMP-PIPELINE.md
+- SPEC-040-RUNTIME-ABI.md
+- SPEC-050-CPU-ISA.md
+- SPEC-060-GPU-GRAPHICS.md
+- SPEC-070-OS-SERVICES.md
+- SPEC-080-TIMING-INTERRUPTS.md
+- SPEC-090-BUILD-DISTRIBUTION.md
+- SPEC-100-VALIDATION.md
+- SPEC-110-TITLE-SELECTION.md
+
+## Template
+- SPEC-TEMPLATE.md
+
+## Related Docs
+- ROADMAP.md
+- RESEARCH.md

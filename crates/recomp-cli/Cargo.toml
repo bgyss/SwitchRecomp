@@ -1,0 +1,13 @@
+[package]
+name = "recomp-cli"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+clap = { version = "4.5", features = ["derive"] }
+recomp-pipeline = { path = "../recomp-pipeline" }
+
+[[bin]]
+name = "recomp"
+path = "src/main.rs"

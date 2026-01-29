@@ -1,0 +1,6 @@
+title = "Minimal Sample"
+entry = "entry"
+abi_version = "0.1.0"
+
+[stubs]
+svc_log = "log"
