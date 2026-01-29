@@ -22,6 +22,8 @@ direnv allow
 cargo test
 ```
 
+- ISA unit tests live in `crates/recomp-isa` and validate arithmetic + flag updates.
+
 - Run the sample pipeline:
 
 ```
