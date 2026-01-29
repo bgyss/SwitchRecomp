@@ -28,6 +28,7 @@ These hooks add fast, consistent feedback to keep the repo autonomous and reduce
 
 - Install hooks: `prek install` or `pre-commit install`.
 - Run on demand: `prek run --all-files` or `pre-commit run --all-files`.
+- macOS note: the Nix dev shell ships `prek` only (to avoid Swift/.NET builds); install `pre-commit` separately if you need it.
 
 Configured hooks:
 - Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
