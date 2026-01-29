@@ -48,3 +48,4 @@ No established commit conventions are present yet. Until standards are set:
 - Update the appropriate spec status when making substantive changes.
 - Do not add proprietary binaries, keys, or assets to the repository.
 - Always test changes, update relevant documentation, and commit all code you modify or add.
+- Push all commits after creating them.
