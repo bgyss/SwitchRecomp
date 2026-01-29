@@ -40,6 +40,30 @@ pub fn syscall_panic(name: &str, _args: &[i64]) -> RuntimeResult<()> {
     })
 }
 
+pub struct Runtime {
+    pub scheduler: Scheduler,
+    pub services: ServiceRegistry,
+    pub access: ServiceAccessControl,
+    pub logger: ServiceLogger,
+}
+
+impl Runtime {
+    pub fn new() -> Self {
+        Self {
+            scheduler: Scheduler::new(),
+            services: ServiceRegistry::new(),
+            access: ServiceAccessControl::default(),
+            logger: ServiceLogger::default(),
+        }
+    }
+
+    pub fn dispatch_service(&self, call: &ServiceCall) -> Result<(), ServiceError> {
+        self.access.check(call)?;
+        self.logger.log_call(call);
+        self.services.call(call)
+    }
+}
+
 struct ArgsDisplay<'a>(&'a [i64]);
 
 impl fmt::Display for ArgsDisplay<'_> {
@@ -72,5 +96,29 @@ mod tests {
                 assert_eq!(name, "svc_test");
             }
         }
+    }
+
+    #[test]
+    fn dispatch_service_respects_access_control() {
+        let mut runtime = Runtime::new();
+        runtime
+            .services
+            .register("svc_ok", |_| Ok(()));
+        runtime.access = ServiceAccessControl::from_allowed(vec!["svc_ok".to_string()]);
+
+        let ok_call = ServiceCall {
+            client: "demo".to_string(),
+            service: "svc_ok".to_string(),
+            args: vec![],
+        };
+        assert!(runtime.dispatch_service(&ok_call).is_ok());
+
+        let bad_call = ServiceCall {
+            client: "demo".to_string(),
+            service: "svc_bad".to_string(),
+            args: vec![],
+        };
+        let err = runtime.dispatch_service(&bad_call).unwrap_err();
+        assert!(matches!(err, ServiceError::AccessDenied(_)));
     }
 }

@@ -1,10 +1,11 @@
 # SPEC-070: OS and Services Model
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Rationale
 - Added a service registry, access control scaffold, and stub framework for early service bring-up.
+- Added a dispatcher that enforces access control and logging for service calls.
 
 ## Purpose
 Define the model for OS services, syscalls, and IPC used by recompiled titles.

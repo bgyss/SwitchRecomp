@@ -1,10 +1,11 @@
 # SPEC-080: Timing, Scheduling, and Interrupts
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Rationale
 - Added a deterministic scheduler scaffold for timing and replay tests.
+- Added a trace recorder for deterministic event playback validation.
 
 ## Purpose
 Define timing models and interrupt handling needed for correctness.

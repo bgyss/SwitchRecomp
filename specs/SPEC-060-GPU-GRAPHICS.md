@@ -1,10 +1,11 @@
 # SPEC-060: GPU and Graphics Strategy
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Rationale
 - Added a stub graphics API surface and command stream model for early conformance tests.
+- Added a deterministic command stream checksum helper for validation.
 
 ## Purpose
 Define the graphics strategy and GPU abstractions required for correctness.

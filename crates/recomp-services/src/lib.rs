@@ -109,6 +109,28 @@ impl ServiceLogger {
     }
 }
 
+pub struct ServiceDispatcher {
+    registry: ServiceRegistry,
+    access: ServiceAccessControl,
+    logger: ServiceLogger,
+}
+
+impl ServiceDispatcher {
+    pub fn new(registry: ServiceRegistry, access: ServiceAccessControl, logger: ServiceLogger) -> Self {
+        Self {
+            registry,
+            access,
+            logger,
+        }
+    }
+
+    pub fn dispatch(&self, call: &ServiceCall) -> ServiceResult<()> {
+        self.access.check(call)?;
+        self.logger.log_call(call);
+        self.registry.call(call)
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -150,5 +172,20 @@ mod tests {
         };
         let err = handler(&call).unwrap_err();
         assert!(matches!(err, ServiceError::Stubbed(_)));
+    }
+
+    #[test]
+    fn dispatcher_checks_access_and_logs() {
+        let mut registry = ServiceRegistry::new();
+        registry.register("svc_ok", |_| Ok(()));
+        let access = ServiceAccessControl::from_allowed(vec!["svc_ok".to_string()]);
+        let dispatcher = ServiceDispatcher::new(registry, access, ServiceLogger::default());
+        let call = ServiceCall {
+            client: "demo".to_string(),
+            service: "svc_ok".to_string(),
+            args: vec![42],
+        };
+
+        assert!(dispatcher.dispatch(&call).is_ok());
     }
 }

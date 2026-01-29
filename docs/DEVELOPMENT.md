@@ -23,6 +23,7 @@ cargo test
 ```
 
 - ISA unit tests live in `crates/recomp-isa` and validate arithmetic, shifts, load/store alignment, and flag updates.
+- Service dispatch, timing trace, and graphics checksum tests live in their respective crates.
 
 - Run the sample pipeline:
 

@@ -54,6 +54,21 @@ impl Scheduler {
     }
 }
 
+#[derive(Debug, Default)]
+pub struct TraceRecorder {
+    events: Vec<Event>,
+}
+
+impl TraceRecorder {
+    pub fn record(&mut self, event: &Event) {
+        self.events.push(event.clone());
+    }
+
+    pub fn snapshot(&self) -> Vec<Event> {
+        self.events.clone()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -70,5 +85,27 @@ mod tests {
 
         assert_eq!(labels, vec!["early", "early2", "late"]);
         assert_eq!(scheduler.pending(), 0);
+    }
+
+    #[test]
+    fn recorder_produces_deterministic_trace() {
+        let mut scheduler = Scheduler::new();
+        scheduler.schedule(5, "alpha");
+        scheduler.schedule(1, "beta");
+        scheduler.schedule(5, "gamma");
+
+        let mut recorder = TraceRecorder::default();
+        scheduler.run_until(10, |event| recorder.record(event));
+        let first = recorder.snapshot();
+
+        let mut scheduler = Scheduler::new();
+        scheduler.schedule(5, "alpha");
+        scheduler.schedule(1, "beta");
+        scheduler.schedule(5, "gamma");
+        let mut recorder = TraceRecorder::default();
+        scheduler.run_until(10, |event| recorder.record(event));
+        let second = recorder.snapshot();
+
+        assert_eq!(first, second);
     }
 }
