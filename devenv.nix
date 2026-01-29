@@ -1,5 +1,7 @@
 { pkgs, ... }:
 {
+  devenv.root = builtins.toString ./.;
+
   packages = [
     pkgs.cargo
     pkgs.clippy

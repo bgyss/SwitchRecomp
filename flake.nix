@@ -7,6 +7,21 @@
     devenv.inputs.nixpkgs.follows = "nixpkgs";
   };
 
-  outputs = inputs@{ devenv, ... }:
-    devenv.lib.mkFlake { inherit inputs; };
+  outputs = inputs@{ self, nixpkgs, devenv, ... }:
+    let
+      systems = [ "x86_64-darwin" "aarch64-darwin" "x86_64-linux" "aarch64-linux" ];
+      forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
+    in
+    {
+      devShells = forAllSystems (system:
+        let
+          pkgs = import nixpkgs { inherit system; };
+        in
+        {
+          default = devenv.lib.mkShell {
+            inherit inputs pkgs;
+            modules = [ ./devenv.nix ];
+          };
+        });
+    };
 }
