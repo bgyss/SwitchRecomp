@@ -11,11 +11,21 @@
     let
       systems = [ "x86_64-darwin" "aarch64-darwin" "x86_64-linux" "aarch64-linux" ];
       forAllSystems = f: nixpkgs.lib.genAttrs systems (system: f system);
+      libOverlay = final: prev: {
+        lib = prev.lib.extend (self: super: {
+          cli = super.cli // {
+            toGNUCommandLineShell = super.cli.toCommandLineShellGNU;
+          };
+        });
+      };
     in
     {
       devShells = forAllSystems (system:
         let
-          pkgs = import nixpkgs { inherit system; };
+          pkgs = import nixpkgs {
+            inherit system;
+            overlays = [ libOverlay ];
+          };
         in
         {
           default = devenv.lib.mkShell {
