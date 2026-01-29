@@ -16,6 +16,8 @@ pub enum Instruction {
     LsrImm { dst: Reg, src: Reg, shift: u8 },
     AsrImm { dst: Reg, src: Reg, shift: u8 },
     RorImm { dst: Reg, src: Reg, shift: u8 },
+    LdrImm { dst: Reg, base: Reg, offset: i64, size: MemSize },
+    StrImm { src: Reg, base: Reg, offset: i64, size: MemSize },
     Ret,
 }
 
@@ -55,9 +57,78 @@ pub struct Flags {
 pub enum ExecError {
     #[error("unsupported instruction")]
     Unsupported,
+    #[error("unaligned memory access at {address} size {size}")]
+    Unaligned { address: usize, size: usize },
+    #[error("memory out of bounds at {address} size {size}")]
+    OutOfBounds { address: usize, size: usize },
 }
 
-pub fn execute_block(instructions: &[Instruction], regs: &mut RegisterFile) -> Result<(), ExecError> {
+#[derive(Debug, Clone)]
+pub struct Memory {
+    data: Vec<u8>,
+}
+
+impl Memory {
+    pub fn new(size: usize) -> Self {
+        Self {
+            data: vec![0; size],
+        }
+    }
+
+    pub fn read(&self, address: usize, size: MemSize) -> Result<u64, ExecError> {
+        let width = size.bytes();
+        if address % width != 0 {
+            return Err(ExecError::Unaligned { address, size: width });
+        }
+        if address + width > self.data.len() {
+            return Err(ExecError::OutOfBounds { address, size: width });
+        }
+        let mut value = 0u64;
+        for i in 0..width {
+            value |= (self.data[address + i] as u64) << (i * 8);
+        }
+        Ok(value)
+    }
+
+    pub fn write(&mut self, address: usize, size: MemSize, value: u64) -> Result<(), ExecError> {
+        let width = size.bytes();
+        if address % width != 0 {
+            return Err(ExecError::Unaligned { address, size: width });
+        }
+        if address + width > self.data.len() {
+            return Err(ExecError::OutOfBounds { address, size: width });
+        }
+        for i in 0..width {
+            self.data[address + i] = ((value >> (i * 8)) & 0xFF) as u8;
+        }
+        Ok(())
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MemSize {
+    Byte,
+    Half,
+    Word,
+    DWord,
+}
+
+impl MemSize {
+    pub fn bytes(self) -> usize {
+        match self {
+            MemSize::Byte => 1,
+            MemSize::Half => 2,
+            MemSize::Word => 4,
+            MemSize::DWord => 8,
+        }
+    }
+}
+
+pub fn execute_block(
+    instructions: &[Instruction],
+    regs: &mut RegisterFile,
+    mem: &mut Memory,
+) -> Result<(), ExecError> {
     for inst in instructions {
         match *inst {
             Instruction::MovImm { dst, imm } => regs.set(dst, imm),
@@ -131,6 +202,32 @@ pub fn execute_block(instructions: &[Instruction], regs: &mut RegisterFile) -> R
                     v: false,
                 });
             }
+            Instruction::LdrImm {
+                dst,
+                base,
+                offset,
+                size,
+            } => {
+                let address = effective_address(regs.get(base), offset)?;
+                let raw = mem.read(address, size)?;
+                regs.set(dst, raw as i64);
+                regs.set_flags(Flags {
+                    n: (raw as i64) < 0,
+                    z: raw == 0,
+                    c: false,
+                    v: false,
+                });
+            }
+            Instruction::StrImm {
+                src,
+                base,
+                offset,
+                size,
+            } => {
+                let address = effective_address(regs.get(base), offset)?;
+                let value = regs.get(src) as u64;
+                mem.write(address, size, value)?;
+            }
             Instruction::Ret => return Ok(()),
         }
     }
@@ -200,6 +297,17 @@ fn rotate_right(value: u64, shift: u8) -> (u64, bool) {
     (result, carry)
 }
 
+fn effective_address(base: i64, offset: i64) -> Result<usize, ExecError> {
+    let addr = base.wrapping_add(offset);
+    if addr < 0 {
+        return Err(ExecError::OutOfBounds {
+            address: 0,
+            size: 1,
+        });
+    }
+    Ok(addr as usize)
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -207,6 +315,7 @@ mod tests {
     #[test]
     fn mov_and_add() {
         let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(0);
         let block = [
             Instruction::MovImm {
                 dst: Reg::X(0),
@@ -224,13 +333,14 @@ mod tests {
             Instruction::Ret,
         ];
 
-        execute_block(&block, &mut regs).expect("exec ok");
+        execute_block(&block, &mut regs, &mut mem).expect("exec ok");
         assert_eq!(regs.get(Reg::X(2)), 12);
     }
 
     #[test]
     fn sub_and_cmp_set_flags() {
         let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(0);
         let block = [
             Instruction::MovImm {
                 dst: Reg::X(0),
@@ -252,7 +362,7 @@ mod tests {
             Instruction::Ret,
         ];
 
-        execute_block(&block, &mut regs).expect("exec ok");
+        execute_block(&block, &mut regs, &mut mem).expect("exec ok");
         assert_eq!(regs.get(Reg::X(2)), 0);
         let flags = regs.flags();
         assert!(flags.z);
@@ -263,6 +373,7 @@ mod tests {
     #[test]
     fn add_immediate_sets_negative_flag() {
         let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(0);
         let block = [
             Instruction::MovImm {
                 dst: Reg::X(0),
@@ -276,7 +387,7 @@ mod tests {
             Instruction::Ret,
         ];
 
-        execute_block(&block, &mut regs).expect("exec ok");
+        execute_block(&block, &mut regs, &mut mem).expect("exec ok");
         assert_eq!(regs.get(Reg::X(1)), -3);
         let flags = regs.flags();
         assert!(flags.n);
@@ -286,6 +397,7 @@ mod tests {
     #[test]
     fn shifts_set_carry_and_zero() {
         let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(0);
         let block = [
             Instruction::MovImm {
                 dst: Reg::X(0),
@@ -309,7 +421,7 @@ mod tests {
             Instruction::Ret,
         ];
 
-        execute_block(&block, &mut regs).expect("exec ok");
+        execute_block(&block, &mut regs, &mut mem).expect("exec ok");
         assert_eq!(regs.get(Reg::X(1)), 0);
         assert_eq!(regs.get(Reg::X(2)), 0);
         assert_eq!(regs.get(Reg::X(3)), 0);
@@ -321,6 +433,7 @@ mod tests {
     #[test]
     fn rotate_right_sets_negative() {
         let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(0);
         let block = [
             Instruction::MovImm {
                 dst: Reg::X(0),
@@ -334,7 +447,7 @@ mod tests {
             Instruction::Ret,
         ];
 
-        execute_block(&block, &mut regs).expect("exec ok");
+        execute_block(&block, &mut regs, &mut mem).expect("exec ok");
         assert_eq!(regs.get(Reg::X(1)), i64::MIN);
         let flags = regs.flags();
         assert!(flags.n);
@@ -344,6 +457,7 @@ mod tests {
     #[test]
     fn lsr_sets_carry_from_bit0() {
         let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(0);
         let block = [
             Instruction::MovImm {
                 dst: Reg::X(0),
@@ -357,10 +471,63 @@ mod tests {
             Instruction::Ret,
         ];
 
-        execute_block(&block, &mut regs).expect("exec ok");
+        execute_block(&block, &mut regs, &mut mem).expect("exec ok");
         assert_eq!(regs.get(Reg::X(1)), 1);
         let flags = regs.flags();
         assert!(!flags.z);
         assert!(flags.c);
+    }
+
+    #[test]
+    fn load_store_with_alignment() {
+        let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(16);
+        let block = [
+            Instruction::MovImm {
+                dst: Reg::X(0),
+                imm: 8,
+            },
+            Instruction::MovImm {
+                dst: Reg::X(1),
+                imm: 0xAABBCCDD,
+            },
+            Instruction::StrImm {
+                src: Reg::X(1),
+                base: Reg::X(0),
+                offset: 0,
+                size: MemSize::Word,
+            },
+            Instruction::LdrImm {
+                dst: Reg::X(2),
+                base: Reg::X(0),
+                offset: 0,
+                size: MemSize::Word,
+            },
+            Instruction::Ret,
+        ];
+
+        execute_block(&block, &mut regs, &mut mem).expect("exec ok");
+        assert_eq!(regs.get(Reg::X(2)), 0xAABBCCDD);
+    }
+
+    #[test]
+    fn load_unaligned_is_error() {
+        let mut regs = RegisterFile::default();
+        let mut mem = Memory::new(16);
+        let block = [
+            Instruction::MovImm {
+                dst: Reg::X(0),
+                imm: 3,
+            },
+            Instruction::LdrImm {
+                dst: Reg::X(1),
+                base: Reg::X(0),
+                offset: 0,
+                size: MemSize::Word,
+            },
+        ];
+
+        let err = execute_block(&block, &mut regs, &mut mem).unwrap_err();
+        assert!(matches!(err, ExecError::Unaligned { .. }));
     }
 }

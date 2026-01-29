@@ -7,6 +7,7 @@ Draft v0.4
 - Added a minimal ISA execution module for early instruction semantics tests.
 - Expanded semantics coverage with arithmetic and NZCV flag updates.
 - Added shift and rotate immediate semantics with carry updates.
+- Added load/store stubs with alignment checks for memory access validation.
 
 ## Purpose
 Define instruction coverage and semantics for the Switch CPU ISA lifting layer.
