@@ -1,6 +1,6 @@
 { pkgs, ... }:
 {
-  devenv.root = builtins.toString ./.;
+  devenv.root = "${./.}";
 
   packages = [
     pkgs.cargo
