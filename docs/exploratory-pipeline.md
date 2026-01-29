@@ -28,6 +28,7 @@ svc_fatal = "panic"
 - A self-contained Rust crate in the output directory.
 - The crate depends on `recomp-runtime` via a relative path.
 - The emitted `main.rs` invokes the entry function and records the ABI version.
+- A `manifest.json` file with input hashes and generated file list.
 
 ## Next Steps
 - Add a real input parser for Switch binaries.

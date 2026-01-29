@@ -1,7 +1,10 @@
 # SPEC-050: CPU ISA Lifting and Semantics
 
 ## Status
-Draft v0.2
+Draft v0.3
+
+## Rationale
+- Added a minimal ISA execution module for early instruction semantics tests.
 
 ## Purpose
 Define instruction coverage and semantics for the Switch CPU ISA lifting layer.

@@ -1,8 +1,12 @@
 [workspace]
 members = [
   "crates/recomp-cli",
+  "crates/recomp-gfx",
+  "crates/recomp-isa",
   "crates/recomp-pipeline",
   "crates/recomp-runtime",
+  "crates/recomp-services",
+  "crates/recomp-timing",
 ]
 resolver = "2"
 

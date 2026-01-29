@@ -67,10 +67,14 @@ fn pipeline_emits_project() {
 
     let cargo_toml = out_dir.join("Cargo.toml");
     let main_rs = out_dir.join("src/main.rs");
+    let manifest = out_dir.join("manifest.json");
     assert!(cargo_toml.exists(), "Cargo.toml emitted");
     assert!(main_rs.exists(), "main.rs emitted");
+    assert!(manifest.exists(), "manifest.json emitted");
 
     let main_src = fs::read_to_string(main_rs).expect("read main.rs");
     assert!(main_src.contains("svc_log"));
-    assert_eq!(report.files_written.len(), 2);
+    let manifest_src = fs::read_to_string(manifest).expect("read manifest.json");
+    assert!(manifest_src.contains("\"module_sha256\""));
+    assert_eq!(report.files_written.len(), 3);
 }

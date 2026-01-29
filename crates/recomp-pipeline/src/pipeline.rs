@@ -1,7 +1,8 @@
 use crate::config::{StubBehavior, TitleConfig};
 use crate::input::{Function, Module, Op};
-use crate::output::emit_project;
+use crate::output::{emit_project, BuildManifest};
 use pathdiff::diff_paths;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -47,8 +48,23 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
 
     let program = translate_module(&module, &config)?;
 
+    let module_hash = sha256_hex(&module_src);
+    let config_hash = sha256_hex(&config_src);
+
     let runtime_rel = diff_paths(&runtime_path, &out_dir).unwrap_or(runtime_path.clone());
-    let files_written = emit_project(&out_dir, &runtime_rel, &program)
+    let manifest = BuildManifest {
+        title: program.title.clone(),
+        abi_version: program.abi_version.clone(),
+        module_sha256: module_hash,
+        config_sha256: config_hash,
+        generated_files: vec![
+            "Cargo.toml".to_string(),
+            "src/main.rs".to_string(),
+            "manifest.json".to_string(),
+        ],
+    };
+
+    let files_written = emit_project(&out_dir, &runtime_rel, &program, &manifest)
         .map_err(PipelineError::Emit)?;
 
     Ok(PipelineReport {
@@ -161,4 +177,11 @@ fn absolute_path(path: &Path) -> Result<PathBuf, PipelineError> {
     } else {
         Ok(std::env::current_dir()?.join(path))
     }
+}
+
+fn sha256_hex(value: &str) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(value.as_bytes());
+    let digest = hasher.finalize();
+    format!("{:x}", digest)
 }

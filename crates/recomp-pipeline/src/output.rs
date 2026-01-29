@@ -1,11 +1,22 @@
 use crate::pipeline::{ensure_dir, RustFunction, RustProgram};
+use serde::Serialize;
 use std::fs;
 use std::path::{Path, PathBuf};
+
+#[derive(Debug, Serialize)]
+pub struct BuildManifest {
+    pub title: String,
+    pub abi_version: String,
+    pub module_sha256: String,
+    pub config_sha256: String,
+    pub generated_files: Vec<String>,
+}
 
 pub fn emit_project(
     out_dir: &Path,
     runtime_rel: &Path,
     program: &RustProgram,
+    manifest: &BuildManifest,
 ) -> Result<Vec<PathBuf>, String> {
     ensure_dir(out_dir).map_err(|err| err.to_string())?;
 
@@ -21,6 +32,12 @@ pub fn emit_project(
     let main_path = src_dir.join("main.rs");
     fs::write(&main_path, main_rs).map_err(|err| err.to_string())?;
     written.push(main_path);
+
+    let manifest_path = out_dir.join("manifest.json");
+    let manifest_json =
+        serde_json::to_string_pretty(manifest).map_err(|err| err.to_string())?;
+    fs::write(&manifest_path, manifest_json).map_err(|err| err.to_string())?;
+    written.push(manifest_path);
 
     Ok(written)
 }

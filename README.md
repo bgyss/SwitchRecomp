@@ -27,6 +27,7 @@ This repository contains a draft specification set for a Nintendo Switch static 
 - 2026-01-29: v0.2 pass started; added hardware baseline details, input/binary format research, OS/services surface notes, and timing/interrupts refinements across specs.
 - 2026-01-29: Added `SPEC-TEMPLATE.md` and expanded `RESEARCH.md` with seed sources.
 - 2026-01-29: Added exploratory pipeline/runtime crates, a minimal sample, and dev environment scaffolding.
+- 2026-01-29: Added ISA, services, graphics, and timing scaffolds plus build manifest output.
 
 ## Status
 Early draft. Expect frequent revisions as research progresses.

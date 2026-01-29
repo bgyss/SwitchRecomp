@@ -36,3 +36,9 @@ cargo run -p recomp-cli -- \
 ```
 cargo build --manifest-path out/minimal/Cargo.toml
 ```
+
+- Inspect the manifest:
+
+```
+cat out/minimal/manifest.json
+```

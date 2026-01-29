@@ -17,3 +17,5 @@ Then build the emitted project:
 ```
 cargo build --manifest-path out/minimal/Cargo.toml
 ```
+
+The output directory also includes `manifest.json` with hashes for the input module/config.

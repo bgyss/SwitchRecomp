@@ -1,10 +1,11 @@
 # SPEC-040: Runtime and ABI Contract
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Rationale
 - Added a minimal runtime ABI stub crate with versioning for early linkage tests.
+- Added runtime-facing scaffolds for services, timing, and graphics.
 
 ## Purpose
 Define the runtime library and ABI contract between recompiled code and host platform.

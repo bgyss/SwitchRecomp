@@ -2,6 +2,13 @@ use std::fmt;
 
 pub const ABI_VERSION: &str = "0.1.0";
 
+pub use recomp_gfx::{CommandStream, GraphicsBackend, GraphicsError, StubBackend};
+pub use recomp_services::{
+    stub_handler, ServiceAccessControl, ServiceCall, ServiceError, ServiceLogger, ServiceRegistry,
+    StubBehavior,
+};
+pub use recomp_timing::Scheduler;
+
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
     #[error("stubbed syscall: {name}")]

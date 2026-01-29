@@ -5,4 +5,7 @@ edition = "2021"
 license = "MIT OR Apache-2.0"
 
 [dependencies]
+recomp-gfx = { path = "../recomp-gfx" }
+recomp-services = { path = "../recomp-services" }
+recomp-timing = { path = "../recomp-timing" }
 thiserror = "1.0"

@@ -1,10 +1,11 @@
 # SPEC-030: Static Recompilation Pipeline
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Rationale
 - Added an exploratory pipeline scaffold and config schema to validate the end-to-end shape.
+- Added deterministic build manifest emission with input hashes.
 
 ## Purpose
 Define the end-to-end pipeline for static recompilation from input binaries to native output.

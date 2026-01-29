@@ -1,10 +1,11 @@
 # SPEC-090: Build, Packaging, and Distribution
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Rationale
 - Added a Nix + devenv development scaffold and initial build outputs for exploratory work.
+- Added a deterministic build manifest with input hashes for reproducible packaging.
 
 ## Purpose
 Define build outputs, packaging, and distribution policy.

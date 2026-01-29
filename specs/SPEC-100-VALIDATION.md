@@ -1,10 +1,11 @@
 # SPEC-100: Validation and Acceptance
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Rationale
 - Added a starter test harness for config parsing and pipeline emission.
+- Added starter unit tests for ISA, services, graphics, and scheduling scaffolds.
 
 ## Purpose
 Define validation, testing, and acceptance criteria for the project.
