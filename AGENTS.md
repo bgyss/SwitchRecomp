@@ -14,7 +14,7 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 - `README.md` is the project overview and contribution entry point.
 
 ## Build, Test, and Development Commands
-- Dev shell: `devenv shell`
+- Dev shell: `nix develop --impure`
 - Run all tests: `cargo test`
 - Run the sample pipeline:
   - `cargo run -p recomp-cli -- --module samples/minimal/module.json --config samples/minimal/title.toml --out-dir out/minimal`

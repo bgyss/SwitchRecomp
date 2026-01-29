@@ -4,10 +4,10 @@ This project now includes an exploratory Rust workspace and uses Nix + devenv fo
 
 ## Nix + devenv
 - Install `nix` and `devenv`.
-- Enter the shell from the repo root:
+- This repo uses devenv's flake integration. Enter the shell from the repo root:
 
 ```
-devenv shell
+nix develop --impure
 ```
 
 If you use direnv, run:
