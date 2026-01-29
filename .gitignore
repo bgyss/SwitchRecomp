@@ -1,3 +1,6 @@
 /target/
 /out/
 /.direnv/
+/.devenv/
+/.devenv.flake.nix
+/devenv.lock

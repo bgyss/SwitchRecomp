@@ -1,7 +1,5 @@
 { pkgs, ... }:
 {
-  devenv.root = "${./.}";
-
   packages = [
     pkgs.cargo
     pkgs.clippy
