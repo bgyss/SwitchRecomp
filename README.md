@@ -23,6 +23,16 @@ This repository contains a draft specification set for a Nintendo Switch static 
 - The dev environment is managed with Nix + devenv.
 - See `docs/DEVELOPMENT.md` for commands and sample usage.
 
+## Back Pressure Hooks
+These hooks add fast, consistent feedback to keep the repo autonomous and reduce review churn. Hooks are defined in `.pre-commit-config.yaml` and can be run with `prek` (preferred) or `pre-commit`.
+
+- Install hooks: `prek install` or `pre-commit install`.
+- Run on demand: `prek run --all-files` or `pre-commit run --all-files`.
+
+Configured hooks:
+- Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
+- Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
+
 ## Specs Update Log
 - 2026-01-29: v0.2 pass started; added hardware baseline details, input/binary format research, OS/services surface notes, and timing/interrupts refinements across specs.
 - 2026-01-29: Added `SPEC-TEMPLATE.md` and expanded `RESEARCH.md` with seed sources.

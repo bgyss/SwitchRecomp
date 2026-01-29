@@ -32,6 +32,15 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 - Test files live under `crates/*/tests/` or inline in modules.
 - Always run the full suite after changes unless the user explicitly says not to.
 
+## Back Pressure Hooks
+Pre-commit hooks provide fast feedback; `prek` is a drop-in replacement that reads the same `.pre-commit-config.yaml`.
+
+- Install hooks: `prek install` or `pre-commit install`.
+- Run on demand: `prek run --all-files` or `pre-commit run --all-files`.
+- Configured hooks:
+  - Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
+  - Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
+
 ## Commit & Pull Request Guidelines
 No established commit conventions are present yet. Until standards are set:
 - Use clear, imperative commit messages (e.g., "Add SPEC-070 OS services draft").
