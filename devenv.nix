@@ -3,6 +3,8 @@
   packages = [
     pkgs.cargo
     pkgs.clippy
+    pkgs.pre-commit
+    pkgs.prek
     pkgs.ripgrep
     pkgs.rustc
     pkgs.rustfmt
