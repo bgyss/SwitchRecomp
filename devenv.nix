@@ -8,6 +8,8 @@
     pkgs.rustfmt
   ];
 
+  cachix.enable = false;
+
   env.RUST_BACKTRACE = "1";
 
   enterShell = ''
