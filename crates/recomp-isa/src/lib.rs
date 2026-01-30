@@ -121,7 +121,7 @@ impl Memory {
 
     pub fn read(&self, address: usize, size: MemSize) -> Result<u64, ExecError> {
         let width = size.bytes();
-        if address % width != 0 {
+        if !address.is_multiple_of(width) {
             return Err(ExecError::Unaligned {
                 address,
                 size: width,
@@ -142,7 +142,7 @@ impl Memory {
 
     pub fn write(&mut self, address: usize, size: MemSize, value: u64) -> Result<(), ExecError> {
         let width = size.bytes();
-        if address % width != 0 {
+        if !address.is_multiple_of(width) {
             return Err(ExecError::Unaligned {
                 address,
                 size: width,

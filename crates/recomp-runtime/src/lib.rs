@@ -92,6 +92,12 @@ impl Runtime {
     }
 }
 
+impl Default for Runtime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct ArgsDisplay<'a>(&'a [i64]);
 
 impl fmt::Display for ArgsDisplay<'_> {

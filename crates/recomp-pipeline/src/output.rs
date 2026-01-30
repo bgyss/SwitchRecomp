@@ -49,7 +49,7 @@ pub fn emit_project(
     generated_files.push(GeneratedFile {
         path: "Cargo.toml".to_string(),
         sha256: sha256_bytes(cargo_toml.as_bytes()),
-        size: cargo_toml.as_bytes().len() as u64,
+        size: cargo_toml.len() as u64,
     });
 
     let src_dir = out_dir.join("src");
@@ -61,7 +61,7 @@ pub fn emit_project(
     generated_files.push(GeneratedFile {
         path: "src/main.rs".to_string(),
         sha256: sha256_bytes(main_rs.as_bytes()),
-        size: main_rs.as_bytes().len() as u64,
+        size: main_rs.len() as u64,
     });
 
     let manifest_path = out_dir.join("manifest.json");
@@ -110,7 +110,7 @@ fn emit_main_rs(program: &RustProgram) -> String {
 
     for function in &program.functions {
         out.push_str(&emit_function(function));
-        out.push_str("\n");
+        out.push('\n');
     }
 
     out
@@ -126,12 +126,12 @@ fn emit_function(function: &RustFunction) -> String {
         out.push_str(&format!("    let mut {reg}: i64 = 0;\n"));
     }
     if !function.regs.is_empty() {
-        out.push_str("\n");
+        out.push('\n');
     }
     for line in &function.lines {
         out.push_str("    ");
         out.push_str(line);
-        out.push_str("\n");
+        out.push('\n');
     }
     if function
         .lines
