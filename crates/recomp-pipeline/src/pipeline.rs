@@ -1,6 +1,7 @@
-use crate::config::{StubBehavior, TitleConfig};
+use crate::config::{PerformanceMode, StubBehavior, TitleConfig};
 use crate::input::{Function, Module, Op};
-use crate::output::{emit_project, BuildManifest};
+use crate::output::{emit_project, BuildManifest, GeneratedFile, InputSummary};
+use crate::provenance::{ProvenanceManifest, ValidatedInput};
 use pathdiff::diff_paths;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -10,6 +11,7 @@ use std::path::{Path, PathBuf};
 pub struct PipelineOptions {
     pub module_path: PathBuf,
     pub config_path: PathBuf,
+    pub provenance_path: PathBuf,
     pub out_dir: PathBuf,
     pub runtime_path: PathBuf,
 }
@@ -18,6 +20,7 @@ pub struct PipelineOptions {
 pub struct PipelineReport {
     pub out_dir: PathBuf,
     pub files_written: Vec<PathBuf>,
+    pub detected_inputs: Vec<ValidatedInput>,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -28,6 +31,8 @@ pub enum PipelineError {
     Config(String),
     #[error("module error: {0}")]
     Module(String),
+    #[error("provenance error: {0}")]
+    Provenance(String),
     #[error("emit error: {0}")]
     Emit(String),
 }
@@ -35,6 +40,7 @@ pub enum PipelineError {
 pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, PipelineError> {
     let module_path = absolute_path(&options.module_path)?;
     let config_path = absolute_path(&options.config_path)?;
+    let provenance_path = absolute_path(&options.provenance_path)?;
     let out_dir = absolute_path(&options.out_dir)?;
     let runtime_path = absolute_path(&options.runtime_path)?;
 
@@ -46,30 +52,58 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
     let config_src = fs::read_to_string(&config_path)?;
     let config = TitleConfig::parse(&config_src).map_err(PipelineError::Config)?;
 
+    let provenance_src = fs::read_to_string(&provenance_path)?;
+    let provenance =
+        ProvenanceManifest::parse(&provenance_src).map_err(PipelineError::Provenance)?;
+    let provenance_validation = provenance
+        .validate(&provenance_path, &provenance_src)
+        .map_err(PipelineError::Provenance)?;
+    if !provenance_validation
+        .inputs
+        .iter()
+        .any(|input| input.path == module_path)
+    {
+        return Err(PipelineError::Provenance(format!(
+            "module input is not listed in provenance metadata: {}",
+            module_path.display()
+        )));
+    }
+
     let program = translate_module(&module, &config)?;
 
     let module_hash = sha256_hex(&module_src);
     let config_hash = sha256_hex(&config_src);
+    let provenance_hash = provenance_validation.manifest_sha256.clone();
 
     let runtime_rel = diff_paths(&runtime_path, &out_dir).unwrap_or(runtime_path.clone());
+    let inputs = provenance_validation
+        .inputs
+        .iter()
+        .map(|input| InputSummary {
+            path: input.path.clone(),
+            format: input.format.as_str().to_string(),
+            sha256: input.sha256.clone(),
+            size: input.size,
+            role: input.role.clone(),
+        })
+        .collect::<Vec<_>>();
     let manifest = BuildManifest {
         title: program.title.clone(),
         abi_version: program.abi_version.clone(),
         module_sha256: module_hash,
         config_sha256: config_hash,
-        generated_files: vec![
-            "Cargo.toml".to_string(),
-            "src/main.rs".to_string(),
-            "manifest.json".to_string(),
-        ],
+        provenance_sha256: provenance_hash,
+        inputs,
+        generated_files: Vec::<GeneratedFile>::new(),
     };
 
-    let files_written = emit_project(&out_dir, &runtime_rel, &program, &manifest)
-        .map_err(PipelineError::Emit)?;
+    let (files_written, _manifest) =
+        emit_project(&out_dir, &runtime_rel, &program, &manifest).map_err(PipelineError::Emit)?;
 
     Ok(PipelineReport {
         out_dir,
         files_written,
+        detected_inputs: provenance_validation.inputs,
     })
 }
 
@@ -85,10 +119,14 @@ fn translate_module(module: &Module, config: &TitleConfig) -> Result<RustProgram
         abi_version: config.abi_version.clone(),
         entry,
         functions,
+        performance_mode: config.runtime.performance_mode,
     })
 }
 
-fn translate_function(function: &Function, config: &TitleConfig) -> Result<RustFunction, PipelineError> {
+fn translate_function(
+    function: &Function,
+    config: &TitleConfig,
+) -> Result<RustFunction, PipelineError> {
     let mut regs = Vec::new();
     let mut lines = Vec::new();
 
@@ -108,7 +146,11 @@ fn translate_function(function: &Function, config: &TitleConfig) -> Result<RustF
                 for arg in args {
                     track_reg(&mut regs, arg);
                 }
-                let behavior = config.stubs.get(name).copied().unwrap_or(StubBehavior::Panic);
+                let behavior = config
+                    .stubs
+                    .get(name)
+                    .copied()
+                    .unwrap_or(StubBehavior::Panic);
                 let call = render_syscall(name, behavior, args);
                 lines.push(call);
             }
@@ -159,6 +201,7 @@ pub struct RustProgram {
     pub abi_version: String,
     pub entry: String,
     pub functions: Vec<RustFunction>,
+    pub performance_mode: PerformanceMode,
 }
 
 impl RustProgram {

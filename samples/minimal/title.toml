@@ -2,5 +2,8 @@ title = "Minimal Sample"
 entry = "entry"
 abi_version = "0.1.0"
 
+[runtime]
+performance_mode = "handheld"
+
 [stubs]
 svc_log = "log"

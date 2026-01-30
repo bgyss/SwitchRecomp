@@ -15,6 +15,7 @@ This document captures the initial exploratory pipeline that mirrors proven stat
 ## Inputs
 - `module.json` describes a module, functions, and operations.
 - `title.toml` provides the title name, entry function, ABI version, and stub map.
+- `provenance.toml` records lawful input provenance and format metadata.
 
 Example stub map:
 ```
@@ -24,11 +25,17 @@ svc_sleep = "noop"
 svc_fatal = "panic"
 ```
 
+Example runtime config:
+```
+[runtime]
+performance_mode = "handheld"
+```
+
 ## Outputs
 - A self-contained Rust crate in the output directory.
 - The crate depends on `recomp-runtime` via a relative path.
 - The emitted `main.rs` invokes the entry function and records the ABI version.
-- A `manifest.json` file with input hashes and generated file list.
+- A `manifest.json` file with input hashes, provenance hash, and generated file list.
 
 ## Next Steps
 - Add a real input parser for Switch binaries.

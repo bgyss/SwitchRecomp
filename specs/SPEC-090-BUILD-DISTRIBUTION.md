@@ -1,7 +1,7 @@
 # SPEC-090: Build, Packaging, and Distribution
 
 ## Status
-Draft v0.4
+Draft v0.5
 
 ## Rationale
 - Added a Nix + devenv development scaffold and initial build outputs for exploratory work.
@@ -27,6 +27,24 @@ Define build outputs, packaging, and distribution policy.
 - A bundle layout that separates code from user-supplied assets.
 - A deterministic build manifest and checksums.
 
+### Bundle Layout (v1)
+```
+bundle/
+  code/
+    Cargo.toml
+    src/
+    manifest.json
+  assets/
+    README.txt
+  metadata/
+    provenance.toml
+    bundle-manifest.json
+```
+
+### Bundle Manifest
+- `bundle-manifest.json` records checksum + size for every file in the bundle.
+- The manifest is reproducible for identical inputs.
+
 ## Distribution Policy
 - Open source code and tooling only.
 - Clear instructions for user-supplied assets.
@@ -34,6 +52,10 @@ Define build outputs, packaging, and distribution policy.
 ## Deliverables
 - A packaging spec and reference implementation.
 - A release checklist that includes legal compliance checks.
+
+## Supporting Docs
+- `docs/packaging.md`
+- `docs/RELEASE-CHECKLIST.md`
 
 ## Open Questions
 - What is the initial host platform support matrix?

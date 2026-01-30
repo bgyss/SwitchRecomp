@@ -55,10 +55,16 @@ pub enum StubBehavior {
     Panic,
 }
 
-pub fn stub_handler(behavior: StubBehavior) -> impl Fn(&ServiceCall) -> ServiceResult<()> + Send + Sync {
+pub fn stub_handler(
+    behavior: StubBehavior,
+) -> impl Fn(&ServiceCall) -> ServiceResult<()> + Send + Sync {
     move |call: &ServiceCall| match behavior {
         StubBehavior::Log => {
-            println!("[recomp-services] stub {service} args={:?}", call.args, service = call.service);
+            println!(
+                "[recomp-services] stub {service} args={:?}",
+                call.args,
+                service = call.service
+            );
             Ok(())
         }
         StubBehavior::Noop => Ok(()),
@@ -116,7 +122,11 @@ pub struct ServiceDispatcher {
 }
 
 impl ServiceDispatcher {
-    pub fn new(registry: ServiceRegistry, access: ServiceAccessControl, logger: ServiceLogger) -> Self {
+    pub fn new(
+        registry: ServiceRegistry,
+        access: ServiceAccessControl,
+        logger: ServiceLogger,
+    ) -> Self {
         Self {
             registry,
             access,

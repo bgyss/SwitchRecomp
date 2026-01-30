@@ -22,6 +22,35 @@ impl FromStr for StubBehavior {
     }
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PerformanceMode {
+    Handheld,
+    Docked,
+}
+
+impl FromStr for PerformanceMode {
+    type Err = String;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        match value {
+            "handheld" => Ok(PerformanceMode::Handheld),
+            "docked" => Ok(PerformanceMode::Docked),
+            other => Err(format!("unknown performance mode: {other}")),
+        }
+    }
+}
+
+#[derive(Debug, Deserialize)]
+struct RawRuntimeConfig {
+    #[serde(default)]
+    performance_mode: Option<String>,
+}
+
+#[derive(Debug)]
+pub struct RuntimeConfig {
+    pub performance_mode: PerformanceMode,
+}
+
 #[derive(Debug, Deserialize)]
 struct RawTitleConfig {
     title: String,
@@ -29,6 +58,8 @@ struct RawTitleConfig {
     abi_version: String,
     #[serde(default)]
     stubs: BTreeMap<String, String>,
+    #[serde(default)]
+    runtime: Option<RawRuntimeConfig>,
 }
 
 #[derive(Debug)]
@@ -37,22 +68,29 @@ pub struct TitleConfig {
     pub entry: String,
     pub abi_version: String,
     pub stubs: BTreeMap<String, StubBehavior>,
+    pub runtime: RuntimeConfig,
 }
 
 impl TitleConfig {
     pub fn parse(toml_src: &str) -> Result<Self, String> {
-        let raw: RawTitleConfig = toml::from_str(toml_src)
-            .map_err(|err| format!("invalid config: {err}"))?;
+        let raw: RawTitleConfig =
+            toml::from_str(toml_src).map_err(|err| format!("invalid config: {err}"))?;
         let mut stubs = BTreeMap::new();
         for (name, behavior) in raw.stubs {
             let parsed = StubBehavior::from_str(&behavior)?;
             stubs.insert(name, parsed);
         }
+        let runtime_mode = raw
+            .runtime
+            .and_then(|runtime| runtime.performance_mode)
+            .unwrap_or_else(|| "handheld".to_string());
+        let performance_mode = PerformanceMode::from_str(&runtime_mode)?;
         Ok(TitleConfig {
             title: raw.title,
             entry: raw.entry,
             abi_version: raw.abi_version,
             stubs,
+            runtime: RuntimeConfig { performance_mode },
         })
     }
 }

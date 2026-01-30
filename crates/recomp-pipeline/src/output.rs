@@ -1,15 +1,35 @@
 use crate::pipeline::{ensure_dir, RustFunction, RustProgram};
 use serde::Serialize;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Clone)]
 pub struct BuildManifest {
     pub title: String,
     pub abi_version: String,
     pub module_sha256: String,
     pub config_sha256: String,
-    pub generated_files: Vec<String>,
+    pub provenance_sha256: String,
+    pub inputs: Vec<InputSummary>,
+    pub generated_files: Vec<GeneratedFile>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct InputSummary {
+    pub path: PathBuf,
+    pub format: String,
+    pub sha256: String,
+    pub size: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub role: Option<String>,
+}
+
+#[derive(Debug, Serialize, Clone)]
+pub struct GeneratedFile {
+    pub path: String,
+    pub sha256: String,
+    pub size: u64,
 }
 
 pub fn emit_project(
@@ -17,29 +37,42 @@ pub fn emit_project(
     runtime_rel: &Path,
     program: &RustProgram,
     manifest: &BuildManifest,
-) -> Result<Vec<PathBuf>, String> {
+) -> Result<(Vec<PathBuf>, BuildManifest), String> {
     ensure_dir(out_dir).map_err(|err| err.to_string())?;
 
     let mut written = Vec::new();
+    let mut generated_files = Vec::new();
     let cargo_toml = emit_cargo_toml(program, runtime_rel);
     let cargo_path = out_dir.join("Cargo.toml");
-    fs::write(&cargo_path, cargo_toml).map_err(|err| err.to_string())?;
+    fs::write(&cargo_path, &cargo_toml).map_err(|err| err.to_string())?;
     written.push(cargo_path);
+    generated_files.push(GeneratedFile {
+        path: "Cargo.toml".to_string(),
+        sha256: sha256_bytes(cargo_toml.as_bytes()),
+        size: cargo_toml.as_bytes().len() as u64,
+    });
 
     let src_dir = out_dir.join("src");
     ensure_dir(&src_dir).map_err(|err| err.to_string())?;
     let main_rs = emit_main_rs(program);
     let main_path = src_dir.join("main.rs");
-    fs::write(&main_path, main_rs).map_err(|err| err.to_string())?;
+    fs::write(&main_path, &main_rs).map_err(|err| err.to_string())?;
     written.push(main_path);
+    generated_files.push(GeneratedFile {
+        path: "src/main.rs".to_string(),
+        sha256: sha256_bytes(main_rs.as_bytes()),
+        size: main_rs.as_bytes().len() as u64,
+    });
 
     let manifest_path = out_dir.join("manifest.json");
+    let mut updated_manifest = manifest.clone();
+    updated_manifest.generated_files = generated_files;
     let manifest_json =
-        serde_json::to_string_pretty(manifest).map_err(|err| err.to_string())?;
+        serde_json::to_string_pretty(&updated_manifest).map_err(|err| err.to_string())?;
     fs::write(&manifest_path, manifest_json).map_err(|err| err.to_string())?;
     written.push(manifest_path);
 
-    Ok(written)
+    Ok((written, updated_manifest))
 }
 
 fn emit_cargo_toml(program: &RustProgram, runtime_rel: &Path) -> String {
@@ -62,10 +95,18 @@ fn emit_main_rs(program: &RustProgram) -> String {
         "    println!(\"abi version: {}\");\n",
         program.abi_version
     ));
-    out.push_str("    recomp_runtime::init();\n");
+    out.push_str("    let runtime_config = recomp_runtime::RuntimeConfig::new(");
+    out.push_str(match program.performance_mode {
+        crate::config::PerformanceMode::Handheld => "recomp_runtime::PerformanceMode::Handheld",
+        crate::config::PerformanceMode::Docked => "recomp_runtime::PerformanceMode::Docked",
+    });
+    out.push_str(");\n");
+    out.push_str("    recomp_runtime::init(&runtime_config);\n");
     out.push_str(&format!("    {}()?;\n", program.entry));
-    out.push_str("    Ok(())\n}
-\n");
+    out.push_str(
+        "    Ok(())\n}
+\n",
+    );
 
     for function in &program.functions {
         out.push_str(&emit_function(function));
@@ -112,4 +153,11 @@ fn sanitize_name(name: &str) -> String {
             _ => '-',
         })
         .collect()
+}
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let digest = hasher.finalize();
+    format!("{:x}", digest)
 }
