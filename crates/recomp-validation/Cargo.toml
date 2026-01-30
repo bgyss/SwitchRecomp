@@ -1,0 +1,16 @@
+[package]
+name = "recomp-validation"
+version = "0.1.0"
+edition = "2021"
+license = "MIT OR Apache-2.0"
+
+[dependencies]
+recomp-pipeline = { path = "../recomp-pipeline" }
+recomp-runtime = { path = "../recomp-runtime" }
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+tempfile = "3.10"
+
+[dependencies.clap]
+version = "4.5"
+features = ["derive"]
