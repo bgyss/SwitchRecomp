@@ -1,7 +1,7 @@
 # SPEC-000: Project Charter and Ethics
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Purpose
 Define the mission, scope, ethics, and constraints for the Switch static recompilation preservation project.
@@ -25,6 +25,10 @@ Define the mission, scope, ethics, and constraints for the Switch static recompi
 - Document an explicit policy for legal acquisition and user responsibility.
 - Avoid hosting or linking to proprietary content.
 - Require provenance metadata for input artifacts.
+
+## Policy Document
+- `docs/LEGAL-POLICY.md` defines legal-use, asset-separation, and prohibited content rules.
+- Provenance enforcement is documented as a tooling guardrail tied to SPEC-020.
 
 ## Deliverables
 - A recompiler toolchain.

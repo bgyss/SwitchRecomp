@@ -3,13 +3,13 @@
 This roadmap is organized by phases with explicit exit criteria. Dates are intentionally omitted until research milestones are validated.
 
 ## Phase 0: Discovery and Architecture
-- Lock the project charter and legal policy.
+- Lock the project charter and legal policy (`docs/LEGAL-POLICY.md`).
 - Identify a minimal test title and input format.
 - Choose the internal representation for instruction lifting.
 - Define the runtime ABI shape and service boundaries.
 
 Exit criteria:
-- SPEC-000 and SPEC-030 approved.
+- SPEC-000, SPEC-020, and SPEC-030 approved.
 - A minimal parser can load a test binary and list functions.
 
 ## Phase 1: CPU Recompilation MVP

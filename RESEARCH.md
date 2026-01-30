@@ -60,6 +60,7 @@ Needed research:
 ### 7) Legal and Preservation Policy
 - Define acceptable inputs, distributions, and legal compliance expectations.
 - Ensure documentation is consistent with preservation goals.
+- Follow and update `docs/LEGAL-POLICY.md` as policy decisions are finalized.
 
 Needed research:
 - Jurisdiction-specific rules affecting preservation.
