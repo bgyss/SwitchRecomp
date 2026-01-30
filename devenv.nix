@@ -3,9 +3,12 @@
   packages = [
     pkgs.cargo
     pkgs.clippy
+    pkgs.prek
     pkgs.ripgrep
     pkgs.rustc
     pkgs.rustfmt
+  ] ++ pkgs.lib.optionals (!pkgs.stdenv.isDarwin) [
+    pkgs.pre-commit
   ];
 
   cachix.enable = false;

@@ -4,16 +4,43 @@ This project now includes an exploratory Rust workspace and uses Nix + devenv fo
 
 ## Nix + devenv
 - Install `nix` and `devenv`.
-- Enter the shell from the repo root:
+- This repo uses devenv's flake integration. Enter the shell from the repo root:
 
 ```
-devenv shell
+nix develop --impure
 ```
 
 If you use direnv, run:
 ```
 direnv allow
 ```
+
+If `devenv.nix` changes, run `direnv reload` so nix-direnv refreshes the cached shell.
+
+## Back Pressure Hooks (prek + pre-commit)
+Back pressure keeps feedback close to the change. This repo uses pre-commit hooks for fast checks, and `prek` is a drop-in replacement that reads the same `.pre-commit-config.yaml`.
+
+Install hooks (config sets `default_install_hook_types` to `pre-commit` + `pre-push`):
+```
+prek install
+```
+```
+pre-commit install
+```
+
+Run hooks on demand:
+```
+prek run --all-files
+```
+```
+pre-commit run --all-files
+```
+
+macOS note: the Nix dev shell ships `prek` only (to avoid Swift/.NET builds); install `pre-commit` separately if you need it.
+
+Configured hooks:
+- Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
+- Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
 
 ## Workspace Commands
 - Run all tests:

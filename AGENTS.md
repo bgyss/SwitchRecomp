@@ -14,7 +14,7 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 - `README.md` is the project overview and contribution entry point.
 
 ## Build, Test, and Development Commands
-- Dev shell: `devenv shell`
+- Dev shell: `nix develop --impure`
 - Run all tests: `cargo test`
 - Run the sample pipeline:
   - `cargo run -p recomp-cli -- --module samples/minimal/module.json --config samples/minimal/title.toml --out-dir out/minimal`
@@ -31,6 +31,16 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 - Use `cargo test` for Rust workspace tests.
 - Test files live under `crates/*/tests/` or inline in modules.
 - Always run the full suite after changes unless the user explicitly says not to.
+
+## Back Pressure Hooks
+Pre-commit hooks provide fast feedback; `prek` is a drop-in replacement that reads the same `.pre-commit-config.yaml`.
+
+- Install hooks: `prek install` or `pre-commit install`.
+- Run on demand: `prek run --all-files` or `pre-commit run --all-files`.
+- macOS note: the Nix dev shell ships `prek` only (to avoid Swift/.NET builds); install `pre-commit` separately if you need it.
+- Configured hooks:
+  - Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
+  - Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
 
 ## Commit & Pull Request Guidelines
 No established commit conventions are present yet. Until standards are set:

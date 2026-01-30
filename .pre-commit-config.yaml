@@ -1,0 +1,40 @@
+default_stages: [pre-commit]
+default_install_hook_types: [pre-commit, pre-push]
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-added-large-files
+      - id: detect-private-key
+      - id: check-executables-have-shebangs
+      - id: check-symlinks
+      - id: check-case-conflict
+  - repo: local
+    hooks:
+      - id: cargo-fmt
+        name: cargo fmt (check)
+        entry: cargo fmt --all -- --check
+        language: system
+        types: [rust]
+        pass_filenames: false
+      - id: cargo-clippy
+        name: cargo clippy (workspace)
+        entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+        stages: [pre-push]
+      - id: cargo-test
+        name: cargo test (workspace)
+        entry: cargo test --workspace
+        language: system
+        pass_filenames: false
+        files: \.(rs|toml)$
+        stages: [pre-push]
