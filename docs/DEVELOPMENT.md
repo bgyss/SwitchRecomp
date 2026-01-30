@@ -15,6 +15,8 @@ If you use direnv, run:
 direnv allow
 ```
 
+If `devenv.nix` changes, run `direnv reload` so nix-direnv refreshes the cached shell.
+
 ## Back Pressure Hooks (prek + pre-commit)
 Back pressure keeps feedback close to the change. This repo uses pre-commit hooks for fast checks, and `prek` is a drop-in replacement that reads the same `.pre-commit-config.yaml`.
 
