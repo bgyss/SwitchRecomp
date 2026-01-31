@@ -165,7 +165,7 @@ fn build_bundle_manifest(files: Vec<BundleFile>) -> Result<(BundleManifest, Stri
     self_entry.sha256 = self_hash;
 
     let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|err| err.to_string())?;
-    let final_size = manifest_json.as_bytes().len() as u64;
+    let final_size = manifest_json.len() as u64;
     if final_size != size {
         return Err(format!(
             "bundle manifest size mismatch: expected {size}, got {final_size}"
@@ -183,7 +183,7 @@ fn stabilize_manifest_size(manifest: &mut BundleManifest) -> Result<u64, String>
         self_entry.size = size;
         let manifest_json =
             serde_json::to_string_pretty(manifest).map_err(|err| err.to_string())?;
-        let new_size = manifest_json.as_bytes().len() as u64;
+        let new_size = manifest_json.len() as u64;
         if new_size == size {
             return Ok(size);
         }
