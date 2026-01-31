@@ -26,6 +26,7 @@ pub struct BundleReport {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BundleManifest {
     pub schema_version: String,
+    pub manifest_self_hash_basis: String,
     pub files: Vec<BundleFile>,
 }
 
@@ -155,6 +156,7 @@ fn build_bundle_manifest(files: Vec<BundleFile>) -> Result<(BundleManifest, Stri
 
     let mut manifest = BundleManifest {
         schema_version: BUNDLE_SCHEMA_VERSION.to_string(),
+        manifest_self_hash_basis: "files_self_placeholder".to_string(),
         files,
     };
 

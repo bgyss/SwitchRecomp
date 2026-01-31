@@ -72,9 +72,9 @@ Outcome
 - Ensure `manifest.json` accounts for every emitted file, including itself.
 
 Work items
-- Add a manifest self-entry in `generated_files`.
-- Add a deterministic two-pass or explicit self-hash field.
-- Add a test that validates manifest self-inclusion and checksum correctness.
+- [x] Add a manifest self-entry in `generated_files`.
+- [x] Add a deterministic two-pass or explicit self-hash field.
+- [x] Add a test that validates manifest self-inclusion and checksum correctness.
 
 Exit criteria (from SPEC-095)
 - `manifest.json` lists every generated file including itself.
@@ -86,9 +86,9 @@ Outcome
 - Ensure `bundle-manifest.json` accounts for every bundle file, including itself.
 
 Work items
-- Add a bundle manifest self-entry in the bundle file list.
-- Implement deterministic ordering for the bundle manifest entries.
-- Add a test that validates bundle manifest self-inclusion and checksum correctness.
+- [x] Add a bundle manifest self-entry in the bundle file list.
+- [x] Implement deterministic ordering for the bundle manifest entries.
+- [x] Add a test that validates bundle manifest self-inclusion and checksum correctness.
 
 Exit criteria (from SPEC-096)
 - `bundle-manifest.json` lists every bundle file including itself.

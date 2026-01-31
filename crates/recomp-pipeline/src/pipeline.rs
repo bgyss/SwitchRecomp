@@ -94,6 +94,7 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
         config_sha256: config_hash,
         provenance_sha256: provenance_hash,
         inputs,
+        manifest_self_hash_basis: String::new(),
         generated_files: Vec::<GeneratedFile>::new(),
     };
 

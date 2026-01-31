@@ -89,7 +89,22 @@ fn pipeline_emits_project() {
     let main_src = fs::read_to_string(main_rs).expect("read main.rs");
     assert!(main_src.contains("svc_log"));
     let manifest_src = fs::read_to_string(manifest).expect("read manifest.json");
-    assert!(manifest_src.contains("\"module_sha256\""));
+    let manifest_json: serde_json::Value =
+        serde_json::from_str(&manifest_src).expect("parse manifest.json");
+    assert!(manifest_json.get("module_sha256").is_some());
+    assert_eq!(
+        manifest_json
+            .get("manifest_self_hash_basis")
+            .and_then(|value| value.as_str()),
+        Some("generated_files_self_placeholder")
+    );
+    let generated_files = manifest_json
+        .get("generated_files")
+        .and_then(|value| value.as_array())
+        .expect("generated_files array");
+    assert!(generated_files.iter().any(|entry| {
+        entry.get("path").and_then(|value| value.as_str()) == Some("manifest.json")
+    }));
     assert_eq!(report.files_written.len(), 3);
     assert_eq!(report.detected_inputs.len(), 2);
 }

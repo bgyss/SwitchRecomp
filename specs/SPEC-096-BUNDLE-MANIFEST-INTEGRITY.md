@@ -20,22 +20,23 @@ The bundle manifest is generated after enumerating bundle files. As a result, it
 ## Requirements
 - `bundle-manifest.json` MUST include an entry for itself in the bundle file list.
 - The manifest MUST include every file in the bundle, including metadata files.
-- Hashes and sizes MUST match the on-disk file contents.
+- Hashes and sizes MUST match the on-disk file contents, except for the self entry which uses the declared hash basis.
 
 ## Interfaces and Data
 - Extend the bundle manifest schema or generation to record `bundle-manifest.json`.
-- Allow a two-pass write or a `manifest_self_sha256` field if needed.
+- Record a `manifest_self_hash_basis` field describing how the self hash is computed.
+- Allow a two-pass write or placeholder-hash basis for the self entry if needed.
 
 ## Deliverables
 - Updated bundle packaging logic to include the manifest entry.
 - Tests that verify bundle manifest self-inclusion.
 
 ## Open Questions
-- Should the bundle manifest include itself in the `files` list or a dedicated field?
+- None.
 
 ## Acceptance Criteria
 - `bundle-manifest.json` lists every bundle file including itself.
-- Checksums and sizes match the bundle contents.
+- Checksums and sizes match the bundle contents, except for the self entry which matches the declared hash basis.
 
 ## Risks
 - Two-pass generation can complicate reproducibility if not deterministic.
