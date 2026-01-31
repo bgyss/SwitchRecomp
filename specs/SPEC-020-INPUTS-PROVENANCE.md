@@ -1,7 +1,7 @@
 # SPEC-020: Inputs and Provenance
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Purpose
 Define input artifacts, provenance requirements, and metadata standards.
@@ -31,6 +31,44 @@ Define input artifacts, provenance requirements, and metadata standards.
 - Input hashes (e.g., SHA-256).
 - Source device and tool versions used to produce dumps.
 - Game identifiers and version metadata.
+
+## Provenance Schema (v1)
+The pipeline consumes a `provenance.toml` file with a strict schema version.
+
+Required fields:
+- `schema_version`: currently `"1"`.
+- `[title]`: `name`, `title_id`, `version`, `region`.
+- `[collection]`: `device`, `collected_at`, `tool.name`, `tool.version`.
+- `[[inputs]]`: `path`, `sha256`, `size`, `format`, `role`.
+
+Supported `format` values:
+- `nca`, `exefs`, `nso0`, `nro0`, `nrr0`, `npdm`, `lifted_json`.
+
+Example:
+```
+schema_version = "1"
+
+[title]
+name = "Example"
+title_id = "0100000000000000"
+version = "1.0.0"
+region = "US"
+
+[collection]
+device = "retail switch"
+collected_at = "2026-01-30"
+
+[collection.tool]
+name = "nxdumptool"
+version = "1.2.3"
+
+[[inputs]]
+path = "inputs/main.nso"
+format = "nso0"
+sha256 = "<sha256>"
+size = 123456
+role = "main_executable"
+```
 
 ## Encryption and Access Policy
 - The project does not distribute keys or proprietary content; users must supply any required keys or decrypted inputs legally and separately.
@@ -104,6 +142,9 @@ function detect_and_extract(path):
     if is_npdm(path):
         log_hash(path)
         return handle_npdm(path)
+    if is_lifted_json(path):
+        log_hash(path)
+        return handle_lifted_json(path)
     error(\"unsupported input format\")
 ```
 
@@ -113,9 +154,9 @@ function detect_and_extract(path):
 - A format detector with explicit extraction steps and logs.
 
 ## Open Questions
-- What input formats are supported initially?
 - How should region and version variations be tracked?
 - Should the pipeline accept program NCAs directly or require pre-extracted NSO/NPDM?
+- How should encrypted input handling be validated without embedding keys?
 
 ## Acceptance Criteria
 - A metadata schema with validation rules.

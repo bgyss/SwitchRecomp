@@ -9,6 +9,31 @@ pub use recomp_services::{
 };
 pub use recomp_timing::Scheduler;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PerformanceMode {
+    Handheld,
+    Docked,
+}
+
+#[derive(Debug, Clone)]
+pub struct RuntimeConfig {
+    pub performance_mode: PerformanceMode,
+}
+
+impl RuntimeConfig {
+    pub fn new(performance_mode: PerformanceMode) -> Self {
+        Self { performance_mode }
+    }
+}
+
+impl Default for RuntimeConfig {
+    fn default() -> Self {
+        Self {
+            performance_mode: PerformanceMode::Handheld,
+        }
+    }
+}
+
 #[derive(Debug, thiserror::Error)]
 pub enum RuntimeError {
     #[error("stubbed syscall: {name}")]
@@ -21,8 +46,11 @@ pub fn abi_version() -> &'static str {
     ABI_VERSION
 }
 
-pub fn init() {
-    // Placeholder for future runtime init work (logging, timing, etc.).
+pub fn init(config: &RuntimeConfig) {
+    println!(
+        "[recomp-runtime] init performance_mode={:?}",
+        config.performance_mode
+    );
 }
 
 pub fn syscall_log(name: &str, args: &[i64]) -> RuntimeResult<()> {
@@ -64,6 +92,12 @@ impl Runtime {
     }
 }
 
+impl Default for Runtime {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 struct ArgsDisplay<'a>(&'a [i64]);
 
 impl fmt::Display for ArgsDisplay<'_> {
@@ -101,9 +135,7 @@ mod tests {
     #[test]
     fn dispatch_service_respects_access_control() {
         let mut runtime = Runtime::new();
-        runtime
-            .services
-            .register("svc_ok", |_| Ok(()));
+        runtime.services.register("svc_ok", |_| Ok(()));
         runtime.access = ServiceAccessControl::from_allowed(vec!["svc_ok".to_string()]);
 
         let ok_call = ServiceCall {
@@ -120,5 +152,11 @@ mod tests {
         };
         let err = runtime.dispatch_service(&bad_call).unwrap_err();
         assert!(matches!(err, ServiceError::AccessDenied(_)));
+    }
+
+    #[test]
+    fn runtime_config_defaults_to_handheld() {
+        let config = RuntimeConfig::default();
+        assert!(matches!(config.performance_mode, PerformanceMode::Handheld));
     }
 }

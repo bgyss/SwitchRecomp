@@ -1,7 +1,7 @@
 # SPEC-110: Target Title Selection Criteria
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Purpose
 Define criteria for choosing an initial preservation‑safe target title for static recompilation.
@@ -20,6 +20,7 @@ Define criteria for choosing an initial preservation‑safe target title for sta
 - Title is no longer commercially available or has clear preservation value.
 - Community consensus supports preservation without enabling piracy.
 - The project can document lawful acquisition of required inputs.
+- Must comply with `docs/LEGAL-POLICY.md`.
 
 ### Technical Feasibility
 - Minimal use of online services and networking features.
@@ -47,6 +48,11 @@ Define criteria for choosing an initial preservation‑safe target title for sta
 - A short-list of 2–3 candidate titles with pros/cons.
 - A final selection memo and rationale.
 - A baseline trace plan for validation.
+
+## Supporting Docs
+- `docs/title-selection/shortlist.md`
+- `docs/title-selection/selection-memo.md`
+- `docs/title-selection/trace-plan.md`
 
 ## Open Questions
 - What constitutes “preservation‑safe” for this project’s policy?

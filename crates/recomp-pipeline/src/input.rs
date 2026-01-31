@@ -15,9 +15,19 @@ pub struct Function {
 #[derive(Debug, Deserialize)]
 #[serde(tag = "op", rename_all = "snake_case")]
 pub enum Op {
-    ConstI64 { dst: String, imm: i64 },
-    AddI64 { dst: String, lhs: String, rhs: String },
-    Syscall { name: String, args: Vec<String> },
+    ConstI64 {
+        dst: String,
+        imm: i64,
+    },
+    AddI64 {
+        dst: String,
+        lhs: String,
+        rhs: String,
+    },
+    Syscall {
+        name: String,
+        args: Vec<String>,
+    },
     Ret,
 }
 

@@ -1,7 +1,7 @@
 # SPEC-010: Target Platform Baseline
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Purpose
 Define the hardware and platform baseline for Switch static recompilation and runtime support.
@@ -26,6 +26,10 @@ Define the hardware and platform baseline for Switch static recompilation and ru
 - Switch OLED / revised units (Tegra X1+ / Mariko, 16 nm).
 - Handheld and docked clocks and thermal behaviors treated as runtime modes, not separate builds.
 
+## Baseline Profile Artifact
+- `docs/target-platform-baseline.toml` is the structured baseline profile.
+- `docs/target-platform-assumptions.md` lists testable assumptions and dependent specs.
+
 ## Platform Assumptions
 - A57 core set is sufficient; A53 cores are not used by retail titles.
 - GPU feature set is Maxwell-class and should be treated as the minimum renderer target.
@@ -33,6 +37,7 @@ Define the hardware and platform baseline for Switch static recompilation and ru
 ## Deliverables
 - A written baseline profile and compatibility matrix.
 - A list of platform assumptions required by the runtime.
+- A runtime timing-mode configuration stub (handheld vs docked).
 
 ## Open Questions
 - Which hardware behaviors must be reproduced for correctness?

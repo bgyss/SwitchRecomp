@@ -49,15 +49,22 @@ Configured hooks:
 cargo test
 ```
 
+- Run baseline validation and emit reports:
+
+```
+cargo run -p recomp-validation -- --out-dir artifacts/validation
+```
+
 - ISA unit tests live in `crates/recomp-isa` and validate arithmetic, shifts, load/store alignment, and flag updates.
 - Service dispatch, timing trace, and graphics checksum tests live in their respective crates.
 
 - Run the sample pipeline:
 
 ```
-cargo run -p recomp-cli -- \
+cargo run -p recomp-cli -- run \
   --module samples/minimal/module.json \
   --config samples/minimal/title.toml \
+  --provenance samples/minimal/provenance.toml \
   --out-dir out/minimal
 ```
 
@@ -71,4 +78,13 @@ cargo build --manifest-path out/minimal/Cargo.toml
 
 ```
 cat out/minimal/manifest.json
+```
+
+- Package a bundle (code + metadata; assets supplied separately):
+
+```
+cargo run -p recomp-cli -- package \
+  --project-dir out/minimal \
+  --provenance samples/minimal/provenance.toml \
+  --out-dir out/bundle-minimal
 ```

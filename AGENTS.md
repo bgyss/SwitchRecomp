@@ -17,7 +17,7 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 - Dev shell: `nix develop --impure`
 - Run all tests: `cargo test`
 - Run the sample pipeline:
-  - `cargo run -p recomp-cli -- --module samples/minimal/module.json --config samples/minimal/title.toml --out-dir out/minimal`
+  - `cargo run -p recomp-cli -- run --module samples/minimal/module.json --config samples/minimal/title.toml --provenance samples/minimal/provenance.toml --out-dir out/minimal`
 - Build emitted output:
   - `cargo build --manifest-path out/minimal/Cargo.toml`
 

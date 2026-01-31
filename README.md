@@ -8,6 +8,7 @@ This repository contains a draft specification set for a Nintendo Switch static 
 - `ROADMAP.md` provides phased milestones and exit criteria.
 - `RESEARCH.md` lists research directions and required sources.
 - `docs/` contains development notes.
+ - `docs/LEGAL-POLICY.md` defines legal use and asset separation rules.
 
 ## How to Use the Specs
 - Read `specs/README.md` for ordering.
@@ -18,6 +19,10 @@ This repository contains a draft specification set for a Nintendo Switch static 
 - Do not add or link to proprietary assets, keys, or copyrighted binaries.
 - Keep inputs and outputs strictly separated.
 - When updating a spec, add a short rationale and keep acceptance criteria testable.
+
+Legal and provenance policy:
+- Follow `docs/LEGAL-POLICY.md` for legal acquisition, asset separation, and prohibited content.
+- All builds require a validated `provenance.toml` describing lawful inputs.
 
 ## Development
 - The dev environment is managed with Nix + devenv.

@@ -1,0 +1,25 @@
+schema_version = "1"
+
+[cpu]
+arch = "armv8-a"
+cores = 4
+model = "cortex-a57"
+notes = "Retail Switch titles target the A57 cluster."
+
+[gpu]
+vendor = "nvidia"
+architecture = "maxwell"
+model = "gm20b"
+
+[memory]
+size_gb = 4
+type = "lpddr4/lpddr4x"
+
+[timing]
+supported_modes = ["handheld", "docked"]
+policy = "runtime-selectable"
+notes = "Clocks and thermal modes are modeled via runtime configuration."
+
+[storage]
+assets = "user_supplied"
+code = "recompiled_output"

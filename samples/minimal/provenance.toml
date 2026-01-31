@@ -1,0 +1,37 @@
+schema_version = "1"
+
+[title]
+name = "Minimal Sample"
+title_id = "0100000000000000"
+version = "1.0.0"
+region = "US"
+
+[collection]
+device = "demo"
+collected_at = "2026-01-30"
+notes = "Sample fixture for pipeline validation."
+
+[collection.tool]
+name = "manual"
+version = "1.0"
+
+[[inputs]]
+path = "module.json"
+format = "lifted_json"
+sha256 = "c4c28a7080f1e03e77baa1acdbcf0b7300935dfff24c6c692d86d12abd88e6ce"
+size = 369
+role = "lifted_module"
+
+[[inputs]]
+path = "inputs/main.nso"
+format = "nso0"
+sha256 = "b06873320cf57661c5781d7d923f262761145ccbaee6fb11f556c12c0293165c"
+size = 5
+role = "main_executable"
+
+[[inputs]]
+path = "inputs/main.npdm"
+format = "npdm"
+sha256 = "f407b7c59bef2939526b13c8a1963d3dcd7e850566127ec97f36ca13456925ee"
+size = 5
+role = "process_metadata"

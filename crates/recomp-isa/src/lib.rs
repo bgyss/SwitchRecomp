@@ -7,17 +7,61 @@ pub enum Reg {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Instruction {
-    MovImm { dst: Reg, imm: i64 },
-    AddImm { dst: Reg, src: Reg, imm: i64 },
-    Add { dst: Reg, lhs: Reg, rhs: Reg },
-    Sub { dst: Reg, lhs: Reg, rhs: Reg },
-    Cmp { lhs: Reg, rhs: Reg },
-    LslImm { dst: Reg, src: Reg, shift: u8 },
-    LsrImm { dst: Reg, src: Reg, shift: u8 },
-    AsrImm { dst: Reg, src: Reg, shift: u8 },
-    RorImm { dst: Reg, src: Reg, shift: u8 },
-    LdrImm { dst: Reg, base: Reg, offset: i64, size: MemSize },
-    StrImm { src: Reg, base: Reg, offset: i64, size: MemSize },
+    MovImm {
+        dst: Reg,
+        imm: i64,
+    },
+    AddImm {
+        dst: Reg,
+        src: Reg,
+        imm: i64,
+    },
+    Add {
+        dst: Reg,
+        lhs: Reg,
+        rhs: Reg,
+    },
+    Sub {
+        dst: Reg,
+        lhs: Reg,
+        rhs: Reg,
+    },
+    Cmp {
+        lhs: Reg,
+        rhs: Reg,
+    },
+    LslImm {
+        dst: Reg,
+        src: Reg,
+        shift: u8,
+    },
+    LsrImm {
+        dst: Reg,
+        src: Reg,
+        shift: u8,
+    },
+    AsrImm {
+        dst: Reg,
+        src: Reg,
+        shift: u8,
+    },
+    RorImm {
+        dst: Reg,
+        src: Reg,
+        shift: u8,
+    },
+    LdrImm {
+        dst: Reg,
+        base: Reg,
+        offset: i64,
+        size: MemSize,
+    },
+    StrImm {
+        src: Reg,
+        base: Reg,
+        offset: i64,
+        size: MemSize,
+    },
     Ret,
 }
 
@@ -77,11 +121,17 @@ impl Memory {
 
     pub fn read(&self, address: usize, size: MemSize) -> Result<u64, ExecError> {
         let width = size.bytes();
-        if address % width != 0 {
-            return Err(ExecError::Unaligned { address, size: width });
+        if !address.is_multiple_of(width) {
+            return Err(ExecError::Unaligned {
+                address,
+                size: width,
+            });
         }
         if address + width > self.data.len() {
-            return Err(ExecError::OutOfBounds { address, size: width });
+            return Err(ExecError::OutOfBounds {
+                address,
+                size: width,
+            });
         }
         let mut value = 0u64;
         for i in 0..width {
@@ -92,11 +142,17 @@ impl Memory {
 
     pub fn write(&mut self, address: usize, size: MemSize, value: u64) -> Result<(), ExecError> {
         let width = size.bytes();
-        if address % width != 0 {
-            return Err(ExecError::Unaligned { address, size: width });
+        if !address.is_multiple_of(width) {
+            return Err(ExecError::Unaligned {
+                address,
+                size: width,
+            });
         }
         if address + width > self.data.len() {
-            return Err(ExecError::OutOfBounds { address, size: width });
+            return Err(ExecError::OutOfBounds {
+                address,
+                size: width,
+            });
         }
         for i in 0..width {
             self.data[address + i] = ((value >> (i * 8)) & 0xFF) as u8;
