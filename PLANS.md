@@ -7,6 +7,8 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-010 Target Platform Baseline
 - SPEC-020 Inputs and Provenance
 - SPEC-090 Build, Packaging, and Distribution
+- SPEC-095 Build Manifest Integrity
+- SPEC-096 Bundle Manifest Integrity
 - SPEC-100 Validation and Acceptance
 - SPEC-110 Target Title Selection Criteria
 
@@ -64,6 +66,33 @@ Work items
 Exit criteria (from SPEC-090)
 - A build that can be reproduced from the same inputs.
 - A packaged output that runs when assets are supplied externally.
+
+## SPEC-095: Build Manifest Integrity
+Outcome
+- Ensure `manifest.json` accounts for every emitted file, including itself.
+
+Work items
+- Add a manifest self-entry in `generated_files`.
+- Add a deterministic two-pass or explicit self-hash field.
+- Add a test that validates manifest self-inclusion and checksum correctness.
+
+Exit criteria (from SPEC-095)
+- `manifest.json` lists every generated file including itself.
+- Generated file hashes and sizes match the files on disk.
+- Re-running the pipeline with identical inputs yields the same manifest.
+
+## SPEC-096: Bundle Manifest Integrity
+Outcome
+- Ensure `bundle-manifest.json` accounts for every bundle file, including itself.
+
+Work items
+- Add a bundle manifest self-entry in the bundle file list.
+- Implement deterministic ordering for the bundle manifest entries.
+- Add a test that validates bundle manifest self-inclusion and checksum correctness.
+
+Exit criteria (from SPEC-096)
+- `bundle-manifest.json` lists every bundle file including itself.
+- Checksums and sizes match the bundle contents.
 
 ## SPEC-100: Validation and Acceptance
 Outcome
