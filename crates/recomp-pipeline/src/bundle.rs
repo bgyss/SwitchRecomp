@@ -4,6 +4,9 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 const BUNDLE_SCHEMA_VERSION: &str = "1";
+const BUNDLE_MANIFEST_SELF_PATH: &str = "metadata/bundle-manifest.json";
+const BUNDLE_MANIFEST_SELF_SHA_PLACEHOLDER: &str =
+    "0000000000000000000000000000000000000000000000000000000000000000";
 
 #[derive(Debug)]
 pub struct PackageOptions {
@@ -20,13 +23,13 @@ pub struct BundleReport {
     pub files_written: Vec<PathBuf>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BundleManifest {
     pub schema_version: String,
     pub files: Vec<BundleFile>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct BundleFile {
     pub path: String,
     pub sha256: String,
@@ -61,12 +64,9 @@ pub fn package_bundle(options: PackageOptions) -> Result<BundleReport, String> {
         written.push(placeholder);
     }
 
-    let manifest = BundleManifest {
-        schema_version: BUNDLE_SCHEMA_VERSION.to_string(),
-        files: collect_bundle_files(&out_dir)?,
-    };
+    let files = collect_bundle_files(&out_dir)?;
+    let (_manifest, manifest_json) = build_bundle_manifest(files)?;
     let manifest_path = metadata_dir.join("bundle-manifest.json");
-    let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|err| err.to_string())?;
     fs::write(&manifest_path, manifest_json).map_err(|err| err.to_string())?;
     written.push(manifest_path.clone());
 
@@ -127,6 +127,77 @@ fn collect_bundle_files(root: &Path) -> Result<Vec<BundleFile>, String> {
     collect_recursive(root, root, &mut files)?;
     files.sort_by(|a, b| a.path.cmp(&b.path));
     Ok(files)
+}
+
+pub fn bundle_manifest_self_hash(manifest: &BundleManifest) -> Result<String, String> {
+    let mut normalized = manifest.clone();
+    let self_entry = find_self_entry_mut(&mut normalized)?;
+    self_entry.sha256 = BUNDLE_MANIFEST_SELF_SHA_PLACEHOLDER.to_string();
+    let manifest_json = serde_json::to_string_pretty(&normalized).map_err(|err| err.to_string())?;
+    Ok(sha256_bytes(manifest_json.as_bytes()))
+}
+
+fn build_bundle_manifest(files: Vec<BundleFile>) -> Result<(BundleManifest, String), String> {
+    let mut files = files;
+    if files
+        .iter()
+        .any(|file| file.path == BUNDLE_MANIFEST_SELF_PATH)
+    {
+        return Err("bundle manifest already present in file list".to_string());
+    }
+
+    files.push(BundleFile {
+        path: BUNDLE_MANIFEST_SELF_PATH.to_string(),
+        sha256: BUNDLE_MANIFEST_SELF_SHA_PLACEHOLDER.to_string(),
+        size: 0,
+    });
+    files.sort_by(|a, b| a.path.cmp(&b.path));
+
+    let mut manifest = BundleManifest {
+        schema_version: BUNDLE_SCHEMA_VERSION.to_string(),
+        files,
+    };
+
+    let size = stabilize_manifest_size(&mut manifest)?;
+    let self_hash = bundle_manifest_self_hash(&manifest)?;
+    let self_entry = find_self_entry_mut(&mut manifest)?;
+    self_entry.size = size;
+    self_entry.sha256 = self_hash;
+
+    let manifest_json = serde_json::to_string_pretty(&manifest).map_err(|err| err.to_string())?;
+    let final_size = manifest_json.as_bytes().len() as u64;
+    if final_size != size {
+        return Err(format!(
+            "bundle manifest size mismatch: expected {size}, got {final_size}"
+        ));
+    }
+
+    Ok((manifest, manifest_json))
+}
+
+fn stabilize_manifest_size(manifest: &mut BundleManifest) -> Result<u64, String> {
+    let mut size = 0_u64;
+    for _ in 0..5 {
+        let self_entry = find_self_entry_mut(manifest)?;
+        self_entry.sha256 = BUNDLE_MANIFEST_SELF_SHA_PLACEHOLDER.to_string();
+        self_entry.size = size;
+        let manifest_json =
+            serde_json::to_string_pretty(manifest).map_err(|err| err.to_string())?;
+        let new_size = manifest_json.as_bytes().len() as u64;
+        if new_size == size {
+            return Ok(size);
+        }
+        size = new_size;
+    }
+    Err("bundle manifest size did not stabilize".to_string())
+}
+
+fn find_self_entry_mut(manifest: &mut BundleManifest) -> Result<&mut BundleFile, String> {
+    manifest
+        .files
+        .iter_mut()
+        .find(|entry| entry.path == BUNDLE_MANIFEST_SELF_PATH)
+        .ok_or_else(|| "bundle manifest self entry not found".to_string())
 }
 
 fn collect_recursive(root: &Path, dir: &Path, files: &mut Vec<BundleFile>) -> Result<(), String> {

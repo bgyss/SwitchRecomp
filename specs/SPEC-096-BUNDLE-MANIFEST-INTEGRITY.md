@@ -1,7 +1,7 @@
 # SPEC-096: Bundle Manifest Integrity
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
 Define requirements for `bundle-manifest.json` to fully enumerate bundle contents, including itself.

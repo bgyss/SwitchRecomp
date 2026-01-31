@@ -1,4 +1,6 @@
-use recomp_pipeline::bundle::{package_bundle, BundleManifest, PackageOptions};
+use recomp_pipeline::bundle::{
+    bundle_manifest_self_hash, package_bundle, BundleManifest, PackageOptions,
+};
 use sha2::{Digest, Sha256};
 use std::fs;
 
@@ -26,9 +28,29 @@ fn bundle_manifest_checksums_match_contents() {
     let manifest_src = fs::read_to_string(&report.manifest_path).expect("read manifest");
     let manifest: BundleManifest = serde_json::from_str(&manifest_src).expect("parse manifest");
 
-    for entry in manifest.files {
-        let path = out_dir.join(entry.path);
+    let mut saw_self = false;
+    let manifest_size = manifest_src.as_bytes().len() as u64;
+    for entry in &manifest.files {
+        let path = out_dir.join(&entry.path);
         let bytes = fs::read(&path).expect("read file");
+        if entry.path == "metadata/bundle-manifest.json" {
+            saw_self = true;
+            let expected_hash = bundle_manifest_self_hash(&manifest).expect("compute self hash");
+            assert_eq!(
+                expected_hash,
+                entry.sha256,
+                "checksum mismatch for {}",
+                path.display()
+            );
+            assert_eq!(
+                manifest_size,
+                entry.size,
+                "size mismatch for {}",
+                path.display()
+            );
+            continue;
+        }
+
         let sha = sha256_bytes(&bytes);
         assert_eq!(
             sha,
@@ -43,6 +65,8 @@ fn bundle_manifest_checksums_match_contents() {
             path.display()
         );
     }
+
+    assert!(saw_self, "bundle-manifest.json entry listed");
 }
 
 fn sha256_bytes(bytes: &[u8]) -> String {
