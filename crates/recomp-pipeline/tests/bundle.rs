@@ -28,8 +28,10 @@ fn bundle_manifest_checksums_match_contents() {
     let manifest_src = fs::read_to_string(&report.manifest_path).expect("read manifest");
     let manifest: BundleManifest = serde_json::from_str(&manifest_src).expect("parse manifest");
 
+    assert_eq!(manifest.manifest_self_hash_basis, "files_self_placeholder");
+
     let mut saw_self = false;
-    let manifest_size = manifest_src.as_bytes().len() as u64;
+    let manifest_size = manifest_src.len() as u64;
     for entry in &manifest.files {
         let path = out_dir.join(&entry.path);
         let bytes = fs::read(&path).expect("read file");
