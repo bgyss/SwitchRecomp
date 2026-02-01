@@ -11,6 +11,10 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-096 Bundle Manifest Integrity
 - SPEC-100 Validation and Acceptance
 - SPEC-110 Target Title Selection Criteria
+- SPEC-120 Homebrew Candidate Intake
+- SPEC-130 Homebrew Module Extraction
+- SPEC-140 Homebrew Runtime Surface
+- SPEC-150 Homebrew Asset Packaging
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -120,3 +124,67 @@ Work items
 Exit criteria (from SPEC-110)
 - A documented selection that satisfies all checklist items.
 - A published plan for obtaining inputs legally and privately.
+
+## SPEC-120: Homebrew Candidate Intake
+Outcome
+- Accept a legally distributable homebrew candidate and emit a deterministic intake manifest.
+
+Work items
+- [ ] Define a module intake manifest schema for NRO + optional NSO inputs.
+- [ ] Implement NRO intake parsing for header fields and asset section offsets.
+- [ ] Add provenance validation checks for homebrew inputs (reject proprietary or encrypted formats).
+- [ ] Emit deterministic `module.json` and `manifest.json` with hashes, sizes, and tool versions.
+- [ ] Add sample intake tests using non-proprietary NRO fixtures.
+
+Exit criteria (from SPEC-120)
+- A homebrew NRO can be ingested with hashes, build id, and asset offsets recorded.
+- Asset extraction is recorded without mixing assets into code output.
+- Intake errors are explicit when required fields are missing or unsupported.
+
+## SPEC-130: Homebrew Module Extraction
+Outcome
+- Normalize NRO/NSO binaries into module.json and extracted segment blobs.
+
+Work items
+- [ ] Implement NSO parsing including LZ4 segment decompression.
+- [ ] Capture build id/module id and preserve section boundaries in module.json.
+- [ ] Preserve relocation and symbol metadata when present.
+- [ ] Ensure extraction is deterministic across runs.
+- [ ] Add tests for NRO-only and NRO + NSO ingestion paths.
+
+Exit criteria (from SPEC-130)
+- NRO and NSO inputs yield module.json with correct segment sizes and build id.
+- Compressed NSO segments are decompressed and emitted deterministically.
+- Section boundaries are preserved for later translation.
+
+## SPEC-140: Homebrew Runtime Surface
+Outcome
+- Provide a minimal runtime ABI surface that can boot a recompiled homebrew title.
+
+Work items
+- [ ] Implement homebrew entrypoint shim with loader config setup.
+- [ ] Define loader config keys and defaults (EndOfList, MainThreadHandle, AppletType).
+- [ ] Add runtime manifest that enumerates provided config keys and stubbed services.
+- [ ] Implement deterministic time and input stubs for validation runs.
+- [ ] Add logging for unsupported service calls with explicit failure behavior.
+
+Exit criteria (from SPEC-140)
+- Recompiled binaries boot with required loader config keys present.
+- Unsupported services fail with explicit, logged errors.
+- Runtime manifest records provided loader config keys.
+
+## SPEC-150: Homebrew Asset Packaging
+Outcome
+- Extract NRO asset section contents and package them alongside recompiled output.
+
+Work items
+- [ ] Implement asset section extraction (icon, NACP, RomFS).
+- [ ] Validate and store NACP as `control.nacp` with expected size.
+- [ ] Emit deterministic asset output directory and hashes in manifest.json.
+- [ ] Document runtime RomFS mount expectations.
+- [ ] Add tests for asset extraction and manifest hashes.
+
+Exit criteria (from SPEC-150)
+- Icon, NACP, and RomFS assets are extracted deterministically when present.
+- Asset hashes in manifest.json match extracted bytes.
+- Code output remains separate from extracted assets.
