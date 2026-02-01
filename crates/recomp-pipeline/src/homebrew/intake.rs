@@ -3,6 +3,7 @@ use crate::homebrew::module::{
 };
 use crate::homebrew::nro::{parse_nro, NroModule};
 use crate::homebrew::nso::{extract_segments, parse_nso, NsoModule, NsoSegmentKind};
+use crate::homebrew::romfs::{list_romfs_entries, RomfsEntry};
 use crate::homebrew::util::hex_bytes;
 use crate::output::{GeneratedFile, InputSummary};
 use crate::provenance::{InputFormat, ProvenanceManifest};
@@ -395,18 +396,19 @@ fn extract_assets(
     if assets.romfs.size > 0 {
         let romfs_dir = assets_dir.join("romfs");
         fs::create_dir_all(&romfs_dir).map_err(|err| format!("create romfs dir: {err}"))?;
-        let (path, info) = extract_asset(
-            &bytes,
-            &assets,
-            assets.romfs,
+        let (romfs_bytes, romfs_base_offset) = extract_asset_bytes(&bytes, &assets, assets.romfs)?;
+        let entries = list_romfs_entries(&romfs_bytes)?;
+        let (generated_entries, written_entries) = write_romfs_entries(
+            &romfs_bytes,
+            &entries,
+            romfs_base_offset,
             root_dir,
             &romfs_dir,
-            "romfs.bin",
             "romfs",
+            records,
         )?;
-        records.push(info);
-        generated.push(path.generated_file);
-        written.push(path.path);
+        generated.extend(generated_entries);
+        written.extend(written_entries);
     }
 
     Ok((generated, written))
@@ -472,6 +474,107 @@ fn extract_asset(
         },
         record,
     ))
+}
+
+fn extract_asset_bytes(
+    bytes: &[u8],
+    assets: &crate::homebrew::nro::NroAssetHeader,
+    section: crate::homebrew::nro::NroAssetSection,
+) -> Result<(Vec<u8>, u64), String> {
+    let start = assets
+        .base_offset
+        .checked_add(section.offset)
+        .ok_or_else(|| "asset offset overflow".to_string())? as usize;
+    let end = start
+        .checked_add(section.size as usize)
+        .ok_or_else(|| "asset size overflow".to_string())?;
+    if end > bytes.len() {
+        return Err(format!(
+            "asset out of range: {}..{} (len={})",
+            start,
+            end,
+            bytes.len()
+        ));
+    }
+    Ok((bytes[start..end].to_vec(), start as u64))
+}
+
+fn write_romfs_entries(
+    romfs_bytes: &[u8],
+    entries: &[RomfsEntry],
+    romfs_base_offset: u64,
+    root_dir: &Path,
+    romfs_dir: &Path,
+    kind: &str,
+    records: &mut Vec<AssetRecord>,
+) -> Result<(Vec<GeneratedFile>, Vec<PathBuf>), String> {
+    let mut generated = Vec::new();
+    let mut written = Vec::new();
+    for entry in entries {
+        let rel_path = Path::new(&entry.path);
+        if rel_path.is_absolute() {
+            return Err(format!("romfs entry path is absolute: {}", entry.path));
+        }
+        for component in rel_path.components() {
+            match component {
+                std::path::Component::Normal(_) => {}
+                _ => {
+                    return Err(format!(
+                        "romfs entry path contains invalid component: {}",
+                        entry.path
+                    ))
+                }
+            }
+        }
+
+        let out_path = romfs_dir.join(rel_path);
+        if let Some(parent) = out_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|err| format!("create romfs dir {}: {err}", parent.display()))?;
+        }
+
+        let start = entry.data_offset as usize;
+        let end = start
+            .checked_add(entry.data_size as usize)
+            .ok_or_else(|| "romfs file size overflow".to_string())?;
+        if end > romfs_bytes.len() {
+            return Err(format!(
+                "romfs entry out of range: {}..{} (len={})",
+                start,
+                end,
+                romfs_bytes.len()
+            ));
+        }
+        let data = &romfs_bytes[start..end];
+        fs::write(&out_path, data)
+            .map_err(|err| format!("write romfs entry {}: {err}", out_path.display()))?;
+
+        let rel = out_path
+            .strip_prefix(root_dir)
+            .unwrap_or(&out_path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        let generated_file = GeneratedFile {
+            path: rel.clone(),
+            sha256: sha256_bytes(data),
+            size: data.len() as u64,
+        };
+        let record = AssetRecord {
+            kind: kind.to_string(),
+            path: rel,
+            sha256: generated_file.sha256.clone(),
+            size: generated_file.size,
+            source_offset: romfs_base_offset
+                .checked_add(entry.data_offset)
+                .ok_or_else(|| "romfs source offset overflow".to_string())?,
+            source_size: entry.data_size,
+        };
+        records.push(record);
+        generated.push(generated_file);
+        written.push(out_path);
+    }
+
+    Ok((generated, written))
 }
 
 fn ensure_input_present(

@@ -13,11 +13,11 @@ This document captures the initial exploratory pipeline that mirrors proven stat
 - Produces compilable artifacts for validation and iteration.
 
 ## Inputs
-- `module.json` describes a module, functions, and operations.
+- `module.json` describes a lifted module, functions, and operations.
 - `title.toml` provides the title name, entry function, ABI version, and stub map.
 - `provenance.toml` records lawful input provenance and format metadata.
-- Homebrew intake can emit a separate `module.json` + `manifest.json` with segment blobs and assets extracted from NRO/NSO inputs.
-- Homebrew RomFS assets are emitted as `assets/romfs/romfs.bin`; runtime implementations should mount this image when wiring up RomFS access.
+- Homebrew intake emits a separate `module.json` + `manifest.json` with segment blobs and assets extracted from NRO/NSO inputs; this homebrew module.json is not consumed by the translator until a lifter produces a lifted module.json.
+- Homebrew RomFS assets are emitted as a file tree under `assets/romfs/`; runtime implementations should mount or map this directory when wiring up RomFS access.
 
 Example stub map:
 ```

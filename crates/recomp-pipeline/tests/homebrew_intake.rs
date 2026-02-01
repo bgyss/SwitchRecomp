@@ -19,6 +19,149 @@ fn write_u64(bytes: &mut [u8], offset: usize, value: u64) {
     bytes[offset..offset + 8].copy_from_slice(&value.to_le_bytes());
 }
 
+fn align_up(value: usize, align: usize) -> usize {
+    (value + align - 1) / align * align
+}
+
+fn build_romfs_image() -> Vec<u8> {
+    let file_root = b"HELLO";
+    let file_nested = b"NESTED";
+    let nested_dir = "data";
+    let root_name = "";
+
+    let root_entry_size = align_up(0x18 + root_name.len(), 4);
+    let nested_entry_off = root_entry_size as u32;
+    let nested_entry_size = align_up(0x18 + nested_dir.len(), 4);
+    let dir_table_size = root_entry_size + nested_entry_size;
+
+    let file_root_name = "hello.txt";
+    let file_nested_name = "nested.bin";
+    let file_root_entry_size = align_up(0x20 + file_root_name.len(), 4);
+    let file_nested_off = file_root_entry_size as u32;
+    let file_nested_entry_size = align_up(0x20 + file_nested_name.len(), 4);
+    let file_table_size = file_root_entry_size + file_nested_entry_size;
+
+    let file_root_data_off = 0u64;
+    let file_nested_data_off = align_up(file_root.len(), 0x10) as u64;
+    let mut file_data = Vec::new();
+    file_data.extend_from_slice(file_root);
+    let padding = align_up(file_data.len(), 0x10) - file_data.len();
+    file_data.extend(std::iter::repeat(0u8).take(padding));
+    file_data.extend_from_slice(file_nested);
+
+    let mut dir_table = Vec::new();
+    push_dir_entry(
+        &mut dir_table,
+        0xFFFF_FFFF,
+        0xFFFF_FFFF,
+        nested_entry_off,
+        0,
+        0xFFFF_FFFF,
+        root_name,
+    );
+    push_dir_entry(
+        &mut dir_table,
+        0,
+        0xFFFF_FFFF,
+        0xFFFF_FFFF,
+        file_nested_off,
+        0xFFFF_FFFF,
+        nested_dir,
+    );
+    assert_eq!(dir_table.len(), dir_table_size);
+
+    let mut file_table = Vec::new();
+    push_file_entry(
+        &mut file_table,
+        0,
+        0xFFFF_FFFF,
+        file_root_data_off,
+        file_root.len() as u64,
+        0xFFFF_FFFF,
+        file_root_name,
+    );
+    push_file_entry(
+        &mut file_table,
+        nested_entry_off,
+        0xFFFF_FFFF,
+        file_nested_data_off,
+        file_nested.len() as u64,
+        0xFFFF_FFFF,
+        file_nested_name,
+    );
+    assert_eq!(file_table.len(), file_table_size);
+
+    let header_size = 0x50usize;
+    let dir_table_off = align_up(header_size, 0x10);
+    let file_table_off = align_up(dir_table_off + dir_table_size, 0x10);
+    let file_data_off = align_up(file_table_off + file_table_size, 0x10);
+    let total_size = file_data_off + file_data.len();
+
+    let mut image = vec![0u8; total_size];
+    write_u64(&mut image, 0x0, 0x50);
+    write_u64(&mut image, 0x8, dir_table_off as u64);
+    write_u64(&mut image, 0x10, 0);
+    write_u64(&mut image, 0x18, dir_table_off as u64);
+    write_u64(&mut image, 0x20, dir_table_size as u64);
+    write_u64(&mut image, 0x28, file_table_off as u64);
+    write_u64(&mut image, 0x30, 0);
+    write_u64(&mut image, 0x38, file_table_off as u64);
+    write_u64(&mut image, 0x40, file_table_size as u64);
+    write_u64(&mut image, 0x48, file_data_off as u64);
+
+    image[dir_table_off..dir_table_off + dir_table_size].copy_from_slice(&dir_table);
+    image[file_table_off..file_table_off + file_table_size].copy_from_slice(&file_table);
+    image[file_data_off..file_data_off + file_data.len()].copy_from_slice(&file_data);
+
+    image
+}
+
+fn push_dir_entry(
+    buf: &mut Vec<u8>,
+    parent: u32,
+    sibling: u32,
+    child_dir: u32,
+    child_file: u32,
+    next_hash: u32,
+    name: &str,
+) -> u32 {
+    let offset = buf.len() as u32;
+    buf.extend_from_slice(&parent.to_le_bytes());
+    buf.extend_from_slice(&sibling.to_le_bytes());
+    buf.extend_from_slice(&child_dir.to_le_bytes());
+    buf.extend_from_slice(&child_file.to_le_bytes());
+    buf.extend_from_slice(&next_hash.to_le_bytes());
+    buf.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    buf.extend_from_slice(name.as_bytes());
+    while buf.len() % 4 != 0 {
+        buf.push(0);
+    }
+    offset
+}
+
+fn push_file_entry(
+    buf: &mut Vec<u8>,
+    parent: u32,
+    sibling: u32,
+    data_off: u64,
+    data_size: u64,
+    next_hash: u32,
+    name: &str,
+) -> u32 {
+    let offset = buf.len() as u32;
+    buf.extend_from_slice(&parent.to_le_bytes());
+    buf.extend_from_slice(&sibling.to_le_bytes());
+    buf.extend_from_slice(&data_off.to_le_bytes());
+    buf.extend_from_slice(&data_size.to_le_bytes());
+    buf.extend_from_slice(&next_hash.to_le_bytes());
+    buf.extend_from_slice(&(name.len() as u32).to_le_bytes());
+    buf.extend_from_slice(name.as_bytes());
+    while buf.len() % 4 != 0 {
+        buf.push(0);
+    }
+    offset
+}
+
 fn build_nro(path: &Path, with_assets: bool) -> Vec<u8> {
     let header_size = 0x80usize;
     let text = b"TEXT";
@@ -52,7 +195,7 @@ fn build_nro(path: &Path, with_assets: bool) -> Vec<u8> {
         let asset_base = bytes.len();
         let icon = b"ICON";
         let nacp = vec![0x11u8; 0x4000];
-        let romfs = b"ROMFS";
+        let romfs = build_romfs_image();
         let asset_header_size = 0x38usize;
         let icon_offset = asset_header_size as u64;
         let nacp_offset = icon_offset + icon.len() as u64;
@@ -73,7 +216,7 @@ fn build_nro(path: &Path, with_assets: bool) -> Vec<u8> {
         let nacp_start = asset_base + nacp_offset as usize;
         bytes[nacp_start..nacp_start + nacp.len()].copy_from_slice(&nacp);
         let romfs_start = asset_base + romfs_offset as usize;
-        bytes[romfs_start..romfs_start + romfs.len()].copy_from_slice(romfs);
+        bytes[romfs_start..romfs_start + romfs.len()].copy_from_slice(&romfs);
     }
 
     fs::write(path, &bytes).expect("write NRO");
@@ -169,11 +312,13 @@ fn intake_homebrew_extracts_assets_and_segments() {
     assert!(out_dir.join("segments/main/text.bin").exists());
     assert!(out_dir.join("assets/icon.bin").exists());
     assert!(out_dir.join("assets/control.nacp").exists());
-    assert!(out_dir.join("assets/romfs/romfs.bin").exists());
+    assert!(out_dir.join("assets/romfs/hello.txt").exists());
+    assert!(out_dir.join("assets/romfs/data/nested.bin").exists());
 
     let manifest = fs::read_to_string(report.manifest_path).expect("read manifest");
     assert!(manifest.contains("control.nacp"));
-    assert!(manifest.contains("romfs/romfs.bin"));
+    assert!(manifest.contains("romfs/hello.txt"));
+    assert!(manifest.contains("romfs/data/nested.bin"));
 }
 
 #[test]

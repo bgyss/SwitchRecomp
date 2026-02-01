@@ -1,7 +1,7 @@
 # SPEC-150: Homebrew Asset Packaging
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Purpose
 Define how homebrew asset data (icon, NACP, RomFS) is extracted from NROs and packaged with the recompiled output while preserving asset separation.
@@ -23,14 +23,14 @@ NACP (control.nacp) is a 0x4000-byte metadata file with UTF-8 strings used for t
 - If an NRO asset section is present, extraction must locate the icon, NACP, and RomFS offsets/sizes and copy them into the output asset directory. citeturn1view0
 - Extracted NACP must be stored verbatim as `control.nacp` and validated for size 0x4000. citeturn3view0
 - Extracted icon data must be preserved as raw bytes with file metadata describing expected image type when known.
-- RomFS content must be emitted into a deterministic directory structure and hashed for provenance.
+- RomFS content must be extracted into a deterministic directory structure and hashed for provenance.
 - The output `manifest.json` must include per-asset hashes and sizes alongside code hashes.
 
 ## Interfaces and Data
 - Output layout:
   - `out/<title>/assets/control.nacp`
   - `out/<title>/assets/icon.bin`
-  - `out/<title>/assets/romfs/`
+  - `out/<title>/assets/romfs/<romfs-path>`
   - `out/<title>/manifest.json`
 - `manifest.json` fields for asset hashes, sizes, and source offsets.
 
@@ -44,7 +44,7 @@ NACP (control.nacp) is a 0x4000-byte metadata file with UTF-8 strings used for t
 - How should multi-language NACP strings be surfaced in title metadata?
 
 ## Acceptance Criteria
-- A homebrew NRO with asset section yields extracted icon, NACP, and RomFS assets in a deterministic output directory.
+- A homebrew NRO with asset section yields extracted icon, NACP, and RomFS file tree in a deterministic output directory.
 - Asset hashes in manifest.json match the extracted bytes.
 - Code output remains separate from extracted assets.
 

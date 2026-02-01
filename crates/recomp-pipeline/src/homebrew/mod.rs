@@ -2,6 +2,7 @@ pub mod intake;
 pub mod module;
 pub mod nro;
 pub mod nso;
+pub mod romfs;
 mod util;
 
 pub use intake::{intake_homebrew, IntakeOptions, IntakeReport};
