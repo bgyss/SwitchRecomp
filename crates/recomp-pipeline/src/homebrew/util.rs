@@ -30,7 +30,7 @@ pub fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, String> {
     ))
 }
 
-pub fn read_bytes<'a>(bytes: &'a [u8], offset: usize, size: usize) -> Result<&'a [u8], String> {
+pub fn read_bytes(bytes: &[u8], offset: usize, size: usize) -> Result<&[u8], String> {
     let end = offset
         .checked_add(size)
         .ok_or_else(|| "offset overflow".to_string())?;

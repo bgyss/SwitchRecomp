@@ -90,7 +90,7 @@ pub fn parse_nro(path: &Path) -> Result<NroModule, String> {
     let segments = match parse_segments_libnx(&bytes, magic_offset) {
         Some(mut segments) => {
             if segments.iter().all(|seg| {
-                let end = seg.file_offset.saturating_add(seg.size).min(u32::MAX);
+                let end = seg.file_offset.saturating_add(seg.size);
                 end as usize <= bytes.len()
             }) {
                 segments[0].memory_offset = text_mem_offset;
