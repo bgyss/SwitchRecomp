@@ -1,7 +1,6 @@
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
 use std::fs;
-use std::io::Read;
 use std::path::{Path, PathBuf};
 
 const SCHEMA_VERSION: &str = "1";
@@ -245,24 +244,33 @@ pub fn detect_format(path: &Path) -> Result<InputFormat, String> {
         }
     }
 
-    let mut file =
-        fs::File::open(path).map_err(|err| format!("failed to open {}: {err}", path.display()))?;
-    let mut magic = [0u8; 4];
-    file.read_exact(&mut magic)
-        .map_err(|err| format!("failed to read {}: {err}", path.display()))?;
-
-    match &magic {
+    let bytes =
+        fs::read(path).map_err(|err| format!("failed to read {}: {err}", path.display()))?;
+    if bytes.len() < 4 {
+        return Err(format!(
+            "unsupported input format (too small: {} bytes) for {}",
+            bytes.len(),
+            path.display()
+        ));
+    }
+    let magic = &bytes[0..4];
+    match magic {
         b"NCA3" | b"NCA2" => Ok(InputFormat::Nca),
         b"PFS0" => Ok(InputFormat::Exefs),
         b"NSO0" => Ok(InputFormat::Nso0),
         b"NRO0" => Ok(InputFormat::Nro0),
         b"NRR0" => Ok(InputFormat::Nrr0),
         b"META" | b"NPDM" => Ok(InputFormat::Npdm),
-        _ => Err(format!(
-            "unsupported input format (magic {:?}) for {}",
-            magic,
-            path.display()
-        )),
+        _ => {
+            if bytes.len() >= 0x14 && &bytes[0x10..0x14] == b"NRO0" {
+                return Ok(InputFormat::Nro0);
+            }
+            Err(format!(
+                "unsupported input format (magic {:?}) for {}",
+                magic,
+                path.display()
+            ))
+        }
     }
 }
 

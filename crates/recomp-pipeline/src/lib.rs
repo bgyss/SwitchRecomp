@@ -1,5 +1,6 @@
 pub mod bundle;
 pub mod config;
+pub mod homebrew;
 pub mod input;
 pub mod output;
 pub mod pipeline;

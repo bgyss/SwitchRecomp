@@ -1,7 +1,7 @@
 # SPEC-120: Homebrew Candidate Intake
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
 Define the intake requirements and metadata capture needed to select a Switch homebrew title and feed it into the static recompilation pipeline.

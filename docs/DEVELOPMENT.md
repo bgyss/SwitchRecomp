@@ -88,3 +88,13 @@ cargo run -p recomp-cli -- package \
   --provenance samples/minimal/provenance.toml \
   --out-dir out/bundle-minimal
 ```
+
+- Run homebrew intake (NRO + optional NSO inputs):
+
+```
+cargo run -p recomp-cli -- homebrew-intake \
+  --module path/to/homebrew.nro \
+  --nso path/to/optional.nso \
+  --provenance path/to/provenance.toml \
+  --out-dir out/homebrew-intake
+```

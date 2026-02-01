@@ -1,7 +1,7 @@
 # SPEC-130: Homebrew Module Extraction
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
 Define how NRO and NSO binaries are parsed and normalized into the internal module representation used by the static recompilation pipeline.

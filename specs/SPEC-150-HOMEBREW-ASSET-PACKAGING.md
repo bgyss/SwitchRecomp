@@ -1,7 +1,7 @@
 # SPEC-150: Homebrew Asset Packaging
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
 Define how homebrew asset data (icon, NACP, RomFS) is extracted from NROs and packaged with the recompiled output while preserving asset separation.

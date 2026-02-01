@@ -1,7 +1,7 @@
 # SPEC-140: Homebrew Runtime Surface
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
 Define the runtime ABI surface required to boot a recompiled homebrew title and satisfy the Switch homebrew ABI expectations.
