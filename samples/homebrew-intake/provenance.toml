@@ -1,0 +1,30 @@
+schema_version = "1"
+
+[title]
+name = "Homebrew Intake Sample"
+title_id = "0100000000000000"
+version = "0.1.0"
+region = "US"
+
+[collection]
+device = "demo"
+collected_at = "2026-02-01"
+notes = "Synthetic homebrew intake fixture with non-proprietary assets."
+
+[collection.tool]
+name = "synthetic-generator"
+version = "1.0"
+
+[[inputs]]
+path = "inputs/homebrew.nro"
+format = "nro0"
+sha256 = "c30c135e46d5b0baea8a9ce8f2686366c754e926beb653c47882477b65f2feb2"
+size = 16637
+role = "homebrew_module"
+
+[[inputs]]
+path = "inputs/overlay.nso"
+format = "nso0"
+sha256 = "a90d4d0c38c9a690869133407253a5f39f2e16a88bb9c0781acd8642e34b5d6b"
+size = 290
+role = "auxiliary_module"
