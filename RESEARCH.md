@@ -73,6 +73,10 @@ Needed research:
 - Nintendo Switch platform baseline: https://en.wikipedia.org/wiki/Nintendo_Switch
 - Tegra X1 whitepaper: https://www.nvidia.com/content/tegra/embedded-systems/pdf/tegra-x1-whitepaper.pdf
 - Switch hardware overview: https://switchbrew.org/wiki/Hardware
+- Switch homebrew NRO format: https://switchbrew.org/wiki/NRO
+- Switch NSO format and compression: https://switchbrew.org/wiki/NSO
+- Homebrew ABI entrypoint and loader config: https://switchbrew.org/wiki/Homebrew_ABI
+- NACP title metadata format: https://switchbrew.org/wiki/NACP
 
 ## Research Deliverables
 - A research summary for each category with sources.
