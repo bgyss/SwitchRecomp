@@ -301,7 +301,7 @@ mod tests {
     use super::list_romfs_entries;
 
     fn align_up(value: usize, align: usize) -> usize {
-        (value + align - 1) / align * align
+        value.div_ceil(align) * align
     }
 
     fn write_u64(bytes: &mut [u8], offset: usize, value: u64) {
@@ -325,7 +325,7 @@ mod tests {
         buf.extend_from_slice(&next_hash.to_le_bytes());
         buf.extend_from_slice(&(name.len() as u32).to_le_bytes());
         buf.extend_from_slice(name.as_bytes());
-        while buf.len() % 4 != 0 {
+        while !buf.len().is_multiple_of(4) {
             buf.push(0);
         }
         offset
@@ -348,7 +348,7 @@ mod tests {
         buf.extend_from_slice(&next_hash.to_le_bytes());
         buf.extend_from_slice(&(name.len() as u32).to_le_bytes());
         buf.extend_from_slice(name.as_bytes());
-        while buf.len() % 4 != 0 {
+        while !buf.len().is_multiple_of(4) {
             buf.push(0);
         }
         offset
@@ -377,7 +377,7 @@ mod tests {
         let mut file_data = Vec::new();
         file_data.extend_from_slice(file_root);
         let padding = align_up(file_data.len(), 0x10) - file_data.len();
-        file_data.extend(std::iter::repeat(0u8).take(padding));
+        file_data.extend(std::iter::repeat_n(0u8, padding));
         file_data.extend_from_slice(file_nested);
 
         let mut dir_table = Vec::new();
