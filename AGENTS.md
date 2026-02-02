@@ -41,6 +41,7 @@ Pre-commit hooks provide fast feedback; `prek` is a drop-in replacement that rea
 - Configured hooks:
   - Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
   - Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
+- If a pre-push hook fails, fix the reported changes, rerun the full test suite, then commit and push again after the hook clears.
 
 ## Commit & Pull Request Guidelines
 No established commit conventions are present yet. Until standards are set:
