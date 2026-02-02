@@ -44,7 +44,13 @@ pub fn read_bytes(bytes: &[u8], offset: usize, size: usize) -> Result<&[u8], Str
 }
 
 pub fn hex_bytes(bytes: &[u8]) -> String {
-    bytes.iter().map(|b| format!("{b:02x}")).collect()
+    use std::fmt::Write;
+
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for byte in bytes {
+        let _ = write!(&mut out, "{byte:02x}");
+    }
+    out
 }
 
 pub fn find_magic(bytes: &[u8], magic: u32, search_len: usize) -> Option<usize> {
