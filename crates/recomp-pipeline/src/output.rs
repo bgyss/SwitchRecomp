@@ -196,10 +196,10 @@ fn emit_memory_layout_init(out: &mut String, layout: &MemoryLayoutDescriptor) {
     out.push_str("    let memory_layout = recomp_runtime::MemoryLayout::new(vec![\n");
     for region in &layout.regions {
         out.push_str(&format!(
-            "        recomp_runtime::MemoryRegionSpec::new(\"{}\", {}, {}, recomp_runtime::MemoryPermissions::new({}, {}, {})),\n",
+            "        recomp_runtime::MemoryRegionSpec::new(\"{}\", {:#x}, {:#x}, recomp_runtime::MemoryPermissions::new({}, {}, {})),\n",
             region.name,
-            format!("{:#x}", region.base),
-            format!("{:#x}", region.size),
+            region.base,
+            region.size,
             region.permissions.read,
             region.permissions.write,
             region.permissions.execute
