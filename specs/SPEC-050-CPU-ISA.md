@@ -1,13 +1,14 @@
 # SPEC-050: CPU ISA Lifting and Semantics
 
 ## Status
-Draft v0.4
+Draft v0.5
 
 ## Rationale
 - Added a minimal ISA execution module for early instruction semantics tests.
 - Expanded semantics coverage with arithmetic and NZCV flag updates.
 - Added shift and rotate immediate semantics with carry updates.
 - Added load/store stubs with alignment checks for memory access validation.
+- Added a minimal AArch64 lifter subset for mov wide, add, and ret to feed the exploratory pipeline.
 
 ## Purpose
 Define instruction coverage and semantics for the Switch CPU ISA lifting layer.

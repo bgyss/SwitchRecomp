@@ -17,7 +17,7 @@ This document captures the initial exploratory pipeline that mirrors proven stat
 - `title.toml` provides the title name, entry function, ABI version, and stub map.
 - `provenance.toml` records lawful input provenance and format metadata.
 - Homebrew intake emits a separate `module.json` + `manifest.json` with segment blobs and assets extracted from NRO/NSO inputs; this homebrew module.json is not consumed by the translator until a lifter produces a lifted module.json.
-- The `homebrew-lift` command currently emits a placeholder lifted module with a stub entry function; it does not decode instructions yet.
+- The `homebrew-lift` command defaults to decoding a small AArch64 subset (mov wide, add, ret). Use `--mode stub` to emit a placeholder lifted module when decoding is not possible.
 - Homebrew RomFS assets are emitted as a file tree under `assets/romfs/`; runtime implementations should mount or map this directory when wiring up RomFS access.
 
 Example stub map:
@@ -42,5 +42,5 @@ performance_mode = "handheld"
 
 ## Next Steps
 - Add a real input parser for Switch binaries.
-- Replace the placeholder lifter with lifted IR from the pipeline.
+- Expand the lifter to cover more AArch64 instructions and control flow.
 - Expand runtime services and ABI validation.

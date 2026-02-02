@@ -1,6 +1,8 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use recomp_pipeline::bundle::{package_bundle, PackageOptions};
-use recomp_pipeline::homebrew::{intake_homebrew, lift_homebrew, IntakeOptions, LiftOptions};
+use recomp_pipeline::homebrew::{
+    intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
+};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -65,6 +67,23 @@ struct HomebrewLiftArgs {
     out_dir: PathBuf,
     #[arg(long, default_value = "entry")]
     entry: String,
+    #[arg(long, value_enum, default_value = "decode")]
+    mode: HomebrewLiftMode,
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+enum HomebrewLiftMode {
+    Stub,
+    Decode,
+}
+
+impl From<HomebrewLiftMode> for LiftMode {
+    fn from(value: HomebrewLiftMode) -> Self {
+        match value {
+            HomebrewLiftMode::Stub => LiftMode::Stub,
+            HomebrewLiftMode::Decode => LiftMode::Decode,
+        }
+    }
 }
 
 fn main() {
@@ -153,6 +172,7 @@ fn main() {
                 module_json_path: lift.module_json,
                 out_dir: lift.out_dir,
                 entry_name: lift.entry,
+                mode: lift.mode.into(),
             };
             match lift_homebrew(options) {
                 Ok(report) => {

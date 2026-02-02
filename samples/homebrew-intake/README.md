@@ -27,7 +27,8 @@ cargo run -p recomp-cli -- homebrew-intake \
 ```
 cargo run -p recomp-cli -- homebrew-lift \
   --module-json out/homebrew-intake/module.json \
-  --out-dir out/homebrew-lift
+  --out-dir out/homebrew-lift \
+  --mode stub
 ```
 
 4) Inspect outputs.

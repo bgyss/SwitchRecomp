@@ -7,7 +7,7 @@ pub mod romfs;
 mod util;
 
 pub use intake::{intake_homebrew, IntakeOptions, IntakeReport};
-pub use lift::{lift_homebrew, LiftOptions, LiftReport};
+pub use lift::{lift_homebrew, LiftMode, LiftOptions, LiftReport};
 pub use module::{ModuleBuild, ModuleJson, ModuleSegment, ModuleWriteReport};
 pub use nro::{NroAssetHeader, NroModule, NroSegment};
 pub use nso::{NsoModule, NsoSegment, NsoSegmentKind, NsoSegmentPermissions};

@@ -99,10 +99,13 @@ cargo run -p recomp-cli -- homebrew-intake \
   --out-dir out/homebrew-intake
 ```
 
-- Lift homebrew intake output into a placeholder lifted module:
+- Lift homebrew intake output into a lifted module:
 
 ```
 cargo run -p recomp-cli -- homebrew-lift \
   --module-json out/homebrew-intake/module.json \
   --out-dir out/homebrew-lift
 ```
+
+The default mode attempts to decode a small AArch64 subset (mov wide, add, ret). Use `--mode stub`
+to emit a placeholder lifted module without decoding instructions.
