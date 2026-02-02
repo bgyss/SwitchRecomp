@@ -1,4 +1,4 @@
-use crate::pipeline::{ensure_dir, RustFunction, RustProgram};
+use crate::pipeline::{ensure_dir, FunctionBody, RustFunction, RustProgram, RustTerminator};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -198,24 +198,104 @@ fn emit_function(function: &RustFunction) -> String {
     for reg in &function.regs {
         out.push_str(&format!("    let mut {reg}: i64 = 0;\n"));
     }
-    if !function.regs.is_empty() {
+    if function.needs_flags {
+        out.push_str("    let mut flag_n = false;\n");
+        out.push_str("    let mut flag_z = false;\n");
+        out.push_str("    let mut flag_c = false;\n");
+        out.push_str("    let mut flag_v = false;\n");
+    }
+    if !function.regs.is_empty() || function.needs_flags {
         out.push('\n');
     }
-    for line in &function.lines {
-        out.push_str("    ");
-        out.push_str(line);
-        out.push('\n');
-    }
-    if function
-        .lines
-        .last()
-        .map(|line| !line.trim_start().starts_with("return"))
-        .unwrap_or(true)
-    {
-        out.push_str("    Ok(())\n");
+    match &function.body {
+        FunctionBody::Linear(lines) => {
+            for line in lines {
+                out.push_str("    ");
+                out.push_str(line);
+                out.push('\n');
+            }
+            if lines
+                .last()
+                .map(|line| !line.trim_start().starts_with("return"))
+                .unwrap_or(true)
+            {
+                out.push_str("    Ok(())\n");
+            }
+        }
+        FunctionBody::Blocks(blocks) => {
+            let entry = blocks
+                .first()
+                .map(|block| block.label.as_str())
+                .unwrap_or("entry");
+            out.push_str(&format!("    let mut block_label = \"{entry}\";\n"));
+            out.push_str("    loop {\n");
+            out.push_str("        match block_label {\n");
+            for block in blocks {
+                out.push_str(&format!("            \"{}\" => {{\n", block.label));
+                for line in &block.lines {
+                    out.push_str("                ");
+                    out.push_str(line);
+                    out.push('\n');
+                }
+                emit_block_terminator(&mut out, &block.terminator);
+                out.push_str("            },\n");
+            }
+            out.push_str("            _ => {\n");
+            out.push_str("                panic!(\"unknown block label: {}\", block_label);\n");
+            out.push_str("            }\n");
+            out.push_str("        }\n");
+            out.push_str("    }\n");
+        }
     }
     out.push_str("}\n");
     out
+}
+
+fn emit_block_terminator(out: &mut String, terminator: &RustTerminator) {
+    match terminator {
+        RustTerminator::Br { target } => {
+            out.push_str(&format!("                block_label = \"{target}\";\n"));
+            out.push_str("                continue;\n");
+        }
+        RustTerminator::BrCond {
+            cond_expr,
+            cond,
+            then_label,
+            else_label,
+        } => {
+            if let Some(expr) = cond_expr {
+                out.push_str(&format!("                if {expr} {{\n"));
+                out.push_str(&format!(
+                    "                    block_label = \"{then_label}\";\n"
+                ));
+                out.push_str("                } else {\n");
+                out.push_str(&format!(
+                    "                    block_label = \"{else_label}\";\n"
+                ));
+                out.push_str("                }\n");
+                out.push_str("                continue;\n");
+            } else {
+                out.push_str(&format!(
+                    "                panic!(\"unsupported condition: {cond}\");\n"
+                ));
+            }
+        }
+        RustTerminator::Call { call_line, next } => {
+            out.push_str("                ");
+            out.push_str(call_line);
+            out.push('\n');
+            out.push_str(&format!("                block_label = \"{next}\";\n"));
+            out.push_str("                continue;\n");
+        }
+        RustTerminator::BrIndirect { reg } => {
+            out.push_str(&format!(
+                "                panic!(\"indirect branch via {reg} is not supported\");\n"
+            ));
+        }
+        RustTerminator::Ret => {
+            out.push_str("                return Ok(());\n");
+        }
+    }
 }
 
 fn sanitize_name(name: &str) -> String {
