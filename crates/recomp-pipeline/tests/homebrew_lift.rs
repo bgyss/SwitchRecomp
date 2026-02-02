@@ -599,5 +599,5 @@ fn ldr_x_imm(rt: u8, rn: u8, offset: u64) -> u32 {
 fn str_x_imm(rt: u8, rn: u8, offset: u64) -> u32 {
     let size = 3_u32;
     let imm12 = (offset >> size) as u32;
-    0x3900_0000 | (size << 30) | (0 << 22) | (imm12 << 10) | ((rn as u32) << 5) | (rt as u32)
+    0x3900_0000 | (size << 30) | (imm12 << 10) | ((rn as u32) << 5) | (rt as u32)
 }
