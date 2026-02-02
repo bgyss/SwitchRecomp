@@ -22,7 +22,15 @@ cargo run -p recomp-cli -- homebrew-intake \
   --out-dir out/homebrew-intake
 ```
 
-3) Inspect outputs.
+3) Lift the intake output into a placeholder lifted module.
+
+```
+cargo run -p recomp-cli -- homebrew-lift \
+  --module-json out/homebrew-intake/module.json \
+  --out-dir out/homebrew-lift
+```
+
+4) Inspect outputs.
 
 ```
 ls out/homebrew-intake

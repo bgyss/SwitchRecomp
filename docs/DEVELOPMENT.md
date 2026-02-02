@@ -98,3 +98,11 @@ cargo run -p recomp-cli -- homebrew-intake \
   --provenance path/to/provenance.toml \
   --out-dir out/homebrew-intake
 ```
+
+- Lift homebrew intake output into a placeholder lifted module:
+
+```
+cargo run -p recomp-cli -- homebrew-lift \
+  --module-json out/homebrew-intake/module.json \
+  --out-dir out/homebrew-lift
+```

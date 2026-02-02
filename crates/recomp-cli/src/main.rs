@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 use recomp_pipeline::bundle::{package_bundle, PackageOptions};
-use recomp_pipeline::homebrew::{intake_homebrew, IntakeOptions};
+use recomp_pipeline::homebrew::{intake_homebrew, lift_homebrew, IntakeOptions, LiftOptions};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -16,6 +16,7 @@ enum Command {
     Run(RunArgs),
     Package(PackageArgs),
     HomebrewIntake(HomebrewIntakeArgs),
+    HomebrewLift(HomebrewLiftArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -54,6 +55,16 @@ struct HomebrewIntakeArgs {
     provenance: PathBuf,
     #[arg(long)]
     out_dir: PathBuf,
+}
+
+#[derive(Parser, Debug)]
+struct HomebrewLiftArgs {
+    #[arg(long)]
+    module_json: PathBuf,
+    #[arg(long)]
+    out_dir: PathBuf,
+    #[arg(long, default_value = "entry")]
+    entry: String,
 }
 
 fn main() {
@@ -133,6 +144,32 @@ fn main() {
                 }
                 Err(err) => {
                     eprintln!("Homebrew intake error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::HomebrewLift(lift) => {
+            let options = LiftOptions {
+                module_json_path: lift.module_json,
+                out_dir: lift.out_dir,
+                entry_name: lift.entry,
+            };
+            match lift_homebrew(options) {
+                Ok(report) => {
+                    println!(
+                        "Homebrew lift wrote {} functions to {}",
+                        report.functions_emitted,
+                        report.module_json_path.display()
+                    );
+                    if !report.warnings.is_empty() {
+                        println!("Warnings:");
+                        for warning in report.warnings {
+                            println!("- {}", warning);
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Homebrew lift error: {err}");
                     std::process::exit(1);
                 }
             }
