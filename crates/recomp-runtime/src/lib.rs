@@ -1,12 +1,18 @@
 use std::fmt;
 
 mod homebrew;
+mod memory;
 
 pub const ABI_VERSION: &str = "0.1.0";
 
 pub use homebrew::{
     entrypoint_shim, DeterministicClock, InputEvent, InputQueue, LoaderConfig, LoaderConfigBuilder,
     LoaderConfigEntry, LoaderConfigKey, NroEntrypoint, RuntimeManifest, ServiceStub, NRO_ENTRY_X1,
+};
+pub use memory::{
+    init_memory, recomp_mem_load_u16, recomp_mem_load_u32, recomp_mem_load_u64, recomp_mem_load_u8,
+    recomp_mem_store_u16, recomp_mem_store_u32, recomp_mem_store_u64, recomp_mem_store_u8,
+    MemoryLayout, MemoryLayoutError, MemoryPermissions, MemoryRegionSpec, MemoryStatus,
 };
 pub use recomp_gfx::{CommandStream, GraphicsBackend, GraphicsError, StubBackend};
 pub use recomp_services::{
@@ -48,6 +54,14 @@ pub enum RuntimeError {
     MissingLoaderConfigKey { key: LoaderConfigKey },
     #[error("runtime manifest serialization failed: {message}")]
     ManifestSerialize { message: String },
+    #[error("memory layout error: {0}")]
+    MemoryLayout(#[from] MemoryLayoutError),
+    #[error("memory access error {status:?} at {address:#x} size {size}")]
+    MemoryAccess {
+        status: MemoryStatus,
+        address: u64,
+        size: usize,
+    },
 }
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -61,6 +75,75 @@ pub fn init(config: &RuntimeConfig) {
         "[recomp-runtime] init performance_mode={:?}",
         config.performance_mode
     );
+}
+
+pub fn init_default_memory(layout: MemoryLayout) -> RuntimeResult<()> {
+    init_memory(layout)?;
+    Ok(())
+}
+
+pub fn mem_load_u8(address: u64) -> RuntimeResult<u64> {
+    memory::mem_load_u8(address).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 1,
+    })
+}
+
+pub fn mem_load_u16(address: u64) -> RuntimeResult<u64> {
+    memory::mem_load_u16(address).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 2,
+    })
+}
+
+pub fn mem_load_u32(address: u64) -> RuntimeResult<u64> {
+    memory::mem_load_u32(address).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 4,
+    })
+}
+
+pub fn mem_load_u64(address: u64) -> RuntimeResult<u64> {
+    memory::mem_load_u64(address).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 8,
+    })
+}
+
+pub fn mem_store_u8(address: u64, value: u64) -> RuntimeResult<()> {
+    memory::mem_store_u8(address, value).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 1,
+    })
+}
+
+pub fn mem_store_u16(address: u64, value: u64) -> RuntimeResult<()> {
+    memory::mem_store_u16(address, value).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 2,
+    })
+}
+
+pub fn mem_store_u32(address: u64, value: u64) -> RuntimeResult<()> {
+    memory::mem_store_u32(address, value).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 4,
+    })
+}
+
+pub fn mem_store_u64(address: u64, value: u64) -> RuntimeResult<()> {
+    memory::mem_store_u64(address, value).map_err(|status| RuntimeError::MemoryAccess {
+        status,
+        address,
+        size: 8,
+    })
 }
 
 pub fn syscall_log(name: &str, args: &[i64]) -> RuntimeResult<()> {

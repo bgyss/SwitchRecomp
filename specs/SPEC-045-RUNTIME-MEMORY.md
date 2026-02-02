@@ -1,7 +1,7 @@
 # SPEC-045: Runtime Memory Model and Load/Store Lowering
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
 Define the minimal runtime memory model and the lowering rules needed so block-based output can execute load/store instructions beyond stub paths.

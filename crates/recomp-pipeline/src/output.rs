@@ -1,3 +1,4 @@
+use crate::memory::MemoryLayoutDescriptor;
 use crate::pipeline::{ensure_dir, FunctionBody, RustFunction, RustProgram, RustTerminator};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
@@ -16,6 +17,7 @@ pub struct BuildManifest {
     pub config_sha256: String,
     pub provenance_sha256: String,
     pub inputs: Vec<InputSummary>,
+    pub memory_layout: MemoryLayoutDescriptor,
     pub manifest_self_hash_basis: String,
     pub generated_files: Vec<GeneratedFile>,
 }
@@ -175,6 +177,7 @@ fn emit_main_rs(program: &RustProgram) -> String {
     });
     out.push_str(");\n");
     out.push_str("    recomp_runtime::init(&runtime_config);\n");
+    emit_memory_layout_init(&mut out, &program.memory_layout);
     out.push_str(&format!("    {}()?;\n", program.entry));
     out.push_str(
         "    Ok(())\n}
@@ -187,6 +190,23 @@ fn emit_main_rs(program: &RustProgram) -> String {
     }
 
     out
+}
+
+fn emit_memory_layout_init(out: &mut String, layout: &MemoryLayoutDescriptor) {
+    out.push_str("    let memory_layout = recomp_runtime::MemoryLayout::new(vec![\n");
+    for region in &layout.regions {
+        out.push_str(&format!(
+            "        recomp_runtime::MemoryRegionSpec::new(\"{}\", {}, {}, recomp_runtime::MemoryPermissions::new({}, {}, {})),\n",
+            region.name,
+            format!("{:#x}", region.base),
+            format!("{:#x}", region.size),
+            region.permissions.read,
+            region.permissions.write,
+            region.permissions.execute
+        ));
+    }
+    out.push_str("    ]);\n");
+    out.push_str("    recomp_runtime::init_memory(memory_layout)?;\n");
 }
 
 fn emit_function(function: &RustFunction) -> String {

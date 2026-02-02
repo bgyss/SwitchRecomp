@@ -65,10 +65,10 @@ Outcome
 - Block-based output can execute basic load/store instructions against a minimal runtime memory model.
 
 Work items
-- [ ] Define a memory layout descriptor schema and emit it with outputs.
-- [ ] Implement runtime memory regions with alignment, bounds, and permission checks.
-- [ ] Lower ISA load/store ops to runtime memory helper calls.
-- [ ] Add tests and sample blocks that validate load/store behavior and error handling.
+- [x] Define a memory layout descriptor schema and emit it with outputs.
+- [x] Implement runtime memory regions with alignment, bounds, and permission checks.
+- [x] Lower ISA load/store ops to runtime memory helper calls.
+- [x] Add tests and sample blocks that validate load/store behavior and error handling.
 
 Exit criteria (from SPEC-045)
 - Block-based output executes a test block with loads and stores using runtime helpers.

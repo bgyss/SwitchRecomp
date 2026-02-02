@@ -1,6 +1,7 @@
 use crate::config::{PerformanceMode, StubBehavior, TitleConfig};
 use crate::homebrew::ModuleJson;
 use crate::input::{Block, Function, Module, Op, Terminator};
+use crate::memory::MemoryLayoutDescriptor;
 use crate::output::{emit_project, BuildManifest, GeneratedFile, InputSummary};
 use crate::provenance::{ProvenanceManifest, ValidatedInput};
 use pathdiff::diff_paths;
@@ -104,6 +105,7 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
         config_sha256: config_hash,
         provenance_sha256: provenance_hash,
         inputs,
+        memory_layout: program.memory_layout.clone(),
         manifest_self_hash_basis: String::new(),
         generated_files: Vec::<GeneratedFile>::new(),
     };
@@ -165,6 +167,7 @@ fn translate_module(module: &Module, config: &TitleConfig) -> Result<RustProgram
         entry,
         functions,
         performance_mode: config.runtime.performance_mode,
+        memory_layout: MemoryLayoutDescriptor::minimal_default(),
     })
 }
 
@@ -367,27 +370,45 @@ fn translate_op(
             track_reg(regs, dst);
             lines.push(format!("{dst} = {pc} + {offset};"));
         }
-        Op::LoadI8 { dst, addr, .. }
-        | Op::LoadI16 { dst, addr, .. }
-        | Op::LoadI32 { dst, addr, .. }
-        | Op::LoadI64 { dst, addr, .. } => {
+        Op::LoadI8 { dst, addr, offset } => {
             track_reg(regs, dst);
             track_reg(regs, addr);
-            lines.push(format!(
-                "panic!({});",
-                rust_string_literal("load op not supported in runtime")
-            ));
+            emit_load(lines, dst, addr, *offset, "mem_load_u8");
         }
-        Op::StoreI8 { src, addr, .. }
-        | Op::StoreI16 { src, addr, .. }
-        | Op::StoreI32 { src, addr, .. }
-        | Op::StoreI64 { src, addr, .. } => {
+        Op::LoadI16 { dst, addr, offset } => {
+            track_reg(regs, dst);
+            track_reg(regs, addr);
+            emit_load(lines, dst, addr, *offset, "mem_load_u16");
+        }
+        Op::LoadI32 { dst, addr, offset } => {
+            track_reg(regs, dst);
+            track_reg(regs, addr);
+            emit_load(lines, dst, addr, *offset, "mem_load_u32");
+        }
+        Op::LoadI64 { dst, addr, offset } => {
+            track_reg(regs, dst);
+            track_reg(regs, addr);
+            emit_load(lines, dst, addr, *offset, "mem_load_u64");
+        }
+        Op::StoreI8 { src, addr, offset } => {
             track_reg(regs, src);
             track_reg(regs, addr);
-            lines.push(format!(
-                "panic!({});",
-                rust_string_literal("store op not supported in runtime")
-            ));
+            emit_store(lines, src, addr, *offset, "mem_store_u8");
+        }
+        Op::StoreI16 { src, addr, offset } => {
+            track_reg(regs, src);
+            track_reg(regs, addr);
+            emit_store(lines, src, addr, *offset, "mem_store_u16");
+        }
+        Op::StoreI32 { src, addr, offset } => {
+            track_reg(regs, src);
+            track_reg(regs, addr);
+            emit_store(lines, src, addr, *offset, "mem_store_u32");
+        }
+        Op::StoreI64 { src, addr, offset } => {
+            track_reg(regs, src);
+            track_reg(regs, addr);
+            emit_store(lines, src, addr, *offset, "mem_store_u64");
         }
         Op::Br { target } => {
             lines.push(format!(
@@ -468,6 +489,23 @@ fn render_call_line(target: &str) -> String {
             rust_string_literal(&format!("unsupported call target: {target}"))
         )
     }
+}
+
+fn emit_load(lines: &mut Vec<String>, dst: &str, addr: &str, offset: i64, helper: &str) {
+    let address_expr = format!("({addr} as u64).wrapping_add({offset} as u64)");
+    lines.push(format!("let __recomp_addr = {address_expr};"));
+    lines.push(format!(
+        "let __recomp_value = recomp_runtime::{helper}(__recomp_addr)?;"
+    ));
+    lines.push(format!("{dst} = __recomp_value as i64;"));
+}
+
+fn emit_store(lines: &mut Vec<String>, src: &str, addr: &str, offset: i64, helper: &str) {
+    let address_expr = format!("({addr} as u64).wrapping_add({offset} as u64)");
+    lines.push(format!("let __recomp_addr = {address_expr};"));
+    lines.push(format!(
+        "recomp_runtime::{helper}(__recomp_addr, {src} as u64)?;"
+    ));
 }
 
 fn render_cond_expr(cond: &str) -> Option<String> {
@@ -556,6 +594,7 @@ pub struct RustProgram {
     pub entry: String,
     pub functions: Vec<RustFunction>,
     pub performance_mode: PerformanceMode,
+    pub memory_layout: MemoryLayoutDescriptor,
 }
 
 impl RustProgram {
