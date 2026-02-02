@@ -109,6 +109,46 @@ fn pipeline_emits_project() {
     assert_eq!(report.detected_inputs.len(), 2);
 }
 
+#[test]
+fn pipeline_rejects_homebrew_module_json() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let module_path = temp.path().join("module.json");
+    let config_path = temp.path().join("title.toml");
+    let provenance_path = temp.path().join("provenance.toml");
+    let out_dir = temp.path().join("out");
+    let runtime_path = PathBuf::from("../crates/recomp-runtime");
+
+    let homebrew_module = r#"{
+  "schema_version": "1",
+  "module_type": "homebrew",
+  "modules": [
+    {
+      "name": "sample",
+      "format": "nro",
+      "input_path": "module.nro",
+      "input_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "input_size": 4,
+      "build_id": "deadbeef",
+      "segments": [],
+      "bss": { "size": 0, "memory_offset": 0 }
+    }
+  ]
+}"#;
+
+    fs::write(&module_path, homebrew_module).expect("write module");
+    let err = run_pipeline(PipelineOptions {
+        module_path,
+        config_path,
+        provenance_path,
+        out_dir,
+        runtime_path,
+    })
+    .expect_err("pipeline rejects homebrew module.json");
+
+    let message = err.to_string();
+    assert!(message.contains("homebrew module.json detected"));
+}
+
 fn sha256_hex(bytes: &[u8]) -> String {
     let mut hasher = Sha256::new();
     hasher.update(bytes);

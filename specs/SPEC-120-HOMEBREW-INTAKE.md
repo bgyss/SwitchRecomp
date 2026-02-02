@@ -1,7 +1,7 @@
 # SPEC-120: Homebrew Candidate Intake
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Purpose
 Define the intake requirements and metadata capture needed to select a Switch homebrew title and feed it into the static recompilation pipeline.
@@ -38,7 +38,7 @@ Homebrew on Switch is commonly distributed as NRO modules, which are executable 
   - Optional `module*.nso`
   - Optional `assets/` extracted from the NRO asset section
   - `provenance.toml` and `title.toml` metadata files
-- Intake produces a `module.json` and `manifest.json` compatible with the pipeline CLI.
+- Intake produces a `module.json` and `manifest.json` compatible with the pipeline CLI; the homebrew module.json is consumed by the lifter stage to produce a lifted module.json for translation.
 
 ## Deliverables
 - NRO and optional NSO intake parser.

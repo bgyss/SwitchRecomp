@@ -1,4 +1,5 @@
 use crate::config::{PerformanceMode, StubBehavior, TitleConfig};
+use crate::homebrew::ModuleJson;
 use crate::input::{Function, Module, Op};
 use crate::output::{emit_project, BuildManifest, GeneratedFile, InputSummary};
 use crate::provenance::{ProvenanceManifest, ValidatedInput};
@@ -45,9 +46,18 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
     let runtime_path = absolute_path(&options.runtime_path)?;
 
     let module_src = fs::read_to_string(&module_path)?;
-    let module: Module = serde_json::from_str(&module_src)
-        .map_err(|err| PipelineError::Module(format!("invalid module JSON: {err}")))?;
-    module.validate_arch().map_err(PipelineError::Module)?;
+    let module = match parse_module_source(&module_src)? {
+        ModuleSource::Lifted(module) => {
+            module.validate_arch().map_err(PipelineError::Module)?;
+            module
+        }
+        ModuleSource::Homebrew(module_json) => {
+            return Err(PipelineError::Module(format!(
+                "homebrew module.json detected (schema_version={}, module_type={}). Run the lifter to produce a lifted module.json before translation.",
+                module_json.schema_version, module_json.module_type
+            )));
+        }
+    };
 
     let config_src = fs::read_to_string(&config_path)?;
     let config = TitleConfig::parse(&config_src).map_err(PipelineError::Config)?;
@@ -106,6 +116,40 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
         files_written,
         detected_inputs: provenance_validation.inputs,
     })
+}
+
+#[derive(Debug)]
+enum ModuleSource {
+    Lifted(Module),
+    Homebrew(ModuleJson),
+}
+
+fn parse_module_source(module_src: &str) -> Result<ModuleSource, PipelineError> {
+    let value: serde_json::Value = serde_json::from_str(module_src)
+        .map_err(|err| PipelineError::Module(format!("invalid module JSON: {err}")))?;
+    if looks_like_homebrew_module(&value) {
+        let module_json: ModuleJson = serde_json::from_value(value)
+            .map_err(|err| PipelineError::Module(format!("invalid homebrew module JSON: {err}")))?;
+        return Ok(ModuleSource::Homebrew(module_json));
+    }
+    let module: Module = serde_json::from_value(value)
+        .map_err(|err| PipelineError::Module(format!("invalid module JSON: {err}")))?;
+    Ok(ModuleSource::Lifted(module))
+}
+
+fn looks_like_homebrew_module(value: &serde_json::Value) -> bool {
+    value
+        .get("schema_version")
+        .and_then(|value| value.as_str())
+        .is_some()
+        && value
+            .get("module_type")
+            .and_then(|value| value.as_str())
+            .is_some()
+        && value
+            .get("modules")
+            .and_then(|value| value.as_array())
+            .is_some()
 }
 
 fn translate_module(module: &Module, config: &TitleConfig) -> Result<RustProgram, PipelineError> {
