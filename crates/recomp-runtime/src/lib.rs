@@ -1,7 +1,13 @@
 use std::fmt;
 
+mod homebrew;
+
 pub const ABI_VERSION: &str = "0.1.0";
 
+pub use homebrew::{
+    entrypoint_shim, DeterministicClock, InputEvent, InputQueue, LoaderConfig, LoaderConfigBuilder,
+    LoaderConfigEntry, LoaderConfigKey, NroEntrypoint, RuntimeManifest, ServiceStub, NRO_ENTRY_X1,
+};
 pub use recomp_gfx::{CommandStream, GraphicsBackend, GraphicsError, StubBackend};
 pub use recomp_services::{
     stub_handler, ServiceAccessControl, ServiceCall, ServiceError, ServiceLogger, ServiceRegistry,
@@ -38,6 +44,10 @@ impl Default for RuntimeConfig {
 pub enum RuntimeError {
     #[error("stubbed syscall: {name}")]
     StubbedSyscall { name: String },
+    #[error("missing loader config key: {key:?}")]
+    MissingLoaderConfigKey { key: LoaderConfigKey },
+    #[error("runtime manifest serialization failed: {message}")]
+    ManifestSerialize { message: String },
 }
 
 pub type RuntimeResult<T> = Result<T, RuntimeError>;
@@ -125,11 +135,10 @@ mod tests {
     #[test]
     fn panic_syscall_returns_error() {
         let err = syscall_panic("svc_test", &[]).unwrap_err();
-        match err {
-            RuntimeError::StubbedSyscall { name } => {
-                assert_eq!(name, "svc_test");
-            }
-        }
+        assert!(matches!(
+            err,
+            RuntimeError::StubbedSyscall { name } if name == "svc_test"
+        ));
     }
 
     #[test]

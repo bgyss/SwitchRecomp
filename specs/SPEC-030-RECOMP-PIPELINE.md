@@ -1,11 +1,13 @@
 # SPEC-030: Static Recompilation Pipeline
 
 ## Status
-Draft v0.4
+Draft v0.6
 
 ## Rationale
 - Added an exploratory pipeline scaffold and config schema to validate the end-to-end shape.
 - Added deterministic build manifest emission with input hashes.
+- Added a placeholder homebrew lifter command to bridge intake into lifted JSON.
+- Added a minimal AArch64 decode mode to lift homebrew text segments into the placeholder IR.
 
 ## Purpose
 Define the end-to-end pipeline for static recompilation from input binaries to native output.

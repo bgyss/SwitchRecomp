@@ -11,6 +11,12 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-096 Bundle Manifest Integrity
 - SPEC-100 Validation and Acceptance
 - SPEC-110 Target Title Selection Criteria
+- SPEC-120 Homebrew Candidate Intake
+- SPEC-130 Homebrew Module Extraction
+- SPEC-140 Homebrew Runtime Surface
+- SPEC-150 Homebrew Asset Packaging
+- SPEC-160 AArch64 Decode Coverage
+- SPEC-170 Function Discovery and Control-Flow Graph
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -120,3 +126,100 @@ Work items
 Exit criteria (from SPEC-110)
 - A documented selection that satisfies all checklist items.
 - A published plan for obtaining inputs legally and privately.
+
+## SPEC-120: Homebrew Candidate Intake
+Outcome
+- Accept a legally distributable homebrew candidate and emit a deterministic intake manifest.
+
+Work items
+- [x] Define a module intake manifest schema for NRO + optional NSO inputs.
+- [x] Implement NRO intake parsing for header fields and asset section offsets.
+- [x] Add provenance validation checks for homebrew inputs (reject proprietary or encrypted formats).
+- [x] Emit deterministic `module.json` and `manifest.json` with hashes, sizes, and tool versions.
+- [x] Add sample intake tests using non-proprietary NRO fixtures.
+
+Exit criteria (from SPEC-120)
+- A homebrew NRO can be ingested with hashes, build id, and asset offsets recorded.
+- Asset extraction is recorded without mixing assets into code output.
+- Intake errors are explicit when required fields are missing or unsupported.
+
+## SPEC-130: Homebrew Module Extraction
+Outcome
+- Normalize NRO/NSO binaries into module.json and extracted segment blobs.
+
+Work items
+- [x] Implement NSO parsing including LZ4 segment decompression.
+- [x] Capture build id/module id and preserve section boundaries in module.json.
+- [x] Preserve relocation and symbol metadata when present.
+- [x] Ensure extraction is deterministic across runs.
+- [x] Add tests for NRO-only and NRO + NSO ingestion paths.
+
+Exit criteria (from SPEC-130)
+- NRO and NSO inputs yield module.json with correct segment sizes and build id.
+- Compressed NSO segments are decompressed and emitted deterministically.
+- Section boundaries are preserved for later translation.
+
+## SPEC-140: Homebrew Runtime Surface
+Outcome
+- Provide a minimal runtime ABI surface that can boot a recompiled homebrew title.
+
+Work items
+- [x] Implement homebrew entrypoint shim with loader config setup.
+- [x] Define loader config keys and defaults (EndOfList, MainThreadHandle, AppletType).
+- [x] Add runtime manifest that enumerates provided config keys and stubbed services.
+- [x] Implement deterministic time and input stubs for validation runs.
+- [x] Add logging for unsupported service calls with explicit failure behavior.
+
+Exit criteria (from SPEC-140)
+- Recompiled binaries boot with required loader config keys present.
+- Unsupported services fail with explicit, logged errors.
+- Runtime manifest records provided loader config keys.
+
+## SPEC-150: Homebrew Asset Packaging
+Outcome
+- Extract NRO asset section contents and package them alongside recompiled output.
+
+Work items
+- [x] Implement asset section extraction (icon, NACP, RomFS).
+- [x] Validate and store NACP as `control.nacp` with expected size.
+- [x] Emit deterministic asset output directory and hashes in manifest.json.
+- [x] Document runtime RomFS mount expectations.
+- [x] Add tests for asset extraction and manifest hashes.
+
+Exit criteria (from SPEC-150)
+- Icon, NACP, and RomFS assets are extracted deterministically when present.
+- Asset hashes in manifest.json match extracted bytes.
+- Code output remains separate from extracted assets.
+
+## SPEC-160: AArch64 Decode Coverage
+Outcome
+- Expand decode coverage and IR support to lift real homebrew code paths.
+
+Work items
+- [x] Extend the lifted IR schema with arithmetic, logical, shift, memory, and branch ops.
+- [x] Add decoder support for MOV (ORR alias), SUB, AND/OR/XOR, ADR/ADRP, LDR/STR, and branch opcodes listed in SPEC-160.
+- [x] Map 32-bit W-register operations to zero-extended 64-bit IR semantics.
+- [x] Add per-op unit tests that validate opcode decoding and emitted IR structure.
+- [x] Add decode-limit enforcement tests for oversized text segments.
+
+Exit criteria (from SPEC-160)
+- A synthetic instruction stream containing Phase 1 opcodes lifts without errors.
+- Unsupported opcodes report the PC and opcode value.
+- Tests confirm 32-bit variants are zero-extended.
+- Loads/stores emit correctly typed IR ops with aligned access checks.
+
+## SPEC-170: Function Discovery and Control-Flow Graph
+Outcome
+- Replace linear decoding with basic blocks and deterministic control-flow graphs.
+
+Work items
+- [x] Extend the lifted module schema to allow block-based functions alongside legacy linear ops.
+- [x] Implement a sorted worklist decoder that builds blocks and edges deterministically.
+- [x] Add control-flow terminators for unconditional, conditional, call, and indirect branches.
+- [x] Seed function discovery from entrypoint and direct call targets.
+- [x] Add tests for if/else blocks, direct call discovery, and unresolved indirect branches.
+
+Exit criteria (from SPEC-170)
+- A synthetic binary with a conditional branch yields at least two blocks and correct edges.
+- Direct call targets are discovered and lifted as separate functions.
+- The lifted module is deterministic when run twice on the same input.

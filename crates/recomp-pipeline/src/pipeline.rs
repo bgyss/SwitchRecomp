@@ -1,5 +1,6 @@
 use crate::config::{PerformanceMode, StubBehavior, TitleConfig};
-use crate::input::{Function, Module, Op};
+use crate::homebrew::ModuleJson;
+use crate::input::{Block, Function, Module, Op, Terminator};
 use crate::output::{emit_project, BuildManifest, GeneratedFile, InputSummary};
 use crate::provenance::{ProvenanceManifest, ValidatedInput};
 use pathdiff::diff_paths;
@@ -45,9 +46,18 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
     let runtime_path = absolute_path(&options.runtime_path)?;
 
     let module_src = fs::read_to_string(&module_path)?;
-    let module: Module = serde_json::from_str(&module_src)
-        .map_err(|err| PipelineError::Module(format!("invalid module JSON: {err}")))?;
-    module.validate_arch().map_err(PipelineError::Module)?;
+    let module = match parse_module_source(&module_src)? {
+        ModuleSource::Lifted(module) => {
+            module.validate_arch().map_err(PipelineError::Module)?;
+            module
+        }
+        ModuleSource::Homebrew(module_json) => {
+            return Err(PipelineError::Module(format!(
+                "homebrew module.json detected (schema_version={}, module_type={}). Run the lifter to produce a lifted module.json before translation.",
+                module_json.schema_version, module_json.module_type
+            )));
+        }
+    };
 
     let config_src = fs::read_to_string(&config_path)?;
     let config = TitleConfig::parse(&config_src).map_err(PipelineError::Config)?;
@@ -108,6 +118,40 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
     })
 }
 
+#[derive(Debug)]
+enum ModuleSource {
+    Lifted(Module),
+    Homebrew(ModuleJson),
+}
+
+fn parse_module_source(module_src: &str) -> Result<ModuleSource, PipelineError> {
+    let value: serde_json::Value = serde_json::from_str(module_src)
+        .map_err(|err| PipelineError::Module(format!("invalid module JSON: {err}")))?;
+    if looks_like_homebrew_module(&value) {
+        let module_json: ModuleJson = serde_json::from_value(value)
+            .map_err(|err| PipelineError::Module(format!("invalid homebrew module JSON: {err}")))?;
+        return Ok(ModuleSource::Homebrew(module_json));
+    }
+    let module: Module = serde_json::from_value(value)
+        .map_err(|err| PipelineError::Module(format!("invalid module JSON: {err}")))?;
+    Ok(ModuleSource::Lifted(module))
+}
+
+fn looks_like_homebrew_module(value: &serde_json::Value) -> bool {
+    value
+        .get("schema_version")
+        .and_then(|value| value.as_str())
+        .is_some()
+        && value
+            .get("module_type")
+            .and_then(|value| value.as_str())
+            .is_some()
+        && value
+            .get("modules")
+            .and_then(|value| value.as_array())
+            .is_some()
+}
+
 fn translate_module(module: &Module, config: &TitleConfig) -> Result<RustProgram, PipelineError> {
     let entry = config.entry.clone();
     let mut functions = Vec::new();
@@ -128,44 +172,16 @@ fn translate_function(
     function: &Function,
     config: &TitleConfig,
 ) -> Result<RustFunction, PipelineError> {
-    let mut regs = Vec::new();
-    let mut lines = Vec::new();
-
-    for op in &function.ops {
-        match op {
-            Op::ConstI64 { dst, imm } => {
-                track_reg(&mut regs, dst);
-                lines.push(format!("{dst} = {imm};"));
-            }
-            Op::AddI64 { dst, lhs, rhs } => {
-                track_reg(&mut regs, dst);
-                track_reg(&mut regs, lhs);
-                track_reg(&mut regs, rhs);
-                lines.push(format!("{dst} = {lhs} + {rhs};"));
-            }
-            Op::Syscall { name, args } => {
-                for arg in args {
-                    track_reg(&mut regs, arg);
-                }
-                let behavior = config
-                    .stubs
-                    .get(name)
-                    .copied()
-                    .unwrap_or(StubBehavior::Panic);
-                let call = render_syscall(name, behavior, args);
-                lines.push(call);
-            }
-            Op::Ret => {
-                lines.push("return Ok(());".to_string());
-            }
-        }
+    if !function.blocks.is_empty() {
+        translate_block_function(function, config)
+    } else if !function.ops.is_empty() {
+        translate_linear_function(function, config)
+    } else {
+        Err(PipelineError::Module(format!(
+            "function {} has no ops or blocks",
+            function.name
+        )))
     }
-
-    Ok(RustFunction {
-        name: function.name.clone(),
-        regs,
-        lines,
-    })
 }
 
 fn track_reg(regs: &mut Vec<String>, name: &str) {
@@ -189,11 +205,348 @@ fn render_syscall(name: &str, behavior: StubBehavior, args: &[String]) -> String
     }
 }
 
+fn translate_linear_function(
+    function: &Function,
+    config: &TitleConfig,
+) -> Result<RustFunction, PipelineError> {
+    let mut regs = Vec::new();
+    let mut lines = Vec::new();
+    let mut needs_flags = false;
+
+    for op in &function.ops {
+        translate_op(op, config, &mut regs, &mut lines, &mut needs_flags)?;
+    }
+
+    Ok(RustFunction {
+        name: function.name.clone(),
+        regs,
+        needs_flags,
+        body: FunctionBody::Linear(lines),
+    })
+}
+
+fn translate_block_function(
+    function: &Function,
+    config: &TitleConfig,
+) -> Result<RustFunction, PipelineError> {
+    let mut regs = Vec::new();
+    let mut blocks = Vec::new();
+    let mut needs_flags = false;
+
+    for block in &function.blocks {
+        let mut lines = Vec::new();
+        for op in &block.ops {
+            translate_op(op, config, &mut regs, &mut lines, &mut needs_flags)?;
+        }
+        let terminator = translate_terminator(block, &mut needs_flags)?;
+        blocks.push(RustBlock {
+            label: block.label.clone(),
+            lines,
+            terminator,
+        });
+    }
+
+    Ok(RustFunction {
+        name: function.name.clone(),
+        regs,
+        needs_flags,
+        body: FunctionBody::Blocks(blocks),
+    })
+}
+
+fn translate_op(
+    op: &Op,
+    config: &TitleConfig,
+    regs: &mut Vec<String>,
+    lines: &mut Vec<String>,
+    needs_flags: &mut bool,
+) -> Result<(), PipelineError> {
+    match op {
+        Op::ConstI64 { dst, imm } => {
+            track_reg(regs, dst);
+            lines.push(format!("{dst} = {imm};"));
+        }
+        Op::AddI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!("{dst} = {lhs} + {rhs};"));
+        }
+        Op::MovI64 { dst, src } => {
+            track_reg(regs, dst);
+            track_reg(regs, src);
+            lines.push(format!("{dst} = {src};"));
+        }
+        Op::SubI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!("{dst} = {lhs} - {rhs};"));
+        }
+        Op::AndI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!("{dst} = {lhs} & {rhs};"));
+        }
+        Op::OrI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!("{dst} = {lhs} | {rhs};"));
+        }
+        Op::XorI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!("{dst} = {lhs} ^ {rhs};"));
+        }
+        Op::CmpI64 { lhs, rhs } => {
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            *needs_flags = true;
+            lines.push(format!(
+                "let (__recomp_cmp_res, __recomp_cmp_overflow) = {lhs}.overflowing_sub({rhs});"
+            ));
+            lines.push(format!(
+                "let (_, __recomp_cmp_borrow) = ({lhs} as u64).overflowing_sub({rhs} as u64);"
+            ));
+            lines.push("flag_n = __recomp_cmp_res < 0;".to_string());
+            lines.push("flag_z = __recomp_cmp_res == 0;".to_string());
+            lines.push("flag_c = !__recomp_cmp_borrow;".to_string());
+            lines.push("flag_v = __recomp_cmp_overflow;".to_string());
+        }
+        Op::CmnI64 { lhs, rhs } => {
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            *needs_flags = true;
+            lines.push(format!(
+                "let (__recomp_cmn_res, __recomp_cmn_overflow) = {lhs}.overflowing_add({rhs});"
+            ));
+            lines.push(format!(
+                "let (_, __recomp_cmn_carry) = ({lhs} as u64).overflowing_add({rhs} as u64);"
+            ));
+            lines.push("flag_n = __recomp_cmn_res < 0;".to_string());
+            lines.push("flag_z = __recomp_cmn_res == 0;".to_string());
+            lines.push("flag_c = __recomp_cmn_carry;".to_string());
+            lines.push("flag_v = __recomp_cmn_overflow;".to_string());
+        }
+        Op::TestI64 { lhs, rhs } => {
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            *needs_flags = true;
+            lines.push(format!("let __recomp_tst_res = {lhs} & {rhs};"));
+            lines.push("flag_n = __recomp_tst_res < 0;".to_string());
+            lines.push("flag_z = __recomp_tst_res == 0;".to_string());
+            lines.push("flag_c = false;".to_string());
+            lines.push("flag_v = false;".to_string());
+        }
+        Op::LslI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!(
+                "{dst} = (({lhs} as u64) << (({rhs} as u64) & 63)) as i64;"
+            ));
+        }
+        Op::LsrI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!(
+                "{dst} = (({lhs} as u64) >> (({rhs} as u64) & 63)) as i64;"
+            ));
+        }
+        Op::AsrI64 { dst, lhs, rhs } => {
+            track_reg(regs, dst);
+            track_reg(regs, lhs);
+            track_reg(regs, rhs);
+            lines.push(format!("{dst} = {lhs} >> (({rhs} as u64) & 63);"));
+        }
+        Op::PcRel { dst, pc, offset } => {
+            track_reg(regs, dst);
+            lines.push(format!("{dst} = {pc} + {offset};"));
+        }
+        Op::LoadI8 { dst, addr, .. }
+        | Op::LoadI16 { dst, addr, .. }
+        | Op::LoadI32 { dst, addr, .. }
+        | Op::LoadI64 { dst, addr, .. } => {
+            track_reg(regs, dst);
+            track_reg(regs, addr);
+            lines.push(format!(
+                "panic!({});",
+                rust_string_literal("load op not supported in runtime")
+            ));
+        }
+        Op::StoreI8 { src, addr, .. }
+        | Op::StoreI16 { src, addr, .. }
+        | Op::StoreI32 { src, addr, .. }
+        | Op::StoreI64 { src, addr, .. } => {
+            track_reg(regs, src);
+            track_reg(regs, addr);
+            lines.push(format!(
+                "panic!({});",
+                rust_string_literal("store op not supported in runtime")
+            ));
+        }
+        Op::Br { target } => {
+            lines.push(format!(
+                "panic!({});",
+                rust_string_literal(&format!("control-flow op in linear IR: br to {target}"))
+            ));
+        }
+        Op::BrCond { cond, .. } => {
+            *needs_flags = true;
+            lines.push(format!(
+                "panic!({});",
+                rust_string_literal(&format!("control-flow op in linear IR: br_cond {cond}"))
+            ));
+        }
+        Op::Call { target } => {
+            let call_line = render_call_line(target);
+            lines.push(call_line);
+        }
+        Op::Syscall { name, args } => {
+            for arg in args {
+                track_reg(regs, arg);
+            }
+            let behavior = config
+                .stubs
+                .get(name)
+                .copied()
+                .unwrap_or(StubBehavior::Panic);
+            let call = render_syscall(name, behavior, args);
+            lines.push(call);
+        }
+        Op::Ret => {
+            lines.push("return Ok(());".to_string());
+        }
+    }
+    Ok(())
+}
+
+fn translate_terminator(
+    block: &Block,
+    needs_flags: &mut bool,
+) -> Result<RustTerminator, PipelineError> {
+    match &block.terminator {
+        Terminator::Br { target } => Ok(RustTerminator::Br {
+            target: target.clone(),
+        }),
+        Terminator::BrCond {
+            cond,
+            then,
+            else_target,
+        } => {
+            *needs_flags = true;
+            let cond_expr = render_cond_expr(cond);
+            Ok(RustTerminator::BrCond {
+                cond_expr,
+                cond: cond.clone(),
+                then_label: then.clone(),
+                else_label: else_target.clone(),
+            })
+        }
+        Terminator::Call { target, next } => {
+            let call_line = render_call_line(target);
+            Ok(RustTerminator::Call {
+                call_line,
+                next: next.clone(),
+            })
+        }
+        Terminator::BrIndirect { reg } => Ok(RustTerminator::BrIndirect { reg: reg.clone() }),
+        Terminator::Ret => Ok(RustTerminator::Ret),
+    }
+}
+
+fn render_call_line(target: &str) -> String {
+    if is_rust_ident(target) {
+        format!("{target}()?;")
+    } else {
+        format!(
+            "panic!({});",
+            rust_string_literal(&format!("unsupported call target: {target}"))
+        )
+    }
+}
+
+fn render_cond_expr(cond: &str) -> Option<String> {
+    let expr = match cond {
+        "eq" => "flag_z",
+        "ne" => "!flag_z",
+        "cs" | "hs" => "flag_c",
+        "cc" | "lo" => "!flag_c",
+        "mi" => "flag_n",
+        "pl" => "!flag_n",
+        "vs" => "flag_v",
+        "vc" => "!flag_v",
+        "hi" => "flag_c && !flag_z",
+        "ls" => "!flag_c || flag_z",
+        "ge" => "flag_n == flag_v",
+        "lt" => "flag_n != flag_v",
+        "gt" => "!flag_z && (flag_n == flag_v)",
+        "le" => "flag_z || (flag_n != flag_v)",
+        "al" => "true",
+        _ => return None,
+    };
+    Some(expr.to_string())
+}
+
+fn is_rust_ident(name: &str) -> bool {
+    let mut chars = name.chars();
+    let Some(first) = chars.next() else {
+        return false;
+    };
+    if !(first == '_' || first.is_ascii_alphabetic()) {
+        return false;
+    }
+    chars.all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+}
+
+fn rust_string_literal(value: &str) -> String {
+    format!("{value:?}")
+}
+
 #[derive(Debug)]
 pub struct RustFunction {
     pub name: String,
     pub regs: Vec<String>,
+    pub needs_flags: bool,
+    pub body: FunctionBody,
+}
+
+#[derive(Debug)]
+pub enum FunctionBody {
+    Linear(Vec<String>),
+    Blocks(Vec<RustBlock>),
+}
+
+#[derive(Debug)]
+pub struct RustBlock {
+    pub label: String,
     pub lines: Vec<String>,
+    pub terminator: RustTerminator,
+}
+
+#[derive(Debug)]
+pub enum RustTerminator {
+    Br {
+        target: String,
+    },
+    BrCond {
+        cond_expr: Option<String>,
+        cond: String,
+        then_label: String,
+        else_label: String,
+    },
+    Call {
+        call_line: String,
+        next: String,
+    },
+    BrIndirect {
+        reg: String,
+    },
+    Ret,
 }
 
 #[derive(Debug)]

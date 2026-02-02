@@ -1,5 +1,8 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use recomp_pipeline::bundle::{package_bundle, PackageOptions};
+use recomp_pipeline::homebrew::{
+    intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
+};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -14,6 +17,8 @@ struct Args {
 enum Command {
     Run(RunArgs),
     Package(PackageArgs),
+    HomebrewIntake(HomebrewIntakeArgs),
+    HomebrewLift(HomebrewLiftArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -40,6 +45,45 @@ struct PackageArgs {
     out_dir: PathBuf,
     #[arg(long)]
     assets_dir: Option<PathBuf>,
+}
+
+#[derive(Parser, Debug)]
+struct HomebrewIntakeArgs {
+    #[arg(long)]
+    module: PathBuf,
+    #[arg(long)]
+    nso: Vec<PathBuf>,
+    #[arg(long)]
+    provenance: PathBuf,
+    #[arg(long)]
+    out_dir: PathBuf,
+}
+
+#[derive(Parser, Debug)]
+struct HomebrewLiftArgs {
+    #[arg(long)]
+    module_json: PathBuf,
+    #[arg(long)]
+    out_dir: PathBuf,
+    #[arg(long, default_value = "entry")]
+    entry: String,
+    #[arg(long, value_enum, default_value = "decode")]
+    mode: HomebrewLiftMode,
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+enum HomebrewLiftMode {
+    Stub,
+    Decode,
+}
+
+impl From<HomebrewLiftMode> for LiftMode {
+    fn from(value: HomebrewLiftMode) -> Self {
+        match value {
+            HomebrewLiftMode::Stub => LiftMode::Stub,
+            HomebrewLiftMode::Decode => LiftMode::Decode,
+        }
+    }
 }
 
 fn main() {
@@ -96,6 +140,56 @@ fn main() {
                 }
                 Err(err) => {
                     eprintln!("Packaging error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::HomebrewIntake(intake) => {
+            let options = IntakeOptions {
+                module_path: intake.module,
+                nso_paths: intake.nso,
+                provenance_path: intake.provenance,
+                out_dir: intake.out_dir,
+            };
+            match intake_homebrew(options) {
+                Ok(report) => {
+                    println!(
+                        "Homebrew intake wrote {} files to {}",
+                        report.files_written.len(),
+                        report.out_dir.display()
+                    );
+                    println!("module.json: {}", report.module_json_path.display());
+                    println!("manifest.json: {}", report.manifest_path.display());
+                }
+                Err(err) => {
+                    eprintln!("Homebrew intake error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::HomebrewLift(lift) => {
+            let options = LiftOptions {
+                module_json_path: lift.module_json,
+                out_dir: lift.out_dir,
+                entry_name: lift.entry,
+                mode: lift.mode.into(),
+            };
+            match lift_homebrew(options) {
+                Ok(report) => {
+                    println!(
+                        "Homebrew lift wrote {} functions to {}",
+                        report.functions_emitted,
+                        report.module_json_path.display()
+                    );
+                    if !report.warnings.is_empty() {
+                        println!("Warnings:");
+                        for warning in report.warnings {
+                            println!("- {}", warning);
+                        }
+                    }
+                }
+                Err(err) => {
+                    eprintln!("Homebrew lift error: {err}");
                     std::process::exit(1);
                 }
             }

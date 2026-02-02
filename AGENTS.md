@@ -41,6 +41,7 @@ Pre-commit hooks provide fast feedback; `prek` is a drop-in replacement that rea
 - Configured hooks:
   - Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
   - Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
+- If a pre-push hook fails, fix the reported changes, rerun the full test suite, then commit and push again after the hook clears.
 
 ## Commit & Pull Request Guidelines
 No established commit conventions are present yet. Until standards are set:
@@ -59,3 +60,17 @@ No established commit conventions are present yet. Until standards are set:
 - Do not add proprietary binaries, keys, or assets to the repository.
 - Always test changes, update relevant documentation, and commit all code you modify or add.
 - Push all commits after creating them.
+
+## Subagent Conflict Resolution
+When using subagents, apply this workflow to keep ownership and diffs clear.
+
+1) Record a clean baseline before spawning subagents: `git status -sb` and `git diff --stat`.
+2) Assign each subagent a strict file or directory scope.
+3) After each subagent finishes, compare changes to the baseline and declared scope.
+4) If unexpected changes appear:
+   - Stop all subagents.
+   - Inspect the diff (`git diff --name-status` + `git diff` for unexpected files).
+   - Decide to accept, revert, or move the changes into a separate commit.
+5) Do not mix subagent outputs across scopes in a single commit.
+6) If hooks modify files on commit/push, rerun the hook targets, re-stage, re-commit, then push again.
+7) Only push when `git status -sb` shows a clean tree and hooks are green.
