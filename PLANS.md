@@ -6,6 +6,7 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-000 Project Charter and Ethics
 - SPEC-010 Target Platform Baseline
 - SPEC-020 Inputs and Provenance
+- SPEC-045 Runtime Memory Model and Load/Store Lowering
 - SPEC-090 Build, Packaging, and Distribution
 - SPEC-095 Build Manifest Integrity
 - SPEC-096 Bundle Manifest Integrity
@@ -58,6 +59,21 @@ Exit criteria (from SPEC-020)
 - A metadata schema with validation rules.
 - The toolchain refuses to build without provenance metadata.
 - A format detector identifies NCA/ExeFS/NSO0/NRO0/NRR0 inputs and logs the chosen path.
+
+## SPEC-045: Runtime Memory Model and Load/Store Lowering
+Outcome
+- Block-based output can execute basic load/store instructions against a minimal runtime memory model.
+
+Work items
+- [ ] Define a memory layout descriptor schema and emit it with outputs.
+- [ ] Implement runtime memory regions with alignment, bounds, and permission checks.
+- [ ] Lower ISA load/store ops to runtime memory helper calls.
+- [ ] Add tests and sample blocks that validate load/store behavior and error handling.
+
+Exit criteria (from SPEC-045)
+- Block-based output executes a test block with loads and stores using runtime helpers.
+- Unaligned or out-of-bounds accesses return deterministic error codes.
+- A sample pipeline output includes a memory layout descriptor that matches runtime regions.
 
 ## SPEC-090: Build, Packaging, and Distribution
 Outcome
