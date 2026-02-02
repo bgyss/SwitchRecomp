@@ -21,6 +21,8 @@ This folder contains the project specs for the Switch static recompilation prese
 - SPEC-130-HOMEBREW-MODULE-EXTRACTION.md
 - SPEC-140-HOMEBREW-RUNTIME-SURFACE.md
 - SPEC-150-HOMEBREW-ASSET-PACKAGING.md
+- SPEC-160-AARCH64-DECODE-COVERAGE.md
+- SPEC-170-FUNCTION-DISCOVERY-CFG.md
 
 ## Template
 - SPEC-TEMPLATE.md

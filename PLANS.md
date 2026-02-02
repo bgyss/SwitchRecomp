@@ -15,6 +15,8 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-130 Homebrew Module Extraction
 - SPEC-140 Homebrew Runtime Surface
 - SPEC-150 Homebrew Asset Packaging
+- SPEC-160 AArch64 Decode Coverage
+- SPEC-170 Function Discovery and Control-Flow Graph
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -188,3 +190,36 @@ Exit criteria (from SPEC-150)
 - Icon, NACP, and RomFS assets are extracted deterministically when present.
 - Asset hashes in manifest.json match extracted bytes.
 - Code output remains separate from extracted assets.
+
+## SPEC-160: AArch64 Decode Coverage
+Outcome
+- Expand decode coverage and IR support to lift real homebrew code paths.
+
+Work items
+- [ ] Extend the lifted IR schema with arithmetic, logical, shift, memory, and branch ops.
+- [ ] Add decoder support for MOV (ORR alias), SUB, AND/OR/XOR, ADR/ADRP, LDR/STR, and branch opcodes listed in SPEC-160.
+- [ ] Map 32-bit W-register operations to zero-extended 64-bit IR semantics.
+- [ ] Add per-op unit tests that validate opcode decoding and emitted IR structure.
+- [ ] Add decode-limit enforcement tests for oversized text segments.
+
+Exit criteria (from SPEC-160)
+- A synthetic instruction stream containing Phase 1 opcodes lifts without errors.
+- Unsupported opcodes report the PC and opcode value.
+- Tests confirm 32-bit variants are zero-extended.
+- Loads/stores emit correctly typed IR ops with aligned access checks.
+
+## SPEC-170: Function Discovery and Control-Flow Graph
+Outcome
+- Replace linear decoding with basic blocks and deterministic control-flow graphs.
+
+Work items
+- [ ] Extend the lifted module schema to allow block-based functions alongside legacy linear ops.
+- [ ] Implement a sorted worklist decoder that builds blocks and edges deterministically.
+- [ ] Add control-flow terminators for unconditional, conditional, call, and indirect branches.
+- [ ] Seed function discovery from entrypoint and direct call targets.
+- [ ] Add tests for if/else blocks, direct call discovery, and unresolved indirect branches.
+
+Exit criteria (from SPEC-170)
+- A synthetic binary with a conditional branch yields at least two blocks and correct edges.
+- Direct call targets are discovered and lifted as separate functions.
+- The lifted module is deterministic when run twice on the same input.
