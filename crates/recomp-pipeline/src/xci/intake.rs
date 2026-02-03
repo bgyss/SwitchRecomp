@@ -3,6 +3,7 @@ use crate::homebrew::nso::{extract_segments, parse_nso, NsoModule, NsoSegmentKin
 use crate::homebrew::romfs::{list_romfs_entries, RomfsEntry};
 use crate::output::{GeneratedFile, InputSummary};
 use crate::provenance::{InputFormat, ProvenanceManifest};
+use crate::xci::external::{ExternalXciExtractor, XciToolPreference};
 use crate::xci::mock::MockXciExtractor;
 use crate::xci::types::{XciExtractRequest, XciExtractResult, XciExtractor, XciProgram};
 use pathdiff::diff_paths;
@@ -23,6 +24,8 @@ pub struct XciIntakeOptions {
     pub provenance_path: PathBuf,
     pub out_dir: PathBuf,
     pub assets_dir: PathBuf,
+    pub tool_preference: XciToolPreference,
+    pub tool_path: Option<PathBuf>,
 }
 
 #[derive(Debug)]
@@ -98,8 +101,14 @@ struct AssetRecord {
 }
 
 pub fn intake_xci(options: XciIntakeOptions) -> Result<XciIntakeReport, String> {
-    let extractor = MockXciExtractor::new();
-    intake_xci_with_extractor(options, &extractor)
+    if let Some(external) =
+        ExternalXciExtractor::detect(options.tool_preference, options.tool_path.as_deref())?
+    {
+        intake_xci_with_extractor(options, &external)
+    } else {
+        let extractor = MockXciExtractor::new();
+        intake_xci_with_extractor(options, &extractor)
+    }
 }
 
 pub fn intake_xci_with_extractor(
@@ -230,7 +239,7 @@ pub fn intake_xci_with_extractor(
     });
 
     let mut assets = Vec::new();
-    if let Some(romfs_image) = extraction.romfs_image.clone() {
+    if let Some(romfs_image) = program.romfs_image.clone() {
         let romfs_root = assets_dir.join("romfs");
         fs::create_dir_all(&romfs_root).map_err(|err| format!("create romfs dir: {err}"))?;
         let entries = list_romfs_entries(&romfs_image)?;
@@ -242,6 +251,10 @@ pub fn intake_xci_with_extractor(
             "romfs",
             &mut assets,
         )?;
+        files_written.extend(asset_written);
+    } else if !program.romfs_entries.is_empty() {
+        let asset_written =
+            write_romfs_entry_files(&program.romfs_entries, &assets_dir, &mut assets)?;
         files_written.extend(asset_written);
     }
 
@@ -571,6 +584,56 @@ fn write_romfs_entries(
         written.push(out_path);
     }
 
+    Ok(written)
+}
+
+fn write_romfs_entry_files(
+    entries: &[crate::xci::types::XciFile],
+    assets_dir: &Path,
+    records: &mut Vec<AssetRecord>,
+) -> Result<Vec<PathBuf>, String> {
+    let mut written = Vec::new();
+    let root = assets_dir.join("romfs");
+    fs::create_dir_all(&root)
+        .map_err(|err| format!("create romfs dir {}: {err}", root.display()))?;
+    for entry in entries {
+        let rel_path = Path::new(&entry.name);
+        if rel_path.is_absolute() {
+            return Err(format!("romfs entry path is absolute: {}", entry.name));
+        }
+        for component in rel_path.components() {
+            match component {
+                std::path::Component::Normal(_) => {}
+                _ => {
+                    return Err(format!(
+                        "romfs entry path contains invalid component: {}",
+                        entry.name
+                    ))
+                }
+            }
+        }
+        let out_path = root.join(rel_path);
+        if let Some(parent) = out_path.parent() {
+            fs::create_dir_all(parent)
+                .map_err(|err| format!("create romfs dir {}: {err}", parent.display()))?;
+        }
+        fs::write(&out_path, &entry.data)
+            .map_err(|err| format!("write romfs entry {}: {err}", out_path.display()))?;
+        let rel_out = out_path
+            .strip_prefix(assets_dir)
+            .unwrap_or(&out_path)
+            .to_string_lossy()
+            .replace('\\', "/");
+        records.push(AssetRecord {
+            kind: "romfs".to_string(),
+            path: rel_out,
+            sha256: sha256_bytes(&entry.data),
+            size: entry.data.len() as u64,
+            source_offset: 0,
+            source_size: entry.data.len() as u64,
+        });
+        written.push(out_path);
+    }
     Ok(written)
 }
 

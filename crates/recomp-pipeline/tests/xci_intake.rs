@@ -1,6 +1,6 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
-use recomp_pipeline::xci::{intake_xci, XciIntakeOptions};
+use recomp_pipeline::xci::{intake_xci, XciIntakeOptions, XciToolPreference};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -283,6 +283,8 @@ fn intake_xci_emits_manifest_and_assets() {
         provenance_path,
         out_dir: out_dir.clone(),
         assets_dir: assets_dir.clone(),
+        tool_preference: XciToolPreference::Mock,
+        tool_path: None,
     })
     .expect("intake xci");
 
@@ -350,6 +352,8 @@ fn intake_xci_rejects_ambiguous_program() {
         provenance_path,
         out_dir,
         assets_dir,
+        tool_preference: XciToolPreference::Mock,
+        tool_path: None,
     })
     .expect_err("ambiguous program should fail");
     assert!(err.contains("ambiguous Program NCA selection"));
@@ -383,6 +387,8 @@ fn intake_xci_rejects_nested_assets_dir() {
         provenance_path,
         out_dir,
         assets_dir,
+        tool_preference: XciToolPreference::Mock,
+        tool_path: None,
     })
     .expect_err("nested assets_dir should fail");
     assert!(err.contains("assets_dir must not be inside out_dir"));

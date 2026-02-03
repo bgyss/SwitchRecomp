@@ -3,7 +3,7 @@ use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
-use recomp_pipeline::xci::{intake_xci, XciIntakeOptions};
+use recomp_pipeline::xci::{intake_xci, XciIntakeOptions, XciToolPreference};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -87,6 +87,29 @@ struct XciIntakeArgs {
     assets_dir: PathBuf,
     #[arg(long)]
     config: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    xci_tool: XciToolMode,
+    #[arg(long)]
+    xci_tool_path: Option<PathBuf>,
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+enum XciToolMode {
+    Auto,
+    Hactool,
+    Hactoolnet,
+    Mock,
+}
+
+impl From<XciToolMode> for XciToolPreference {
+    fn from(value: XciToolMode) -> Self {
+        match value {
+            XciToolMode::Auto => XciToolPreference::Auto,
+            XciToolMode::Hactool => XciToolPreference::Hactool,
+            XciToolMode::Hactoolnet => XciToolPreference::Hactoolnet,
+            XciToolMode::Mock => XciToolPreference::Mock,
+        }
+    }
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -220,6 +243,8 @@ fn main() {
                 provenance_path: intake.provenance,
                 out_dir: intake.out_dir,
                 assets_dir: intake.assets_dir,
+                tool_preference: intake.xci_tool.into(),
+                tool_path: intake.xci_tool_path,
             };
             match intake_xci(options) {
                 Ok(report) => {

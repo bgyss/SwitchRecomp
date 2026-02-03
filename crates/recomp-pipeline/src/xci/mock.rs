@@ -68,6 +68,10 @@ impl XciExtractor for MockXciExtractor {
             let nca_bytes = decode_b64("nca", &program.nca.data_b64)?;
             let exefs_files = decode_files(&program.exefs)?;
             let nso_files = decode_files(&program.nso)?;
+            let romfs_image = match &image.romfs {
+                Some(romfs) => Some(decode_b64("romfs", &romfs.image_b64)?),
+                None => None,
+            };
             programs.push(XciProgram {
                 title_id: program.title_id,
                 content_type: program.content_type,
@@ -75,18 +79,11 @@ impl XciExtractor for MockXciExtractor {
                 nca_bytes,
                 exefs_files,
                 nso_files,
+                romfs_image,
+                romfs_entries: Vec::new(),
             });
         }
-
-        let romfs_image = match image.romfs {
-            Some(romfs) => Some(decode_b64("romfs", &romfs.image_b64)?),
-            None => None,
-        };
-
-        Ok(XciExtractResult {
-            programs,
-            romfs_image,
-        })
+        Ok(XciExtractResult { programs })
     }
 }
 

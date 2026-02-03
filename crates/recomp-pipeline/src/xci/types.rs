@@ -14,12 +14,13 @@ pub struct XciProgram {
     pub nca_bytes: Vec<u8>,
     pub exefs_files: Vec<XciFile>,
     pub nso_files: Vec<XciFile>,
+    pub romfs_image: Option<Vec<u8>>,
+    pub romfs_entries: Vec<XciFile>,
 }
 
 #[derive(Debug, Clone)]
 pub struct XciExtractResult {
     pub programs: Vec<XciProgram>,
-    pub romfs_image: Option<Vec<u8>>,
 }
 
 #[derive(Debug, Clone)]

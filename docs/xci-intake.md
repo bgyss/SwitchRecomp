@@ -17,7 +17,8 @@ cargo run -p recomp-cli -- xci-intake \
   --keys path/to/title.keys \
   --provenance provenance.toml \
   --out-dir out/xci-intake \
-  --assets-dir assets/xci-intake
+  --assets-dir assets/xci-intake \
+  --xci-tool auto
 ```
 
 Optional program selection:
@@ -28,8 +29,19 @@ cargo run -p recomp-cli -- xci-intake \
   --provenance provenance.toml \
   --config title.toml \
   --out-dir out/xci-intake \
-  --assets-dir assets/xci-intake
+  --assets-dir assets/xci-intake \
+  --xci-tool hactool
 ```
+
+Tool selection:
+- `--xci-tool auto` (default): use `hactoolnet` or `hactool` if found on `PATH`, else fall back to the mock extractor.
+- `--xci-tool hactool` or `--xci-tool hactoolnet`: require the specified tool.
+- `--xci-tool mock`: force the mock extractor even if tools are available.
+- `--xci-tool-path /path/to/hactool`: override the tool executable location.
+
+Environment overrides:
+- `RECOMP_XCI_TOOL=auto|hactool|hactoolnet|mock`
+- `RECOMP_XCI_TOOL_PATH=/path/to/hactool`
 
 The XCI intake config recognizes these optional fields at the top level:
 - `program_title_id`
@@ -87,3 +99,5 @@ For tests and fixtures, the mock extractor expects a JSON payload in the `.xci` 
 - The implementation refuses to place assets inside `out_dir` or vice versa.
 - Real extraction should run outside the repo and only copy non-proprietary metadata
   into tracked files.
+- External extraction uses `--outdir`, `--exefsdir`, and `--romfsdir` flags that are
+  compatible with recent `hactool`/`hactoolnet` builds; adjust tool paths if needed.
