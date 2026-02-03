@@ -14,6 +14,7 @@ This workflow compares a reference gameplay video against a captured run using d
 
 ## Reference Config
 Use `samples/reference_video.toml` as a template. Capture configs are similar but only need `[video]` and `[hashes]`. A starter capture template lives at `samples/capture_video.toml`.
+See `docs/reference-media.md` and `docs/automation-loop.md` for the planned normalization and automation flow.
 
 ## Hash Generation
 Generate hash lists from deterministic inputs:

@@ -23,6 +23,10 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-180 XCI Title Intake
 - SPEC-190 Video-Based Validation
 - SPEC-200 DKCR HD First-Level Milestone (macOS/aarch64)
+- SPEC-210 Automated Recompilation Loop
+- SPEC-220 Input Replay and Interaction Scripts
+- SPEC-230 Reference Media Normalization
+- SPEC-240 Validation Orchestration and Triage
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -295,6 +299,9 @@ Exit criteria (from SPEC-180)
 Outcome
 - Validate the recompiled output against a reference gameplay video without emulator traces.
 
+Note
+- DKCR validation is paused until the automation loop, input replay, and normalization specs land (SPEC-210/220/230/240).
+
 Work items
 - [x] Define a reference timeline for the first level and store it in `reference_video.toml`.
 - [x] Implement a capture workflow for macOS/aarch64 runtime output.
@@ -311,6 +318,9 @@ Exit criteria (from SPEC-190)
 Outcome
 - Produce a macOS/aarch64 static recompilation of DKCR HD that reaches and plays the first level.
 
+Note
+- DKCR validation is paused until SPEC-210/220/230/240 are implemented.
+
 Work items
 - [x] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
 - [x] Identify required OS services and implement or stub them in the runtime.
@@ -322,3 +332,62 @@ Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.
 - First-level gameplay matches the reference video within defined tolerances.
 - No proprietary assets or keys are stored in the repo or build outputs.
+
+## SPEC-210: Automated Recompilation Loop
+Outcome
+- Provide a one-command automation loop for intake, build, capture, and validation.
+
+Work items
+- [ ] Define `automation.toml` schema and validator.
+- [ ] Implement an orchestrator CLI that runs intake -> lift -> build -> run -> capture -> validate.
+- [ ] Emit a deterministic `run-manifest.json` with step timings and artifact hashes.
+- [ ] Add resume/caching logic keyed by input hashes.
+- [ ] Add integration tests using non-proprietary fixtures.
+
+Exit criteria (from SPEC-210)
+- One command runs the full loop and produces a run manifest and validation report.
+- Re-running with identical inputs yields identical artifacts.
+- Proprietary assets remain external.
+
+## SPEC-220: Input Replay and Interaction Scripts
+Outcome
+- Deterministic input playback aligned to reference timelines.
+
+Work items
+- [ ] Define `input_script.toml` schema with events and markers.
+- [ ] Implement input script loader and runtime playback module.
+- [ ] Add tools/tests for deterministic playback and alignment.
+- [ ] Document authoring and replay workflows.
+
+Exit criteria (from SPEC-220)
+- Input scripts replay deterministically across two runs.
+- Playback order is stable for simultaneous events.
+- Markers align to reference timecodes.
+
+## SPEC-230: Reference Media Normalization
+Outcome
+- Normalize reference video/audio into a canonical, comparable format.
+
+Work items
+- [ ] Define canonical reference profile (resolution, fps, audio).
+- [ ] Implement normalization workflow and metadata capture.
+- [ ] Update `reference_video.toml` schema to record normalization details.
+- [ ] Add hash generation tests for normalized outputs.
+
+Exit criteria (from SPEC-230)
+- Reference media can be normalized deterministically.
+- Hashes for normalized outputs are stable across runs.
+
+## SPEC-240: Validation Orchestration and Triage
+Outcome
+- Automated validation with structured reports and triage summaries.
+
+Work items
+- [ ] Define `validation-config.toml` and report schema extensions.
+- [ ] Implement triage summary generation (drift, likely causes).
+- [ ] Integrate validation orchestration into the automation loop.
+- [ ] Add tests for report determinism and failure summaries.
+
+Exit criteria (from SPEC-240)
+- Validation runs emit deterministic reports and triage summaries.
+- Failures include actionable context and artifact references.

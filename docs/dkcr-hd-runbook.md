@@ -56,6 +56,8 @@ recomp-validation video \
   --out-dir artifacts/dkcr-hd/validation
 ```
 
+Note: The automated validation loop is paused until SPEC-210/220/230/240 are implemented.
+
 ## External Assets
 - RomFS assets are expected at `game-data/dkcr-hd/romfs`.
 - Replace placeholder inputs under `samples/dkcr-hd/inputs/` with real artifacts in a

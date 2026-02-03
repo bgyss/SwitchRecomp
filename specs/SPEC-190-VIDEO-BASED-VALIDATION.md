@@ -1,12 +1,11 @@
 # SPEC-190: Video-Based Validation
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Rationale
-- Added reference timeline and capture templates in `samples/`.
-- Implemented hash-based video/audio comparison with drift reporting.
-- Documented capture and manual review workflow with a macOS capture script.
+- Validation flow exists, but DKCR validation is paused until the automation loop and input replay are in place.
+- New dependencies: SPEC-210 (automation), SPEC-220 (input replay), SPEC-230 (normalization), SPEC-240 (orchestration).
 
 ## Purpose
 Define a validation workflow that compares recompiled output against a reference gameplay video when no instrumented emulator is available.
