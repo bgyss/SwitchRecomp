@@ -9,6 +9,7 @@ This repository contains a draft specification set for a Nintendo Switch static 
 - `RESEARCH.md` lists research directions and required sources.
 - `docs/` contains development notes.
  - `docs/LEGAL-POLICY.md` defines legal use and asset separation rules.
+ - `docs/static-recomp-skills.md` documents the Codex skill set and project-level validation templates.
 
 ## How to Use the Specs
 - Read `specs/README.md` for ordering.
@@ -31,6 +32,7 @@ Legal and provenance policy:
 ## Samples and Flow Docs
 - `samples/memory-image/` shows the memory image initialization flow (segment blob + lifted module).
 - `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline.
+- `docs/validation-matrix-template.md`, `docs/title-run-sheet-template.md`, and `docs/thresholds/default.json` are reusable validation templates.
 
 ## Back Pressure Hooks
 These hooks add fast, consistent feedback to keep the repo autonomous and reduce review churn. Hooks are defined in `.pre-commit-config.yaml` and can be run with `prek` (preferred) or `pre-commit`.
