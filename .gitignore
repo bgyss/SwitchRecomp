@@ -4,3 +4,4 @@
 /.devenv/
 /.devenv.flake.nix
 /devenv.lock
+/game-data/
