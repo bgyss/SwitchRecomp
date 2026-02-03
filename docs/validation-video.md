@@ -13,7 +13,7 @@ This workflow compares a reference gameplay video against a captured run using d
   - A raw file (`format = "file"`) hashed in fixed chunks (4096 bytes).
 
 ## Reference Config
-Use `samples/reference_video.toml` as a template. Capture configs are similar but only need `[video]` and `[hashes]`.
+Use `samples/reference_video.toml` as a template. Capture configs are similar but only need `[video]` and `[hashes]`. A starter capture template lives at `samples/capture_video.toml`.
 
 ## Hash Generation
 Generate hash lists from deterministic inputs:
@@ -24,6 +24,21 @@ recomp-validation hash-audio --audio-file artifacts/audio.wav --out artifacts/au
 ```
 
 If you already have precomputed hashes, point `hashes.frames` or `hashes.audio` at the list files directly.
+
+## Capture (macOS)
+Use `scripts/capture-video-macos.sh` to record a run. Set the device indices to match your capture
+setup (use `ffmpeg -f avfoundation -list_devices true -i \"\"` to enumerate devices).
+
+```bash
+scripts/capture-video-macos.sh artifacts/capture
+```
+
+Extract frames and audio from the capture before hashing:
+
+```bash
+ffmpeg -i artifacts/capture/capture.mp4 artifacts/capture/frames/%08d.png
+ffmpeg -i artifacts/capture/capture.mp4 -vn -acodec pcm_s16le artifacts/capture/audio.wav
+```
 
 ## Comparison
 Run the comparison and emit `validation-report.json`:
@@ -51,3 +66,9 @@ Thresholds are configured in `reference_video.toml`. Defaults are:
 - `max_dropped_frames = 0`
 
 Tune thresholds per title and keep the drift window small to avoid false positives.
+
+## Manual Review
+When validation fails:
+- Inspect the frame hash lists near the reported drift offset.
+- Compare audio hashes around the reported chunk offset.
+- If a mismatch is expected (e.g., cutscene timing), record a note in the provenance metadata.
