@@ -3,6 +3,7 @@ use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
+use recomp_pipeline::xci::{intake_xci, XciIntakeOptions};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -19,6 +20,7 @@ enum Command {
     Package(PackageArgs),
     HomebrewIntake(HomebrewIntakeArgs),
     HomebrewLift(HomebrewLiftArgs),
+    XciIntake(XciIntakeArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -69,6 +71,22 @@ struct HomebrewLiftArgs {
     entry: String,
     #[arg(long, value_enum, default_value = "decode")]
     mode: HomebrewLiftMode,
+}
+
+#[derive(Parser, Debug)]
+struct XciIntakeArgs {
+    #[arg(long)]
+    xci: PathBuf,
+    #[arg(long)]
+    keys: PathBuf,
+    #[arg(long)]
+    provenance: PathBuf,
+    #[arg(long)]
+    out_dir: PathBuf,
+    #[arg(long)]
+    assets_dir: PathBuf,
+    #[arg(long)]
+    config: Option<PathBuf>,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -190,6 +208,32 @@ fn main() {
                 }
                 Err(err) => {
                     eprintln!("Homebrew lift error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::XciIntake(intake) => {
+            let options = XciIntakeOptions {
+                xci_path: intake.xci,
+                keys_path: intake.keys,
+                config_path: intake.config,
+                provenance_path: intake.provenance,
+                out_dir: intake.out_dir,
+                assets_dir: intake.assets_dir,
+            };
+            match intake_xci(options) {
+                Ok(report) => {
+                    println!(
+                        "XCI intake wrote {} files to {}",
+                        report.files_written.len(),
+                        report.out_dir.display()
+                    );
+                    println!("module.json: {}", report.module_json_path.display());
+                    println!("manifest.json: {}", report.manifest_path.display());
+                    println!("assets root: {}", report.assets_dir.display());
+                }
+                Err(err) => {
+                    eprintln!("XCI intake error: {err}");
                     std::process::exit(1);
                 }
             }
