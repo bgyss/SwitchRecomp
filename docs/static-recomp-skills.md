@@ -28,6 +28,8 @@ future titles and projects.
 - Validation matrix template: `docs/validation-matrix-template.md`
 - Per-title run sheet template: `docs/title-run-sheet-template.md`
 - Default A/V thresholds: `docs/thresholds/default.json`
+- Batch manifest schema: `docs/batch-manifest-schema.md`
+- Batch pipeline layout: `docs/batch-pipeline-layout.md`
 
 ## Recommended Practice
 - Keep all proprietary inputs outside the repo.
