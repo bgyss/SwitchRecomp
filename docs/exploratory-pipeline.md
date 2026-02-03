@@ -44,3 +44,6 @@ performance_mode = "handheld"
 - Add a real input parser for Switch binaries.
 - Expand the lifter to cover more AArch64 instructions and control flow.
 - Expand runtime services and ABI validation.
+
+## Further Reading
+- `docs/static-recompilation-flow.md` for a hypothetical end-to-end flow and verification plan.
