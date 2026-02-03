@@ -1,0 +1,34 @@
+schema_version = "1"
+
+[video]
+path = "/path/to/reference.mp4"
+width = 1280
+height = 720
+fps = 30.0
+
+[timeline]
+start = "00:00:05.000"
+end = "00:02:30.000"
+
+[[timeline.events]]
+name = "level_start"
+time = "00:00:05.000"
+
+[[timeline.events]]
+name = "level_complete"
+time = "00:02:30.000"
+
+[hashes.frames]
+format = "list"
+path = "artifacts/reference/frames.hashes"
+
+[hashes.audio]
+format = "list"
+path = "artifacts/reference/audio.hashes"
+
+[thresholds]
+frame_match_ratio = 0.92
+audio_match_ratio = 0.9
+max_drift_frames = 3
+max_dropped_frames = 5
+max_audio_drift_chunks = 3
