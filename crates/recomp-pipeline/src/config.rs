@@ -1,3 +1,4 @@
+use crate::memory::{MemoryLayoutDescriptor, MemoryPermissionsDescriptor, MemoryRegionDescriptor};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -46,6 +47,26 @@ struct RawRuntimeConfig {
     performance_mode: Option<String>,
 }
 
+#[derive(Debug, Deserialize)]
+struct RawMemoryLayoutConfig {
+    regions: Vec<RawMemoryRegionConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawMemoryRegionConfig {
+    name: String,
+    base: u64,
+    size: u64,
+    permissions: RawMemoryPermissionsConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawMemoryPermissionsConfig {
+    read: bool,
+    write: bool,
+    execute: bool,
+}
+
 #[derive(Debug)]
 pub struct RuntimeConfig {
     pub performance_mode: PerformanceMode,
@@ -60,6 +81,8 @@ struct RawTitleConfig {
     stubs: BTreeMap<String, String>,
     #[serde(default)]
     runtime: Option<RawRuntimeConfig>,
+    #[serde(default)]
+    memory_layout: Option<RawMemoryLayoutConfig>,
 }
 
 #[derive(Debug)]
@@ -69,6 +92,7 @@ pub struct TitleConfig {
     pub abi_version: String,
     pub stubs: BTreeMap<String, StubBehavior>,
     pub runtime: RuntimeConfig,
+    pub memory_layout: MemoryLayoutDescriptor,
 }
 
 impl TitleConfig {
@@ -85,12 +109,40 @@ impl TitleConfig {
             .and_then(|runtime| runtime.performance_mode)
             .unwrap_or_else(|| "handheld".to_string());
         let performance_mode = PerformanceMode::from_str(&runtime_mode)?;
+        let memory_layout = match raw.memory_layout {
+            Some(layout) => parse_memory_layout(layout)?,
+            None => MemoryLayoutDescriptor::minimal_default(),
+        };
         Ok(TitleConfig {
             title: raw.title,
             entry: raw.entry,
             abi_version: raw.abi_version,
             stubs,
             runtime: RuntimeConfig { performance_mode },
+            memory_layout,
         })
     }
+}
+
+fn parse_memory_layout(layout: RawMemoryLayoutConfig) -> Result<MemoryLayoutDescriptor, String> {
+    if layout.regions.is_empty() {
+        return Err("memory_layout.regions must include at least one region".to_string());
+    }
+    let regions = layout
+        .regions
+        .into_iter()
+        .map(|region| {
+            MemoryRegionDescriptor::new(
+                region.name,
+                region.base,
+                region.size,
+                MemoryPermissionsDescriptor::new(
+                    region.permissions.read,
+                    region.permissions.write,
+                    region.permissions.execute,
+                ),
+            )
+        })
+        .collect();
+    Ok(MemoryLayoutDescriptor { regions })
 }

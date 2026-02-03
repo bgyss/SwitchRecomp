@@ -167,7 +167,7 @@ fn translate_module(module: &Module, config: &TitleConfig) -> Result<RustProgram
         entry,
         functions,
         performance_mode: config.runtime.performance_mode,
-        memory_layout: MemoryLayoutDescriptor::minimal_default(),
+        memory_layout: config.memory_layout.clone(),
     })
 }
 

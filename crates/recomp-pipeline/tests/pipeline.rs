@@ -26,6 +26,28 @@ title = "Minimal Sample"
 entry = "entry"
 abi_version = "0.1.0"
 
+[memory_layout]
+[[memory_layout.regions]]
+name = "code"
+base = 0x1000_0000
+size = 0x0001_0000
+permissions = { read = true, write = false, execute = true }
+
+[[memory_layout.regions]]
+name = "data"
+base = 0x2000_0000
+size = 0x0004_0000
+permissions = { read = true, write = true, execute = false }
+
+[stubs]
+svc_log = "log"
+"#;
+
+const CONFIG_TOML_DEFAULT_LAYOUT: &str = r#"
+title = "Minimal Sample"
+entry = "entry"
+abi_version = "0.1.0"
+
 [stubs]
 svc_log = "log"
 "#;
@@ -37,6 +59,13 @@ fn parse_title_config() {
     assert_eq!(config.entry, "entry");
     assert_eq!(config.abi_version, "0.1.0");
     assert!(config.stubs.contains_key("svc_log"));
+    assert_eq!(config.memory_layout.regions.len(), 2);
+}
+
+#[test]
+fn parse_title_config_defaults_layout() {
+    let config = TitleConfig::parse(CONFIG_TOML_DEFAULT_LAYOUT).expect("config parses");
+    assert_eq!(config.memory_layout.regions.len(), 5);
 }
 
 #[test]
@@ -98,7 +127,7 @@ fn pipeline_emits_project() {
         .and_then(|value| value.get("regions"))
         .and_then(|value| value.as_array())
         .expect("memory_layout.regions array");
-    assert_eq!(regions.len(), 5);
+    assert_eq!(regions.len(), 2);
     assert_eq!(
         manifest_json
             .get("manifest_self_hash_basis")
