@@ -94,7 +94,7 @@ impl<'de> Deserialize<'de> for Timecode {
     {
         struct TimecodeVisitor;
 
-        impl<'de> serde::de::Visitor<'de> for TimecodeVisitor {
+        impl serde::de::Visitor<'_> for TimecodeVisitor {
             type Value = Timecode;
 
             fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -384,7 +384,7 @@ pub fn run_video_validation(
             alignment.offset, reference.thresholds.max_drift_frames
         ));
     }
-    if length_delta.abs() as usize > reference.thresholds.max_dropped_frames {
+    if length_delta.unsigned_abs() > reference.thresholds.max_dropped_frames {
         failures.push(format!(
             "frame length delta {} exceeds max dropped {}",
             length_delta, reference.thresholds.max_dropped_frames
