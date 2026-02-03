@@ -33,6 +33,8 @@ This folder contains the project specs for the Switch static recompilation prese
 - SPEC-220-INPUT-REPLAY.md
 - SPEC-230-REFERENCE-MEDIA-NORMALIZATION.md
 - SPEC-240-VALIDATION-ORCHESTRATION.md
+- SPEC-250-AUTOMATION-SERVICES.md
+- SPEC-260-AGENT-PIPELINE-SECURITY.md
 
 ## Template
 - SPEC-TEMPLATE.md
