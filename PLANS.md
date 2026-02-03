@@ -7,6 +7,8 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-010 Target Platform Baseline
 - SPEC-020 Inputs and Provenance
 - SPEC-045 Runtime Memory Model and Load/Store Lowering
+- SPEC-046 Runtime Memory Layout Configuration
+- SPEC-047 Memory Image Initialization
 - SPEC-090 Build, Packaging, and Distribution
 - SPEC-095 Build Manifest Integrity
 - SPEC-096 Bundle Manifest Integrity
@@ -74,6 +76,36 @@ Exit criteria (from SPEC-045)
 - Block-based output executes a test block with loads and stores using runtime helpers.
 - Unaligned or out-of-bounds accesses return deterministic error codes.
 - A sample pipeline output includes a memory layout descriptor that matches runtime regions.
+
+## SPEC-046: Runtime Memory Layout Configuration
+Outcome
+- Runtime memory layout is configurable via `title.toml` while preserving a safe default.
+
+Work items
+- [ ] Extend `title.toml` schema to include `runtime.memory_layout` regions.
+- [ ] Validate region overlap, zero sizes, and overflow errors.
+- [ ] Emit configured memory layout in `manifest.json` and generated runtime init.
+- [ ] Add tests for default layout and custom layout parsing.
+
+Exit criteria (from SPEC-046)
+- Custom memory layout in `title.toml` is parsed and emitted in `manifest.json`.
+- Invalid layouts fail the pipeline with clear errors.
+- Default behavior remains unchanged when no layout is provided.
+
+## SPEC-047: Memory Image Initialization
+Outcome
+- Runtime memory is initialized from module segment metadata (code/rodata/data/bss).
+
+Work items
+- [ ] Define segment descriptor schema and carry it through pipeline output metadata.
+- [ ] Populate runtime memory regions with initial segment bytes and zeroed bss.
+- [ ] Validate init sizes and bounds during initialization.
+- [ ] Add tests covering initialized load/store behavior and error paths.
+
+Exit criteria (from SPEC-047)
+- A sample module with init bytes executes a load/store path against initialized memory.
+- BSS regions are zeroed deterministically.
+- Invalid init sizes or region mismatches fail with clear errors.
 
 ## SPEC-090: Build, Packaging, and Distribution
 Outcome

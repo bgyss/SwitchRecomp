@@ -41,10 +41,12 @@ impl FromStr for PerformanceMode {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 struct RawRuntimeConfig {
     #[serde(default)]
     performance_mode: Option<String>,
+    #[serde(default)]
+    memory_layout: Option<RawMemoryLayoutConfig>,
 }
 
 #[derive(Debug, Deserialize)]
@@ -81,8 +83,6 @@ struct RawTitleConfig {
     stubs: BTreeMap<String, String>,
     #[serde(default)]
     runtime: Option<RawRuntimeConfig>,
-    #[serde(default)]
-    memory_layout: Option<RawMemoryLayoutConfig>,
 }
 
 #[derive(Debug)]
@@ -104,12 +104,12 @@ impl TitleConfig {
             let parsed = StubBehavior::from_str(&behavior)?;
             stubs.insert(name, parsed);
         }
-        let runtime_mode = raw
-            .runtime
-            .and_then(|runtime| runtime.performance_mode)
+        let runtime = raw.runtime.unwrap_or_default();
+        let runtime_mode = runtime
+            .performance_mode
             .unwrap_or_else(|| "handheld".to_string());
         let performance_mode = PerformanceMode::from_str(&runtime_mode)?;
-        let memory_layout = match raw.memory_layout {
+        let memory_layout = match runtime.memory_layout {
             Some(layout) => parse_memory_layout(layout)?,
             None => MemoryLayoutDescriptor::minimal_default(),
         };
@@ -125,9 +125,6 @@ impl TitleConfig {
 }
 
 fn parse_memory_layout(layout: RawMemoryLayoutConfig) -> Result<MemoryLayoutDescriptor, String> {
-    if layout.regions.is_empty() {
-        return Err("memory_layout.regions must include at least one region".to_string());
-    }
     let regions = layout
         .regions
         .into_iter()
@@ -144,5 +141,7 @@ fn parse_memory_layout(layout: RawMemoryLayoutConfig) -> Result<MemoryLayoutDesc
             )
         })
         .collect();
-    Ok(MemoryLayoutDescriptor { regions })
+    let descriptor = MemoryLayoutDescriptor { regions };
+    descriptor.validate()?;
+    Ok(descriptor)
 }

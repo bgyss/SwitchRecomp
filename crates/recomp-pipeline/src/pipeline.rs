@@ -1,7 +1,10 @@
 use crate::config::{PerformanceMode, StubBehavior, TitleConfig};
 use crate::homebrew::ModuleJson;
 use crate::input::{Block, Function, Module, Op, Terminator};
-use crate::memory::MemoryLayoutDescriptor;
+use crate::memory::{
+    MemoryImageDescriptor, MemoryInitSegmentDescriptor, MemoryLayoutDescriptor,
+    MemoryZeroSegmentDescriptor,
+};
 use crate::output::{emit_project, BuildManifest, GeneratedFile, InputSummary};
 use crate::provenance::{ProvenanceManifest, ValidatedInput};
 use pathdiff::diff_paths;
@@ -23,6 +26,12 @@ pub struct PipelineReport {
     pub out_dir: PathBuf,
     pub files_written: Vec<PathBuf>,
     pub detected_inputs: Vec<ValidatedInput>,
+}
+
+#[derive(Debug)]
+pub struct MemoryImageSource {
+    pub source_path: PathBuf,
+    pub dest_path: PathBuf,
 }
 
 #[derive(Debug, thiserror::Error)]
@@ -80,7 +89,8 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
         )));
     }
 
-    let program = translate_module(&module, &config)?;
+    let (memory_image, memory_sources) = build_memory_image(&module, &module_path)?;
+    let program = translate_module(&module, &config, memory_image.clone())?;
 
     let module_hash = sha256_hex(&module_src);
     let config_hash = sha256_hex(&config_src);
@@ -106,12 +116,14 @@ pub fn run_pipeline(options: PipelineOptions) -> Result<PipelineReport, Pipeline
         provenance_sha256: provenance_hash,
         inputs,
         memory_layout: program.memory_layout.clone(),
+        memory_image: program.memory_image.clone(),
         manifest_self_hash_basis: String::new(),
         generated_files: Vec::<GeneratedFile>::new(),
     };
 
     let (files_written, _manifest) =
-        emit_project(&out_dir, &runtime_rel, &program, &manifest).map_err(PipelineError::Emit)?;
+        emit_project(&out_dir, &runtime_rel, &program, &manifest, &memory_sources)
+            .map_err(PipelineError::Emit)?;
 
     Ok(PipelineReport {
         out_dir,
@@ -154,7 +166,95 @@ fn looks_like_homebrew_module(value: &serde_json::Value) -> bool {
             .is_some()
 }
 
-fn translate_module(module: &Module, config: &TitleConfig) -> Result<RustProgram, PipelineError> {
+fn build_memory_image(
+    module: &Module,
+    module_path: &Path,
+) -> Result<(Option<MemoryImageDescriptor>, Vec<MemoryImageSource>), PipelineError> {
+    if module.segments.is_empty() {
+        return Ok((None, Vec::new()));
+    }
+
+    let base_dir = module_path.parent().unwrap_or_else(|| Path::new("."));
+    let mut descriptor = MemoryImageDescriptor::empty();
+    let mut sources = Vec::new();
+
+    for (index, segment) in module.segments.iter().enumerate() {
+        let mut wrote_init = false;
+        if let Some(init_path) = &segment.init_path {
+            let source_path = base_dir.join(init_path);
+            let metadata = fs::metadata(&source_path)?;
+            let file_size = metadata.len();
+            let init_size = segment.init_size.unwrap_or(file_size);
+            if init_size != file_size {
+                return Err(PipelineError::Module(format!(
+                    "segment {} init_size {} does not match file size {}",
+                    segment.name, init_size, file_size
+                )));
+            }
+            if init_size > segment.size {
+                return Err(PipelineError::Module(format!(
+                    "segment {} init_size {} exceeds segment size {}",
+                    segment.name, init_size, segment.size
+                )));
+            }
+            let name = sanitize_segment_name(&segment.name, index);
+            let dest_path = PathBuf::from(format!("segments/{name}.bin"));
+            descriptor.init_segments.push(MemoryInitSegmentDescriptor {
+                name: segment.name.clone(),
+                base: segment.base,
+                size: init_size,
+                init_path: dest_path.to_string_lossy().to_string(),
+            });
+            sources.push(MemoryImageSource {
+                source_path,
+                dest_path,
+            });
+            wrote_init = true;
+
+            if segment.zero_fill && segment.size > init_size {
+                descriptor.zero_segments.push(MemoryZeroSegmentDescriptor {
+                    name: format!("{}_bss", segment.name),
+                    base: segment.base + init_size,
+                    size: segment.size - init_size,
+                });
+            }
+        }
+
+        if segment.zero_fill && !wrote_init {
+            descriptor.zero_segments.push(MemoryZeroSegmentDescriptor {
+                name: segment.name.clone(),
+                base: segment.base,
+                size: segment.size,
+            });
+        }
+    }
+
+    if descriptor.is_empty() {
+        return Ok((None, Vec::new()));
+    }
+
+    Ok((Some(descriptor), sources))
+}
+
+fn sanitize_segment_name(name: &str, index: usize) -> String {
+    let mut sanitized: String = name
+        .chars()
+        .map(|ch| match ch {
+            'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => ch,
+            _ => '-',
+        })
+        .collect();
+    if sanitized.trim_matches('-').is_empty() {
+        sanitized = "segment".to_string();
+    }
+    format!("{sanitized}-{index}")
+}
+
+fn translate_module(
+    module: &Module,
+    config: &TitleConfig,
+    memory_image: Option<MemoryImageDescriptor>,
+) -> Result<RustProgram, PipelineError> {
     let entry = config.entry.clone();
     let mut functions = Vec::new();
     for function in &module.functions {
@@ -168,6 +268,7 @@ fn translate_module(module: &Module, config: &TitleConfig) -> Result<RustProgram
         functions,
         performance_mode: config.runtime.performance_mode,
         memory_layout: config.memory_layout.clone(),
+        memory_image,
     })
 }
 
@@ -595,6 +696,7 @@ pub struct RustProgram {
     pub functions: Vec<RustFunction>,
     pub performance_mode: PerformanceMode,
     pub memory_layout: MemoryLayoutDescriptor,
+    pub memory_image: Option<MemoryImageDescriptor>,
 }
 
 impl RustProgram {

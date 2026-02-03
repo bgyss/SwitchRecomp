@@ -26,14 +26,17 @@ title = "Minimal Sample"
 entry = "entry"
 abi_version = "0.1.0"
 
-[memory_layout]
-[[memory_layout.regions]]
+[runtime]
+performance_mode = "handheld"
+
+[runtime.memory_layout]
+[[runtime.memory_layout.regions]]
 name = "code"
 base = 0x1000_0000
 size = 0x0001_0000
 permissions = { read = true, write = false, execute = true }
 
-[[memory_layout.regions]]
+[[runtime.memory_layout.regions]]
 name = "data"
 base = 0x2000_0000
 size = 0x0004_0000
@@ -87,7 +90,7 @@ fn pipeline_emits_project() {
     let runtime_path = PathBuf::from("../crates/recomp-runtime");
 
     fs::write(&module_path, MODULE_JSON).expect("write module");
-    fs::write(&config_path, CONFIG_TOML).expect("write config");
+    fs::write(&config_path, CONFIG_TOML_DEFAULT_LAYOUT).expect("write config");
     fs::write(&nso_path, b"NSO0").expect("write nso");
 
     let module_hash = sha256_hex(MODULE_JSON.as_bytes());
@@ -127,7 +130,7 @@ fn pipeline_emits_project() {
         .and_then(|value| value.get("regions"))
         .and_then(|value| value.as_array())
         .expect("memory_layout.regions array");
-    assert_eq!(regions.len(), 2);
+    assert_eq!(regions.len(), 5);
     assert_eq!(
         manifest_json
             .get("manifest_self_hash_basis")
@@ -172,7 +175,7 @@ fn pipeline_lowers_load_store_ops() {
 }"#;
 
     fs::write(&module_path, module_json).expect("write module");
-    fs::write(&config_path, CONFIG_TOML).expect("write config");
+    fs::write(&config_path, CONFIG_TOML_DEFAULT_LAYOUT).expect("write config");
     fs::write(&nso_path, b"NSO0").expect("write nso");
 
     let module_hash = sha256_hex(module_json.as_bytes());
@@ -197,6 +200,87 @@ fn pipeline_lowers_load_store_ops() {
     let main_src = fs::read_to_string(main_rs).expect("read main.rs");
     assert!(main_src.contains("mem_store_u32"));
     assert!(main_src.contains("mem_load_u32"));
+}
+
+#[test]
+fn pipeline_emits_memory_image() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let module_path = temp.path().join("module.json");
+    let config_path = temp.path().join("title.toml");
+    let provenance_path = temp.path().join("provenance.toml");
+    let nso_path = temp.path().join("main.nso");
+    let data_path = temp.path().join("data.bin");
+    let out_dir = temp.path().join("out");
+    let runtime_path = PathBuf::from("../crates/recomp-runtime");
+
+    let module_json = r#"{
+  "arch": "aarch64",
+  "segments": [
+    {
+      "name": "data",
+      "base": 4096,
+      "size": 8,
+      "permissions": { "read": true, "write": true, "execute": false },
+      "init_path": "data.bin",
+      "init_size": 4,
+      "zero_fill": true
+    }
+  ],
+  "functions": [
+    { "name": "entry", "ops": [ { "op": "ret" } ] }
+  ]
+}"#;
+
+    fs::write(&module_path, module_json).expect("write module");
+    fs::write(&config_path, CONFIG_TOML_DEFAULT_LAYOUT).expect("write config");
+    fs::write(&nso_path, b"NSO0").expect("write nso");
+    fs::write(&data_path, [1u8, 2, 3, 4]).expect("write data");
+
+    let module_hash = sha256_hex(module_json.as_bytes());
+    let nso_hash = sha256_hex(b"NSO0");
+    let provenance = format!(
+        "schema_version = \"1\"\n\n[title]\nname = \"Minimal Sample\"\ntitle_id = \"0100000000000000\"\nversion = \"1.0.0\"\nregion = \"US\"\n\n[collection]\ndevice = \"demo\"\ncollected_at = \"2026-01-30\"\n\n[collection.tool]\nname = \"manual\"\nversion = \"1.0\"\n\n[[inputs]]\npath = \"module.json\"\nformat = \"lifted_json\"\nsha256 = \"{module_hash}\"\nsize = {module_size}\nrole = \"lifted_module\"\n\n[[inputs]]\npath = \"main.nso\"\nformat = \"nso0\"\nsha256 = \"{nso_hash}\"\nsize = 4\nrole = \"main_executable\"\n",
+        module_hash = module_hash,
+        module_size = module_json.len()
+    );
+    fs::write(&provenance_path, provenance).expect("write provenance");
+
+    run_pipeline(PipelineOptions {
+        module_path,
+        config_path,
+        provenance_path,
+        out_dir: out_dir.clone(),
+        runtime_path,
+    })
+    .expect("pipeline runs");
+
+    let segment_path = out_dir.join("segments/data-0.bin");
+    assert!(segment_path.exists(), "segment file emitted");
+    let segment_bytes = fs::read(&segment_path).expect("read segment file");
+    assert_eq!(segment_bytes, [1u8, 2, 3, 4]);
+
+    let manifest = out_dir.join("manifest.json");
+    let manifest_src = fs::read_to_string(manifest).expect("read manifest.json");
+    let manifest_json: serde_json::Value =
+        serde_json::from_str(&manifest_src).expect("parse manifest.json");
+    let memory_image = manifest_json
+        .get("memory_image")
+        .and_then(|value| value.as_object())
+        .expect("memory_image object");
+    let init_segments = memory_image
+        .get("init_segments")
+        .and_then(|value| value.as_array())
+        .expect("init_segments array");
+    let zero_segments = memory_image
+        .get("zero_segments")
+        .and_then(|value| value.as_array())
+        .expect("zero_segments array");
+    assert_eq!(init_segments.len(), 1);
+    assert_eq!(zero_segments.len(), 1);
+
+    let main_rs = out_dir.join("src/main.rs");
+    let main_src = fs::read_to_string(main_rs).expect("read main.rs");
+    assert!(main_src.contains("apply_memory_image"));
 }
 
 #[test]

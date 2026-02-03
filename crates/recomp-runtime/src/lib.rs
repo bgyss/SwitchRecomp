@@ -12,7 +12,8 @@ pub use homebrew::{
 pub use memory::{
     init_memory, recomp_mem_load_u16, recomp_mem_load_u32, recomp_mem_load_u64, recomp_mem_load_u8,
     recomp_mem_store_u16, recomp_mem_store_u32, recomp_mem_store_u64, recomp_mem_store_u8,
-    MemoryLayout, MemoryLayoutError, MemoryPermissions, MemoryRegionSpec, MemoryStatus,
+    MemoryInitSegment, MemoryLayout, MemoryLayoutError, MemoryPermissions, MemoryRegionSpec,
+    MemoryStatus, MemoryZeroSegment,
 };
 pub use recomp_gfx::{CommandStream, GraphicsBackend, GraphicsError, StubBackend};
 pub use recomp_services::{
@@ -54,6 +55,8 @@ pub enum RuntimeError {
     MissingLoaderConfigKey { key: LoaderConfigKey },
     #[error("runtime manifest serialization failed: {message}")]
     ManifestSerialize { message: String },
+    #[error("io error: {message}")]
+    Io { message: String },
     #[error("memory layout error: {0}")]
     MemoryLayout(#[from] MemoryLayoutError),
     #[error("memory access error {status:?} at {address:#x} size {size}")]
@@ -80,6 +83,19 @@ pub fn init(config: &RuntimeConfig) {
 pub fn init_default_memory(layout: MemoryLayout) -> RuntimeResult<()> {
     init_memory(layout)?;
     Ok(())
+}
+
+pub fn apply_memory_image(
+    init_segments: &[MemoryInitSegment],
+    zero_segments: &[MemoryZeroSegment],
+) -> RuntimeResult<()> {
+    memory::apply_memory_image(init_segments, zero_segments).map_err(|status| {
+        RuntimeError::MemoryAccess {
+            status,
+            address: 0,
+            size: 0,
+        }
+    })
 }
 
 pub fn mem_load_u8(address: u64) -> RuntimeResult<u64> {

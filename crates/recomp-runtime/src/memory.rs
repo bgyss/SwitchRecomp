@@ -10,7 +10,8 @@ pub enum MemoryStatus {
     Unmapped = 4,
     Uninitialized = 5,
     InvalidOutPtr = 6,
-    Internal = 7,
+    SizeMismatch = 7,
+    Internal = 8,
 }
 
 impl MemoryStatus {
@@ -111,6 +112,7 @@ enum AccessKind {
     Write,
     #[allow(dead_code)]
     Execute,
+    Init,
 }
 
 #[derive(Debug)]
@@ -166,7 +168,7 @@ impl RuntimeMemory {
     }
 
     fn load(&self, address: u64, size: usize) -> Result<u64, MemoryStatus> {
-        let region = self.resolve_region(address, size, AccessKind::Read)?;
+        let region = self.resolve_region(address, size, AccessKind::Read, true)?;
         let offset = (address - region.spec.base) as usize;
         let mut value = 0u64;
         for i in 0..size {
@@ -176,10 +178,36 @@ impl RuntimeMemory {
     }
 
     fn store(&mut self, address: u64, size: usize, value: u64) -> Result<(), MemoryStatus> {
-        let region = self.resolve_region_mut(address, size, AccessKind::Write)?;
+        let region = self.resolve_region_mut(address, size, AccessKind::Write, true)?;
         let offset = (address - region.spec.base) as usize;
         for i in 0..size {
             region.data[offset + i] = ((value >> (i * 8)) & 0xFF) as u8;
+        }
+        Ok(())
+    }
+
+    fn write_bytes_init(
+        &mut self,
+        address: u64,
+        size: u64,
+        bytes: &[u8],
+    ) -> Result<(), MemoryStatus> {
+        if bytes.len() as u64 != size {
+            return Err(MemoryStatus::SizeMismatch);
+        }
+        let region = self.resolve_region_mut(address, size as usize, AccessKind::Init, false)?;
+        let offset = (address - region.spec.base) as usize;
+        let end = offset + bytes.len();
+        region.data[offset..end].copy_from_slice(bytes);
+        Ok(())
+    }
+
+    fn zero_fill_init(&mut self, address: u64, size: u64) -> Result<(), MemoryStatus> {
+        let region = self.resolve_region_mut(address, size as usize, AccessKind::Init, false)?;
+        let offset = (address - region.spec.base) as usize;
+        let end = offset + size as usize;
+        for value in &mut region.data[offset..end] {
+            *value = 0;
         }
         Ok(())
     }
@@ -189,8 +217,9 @@ impl RuntimeMemory {
         address: u64,
         size: usize,
         access: AccessKind,
+        require_alignment: bool,
     ) -> Result<&MemoryRegion, MemoryStatus> {
-        let index = self.resolve_region_inner(address, size, access)?;
+        let index = self.resolve_region_inner(address, size, access, require_alignment)?;
         Ok(&self.regions[index])
     }
 
@@ -199,8 +228,9 @@ impl RuntimeMemory {
         address: u64,
         size: usize,
         access: AccessKind,
+        require_alignment: bool,
     ) -> Result<&mut MemoryRegion, MemoryStatus> {
-        let index = self.resolve_region_inner(address, size, access)?;
+        let index = self.resolve_region_inner(address, size, access, require_alignment)?;
         Ok(&mut self.regions[index])
     }
 
@@ -209,12 +239,13 @@ impl RuntimeMemory {
         address: u64,
         size: usize,
         access: AccessKind,
+        require_alignment: bool,
     ) -> Result<usize, MemoryStatus> {
         if size == 0 {
             return Err(MemoryStatus::Internal);
         }
         let size_u64 = size as u64;
-        if address % size_u64 != 0 {
+        if require_alignment && address % size_u64 != 0 {
             return Err(MemoryStatus::Unaligned);
         }
         let end = address
@@ -247,6 +278,7 @@ impl RuntimeMemory {
             AccessKind::Read => region.spec.permissions.allows_read(),
             AccessKind::Write => region.spec.permissions.allows_write(),
             AccessKind::Execute => region.spec.permissions.allows_execute(),
+            AccessKind::Init => true,
         }
     }
 }
@@ -257,6 +289,62 @@ pub fn init_memory(layout: MemoryLayout) -> Result<(), MemoryLayoutError> {
     let memory = RuntimeMemory::new(&layout)?;
     let _ = MEMORY.set(Mutex::new(memory));
     Ok(())
+}
+
+#[derive(Debug, Clone)]
+pub struct MemoryInitSegment {
+    pub name: String,
+    pub base: u64,
+    pub size: u64,
+    pub bytes: Vec<u8>,
+}
+
+impl MemoryInitSegment {
+    pub fn new(name: impl Into<String>, base: u64, size: u64, bytes: Vec<u8>) -> Self {
+        Self {
+            name: name.into(),
+            base,
+            size,
+            bytes,
+        }
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MemoryZeroSegment {
+    pub name: String,
+    pub base: u64,
+    pub size: u64,
+}
+
+impl MemoryZeroSegment {
+    pub fn new(name: impl Into<String>, base: u64, size: u64) -> Self {
+        Self {
+            name: name.into(),
+            base,
+            size,
+        }
+    }
+}
+
+pub fn apply_memory_image(
+    init_segments: &[MemoryInitSegment],
+    zero_segments: &[MemoryZeroSegment],
+) -> Result<(), MemoryStatus> {
+    let status = with_memory_mut(|memory| {
+        for segment in init_segments {
+            memory.write_bytes_init(segment.base, segment.size, &segment.bytes)?;
+        }
+        for segment in zero_segments {
+            memory.zero_fill_init(segment.base, segment.size)?;
+        }
+        Ok(())
+    });
+    if status.is_ok() {
+        Ok(())
+    } else {
+        Err(status)
+    }
 }
 
 fn with_memory_mut<F>(mut f: F) -> MemoryStatus
@@ -425,5 +513,18 @@ mod tests {
         init_memory(test_layout()).expect("init memory");
         let err = mem_store_u8(0x2000, 1).unwrap_err();
         assert_eq!(err, MemoryStatus::PermissionDenied);
+    }
+
+    #[test]
+    fn apply_memory_image_writes_and_zeros() {
+        init_memory(test_layout()).expect("init memory");
+        let init = MemoryInitSegment::new("data", 0x1000, 4, vec![1, 2, 3, 4]);
+        let zero = MemoryZeroSegment::new("bss", 0x1004, 4);
+        apply_memory_image(&[init], &[zero]).expect("apply image");
+
+        let value = mem_load_u32(0x1000).expect("load");
+        assert_eq!(value, 0x04030201);
+        let zeroed = mem_load_u32(0x1004).expect("load zero");
+        assert_eq!(zeroed, 0);
     }
 }

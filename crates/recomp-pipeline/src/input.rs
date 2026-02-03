@@ -3,7 +3,30 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Deserialize, Serialize)]
 pub struct Module {
     pub arch: String,
+    #[serde(default)]
+    pub segments: Vec<ModuleSegment>,
     pub functions: Vec<Function>,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ModuleSegment {
+    pub name: String,
+    pub base: u64,
+    pub size: u64,
+    pub permissions: ModuleSegmentPermissions,
+    #[serde(default)]
+    pub init_path: Option<String>,
+    #[serde(default)]
+    pub init_size: Option<u64>,
+    #[serde(default)]
+    pub zero_fill: bool,
+}
+
+#[derive(Debug, Deserialize, Serialize)]
+pub struct ModuleSegmentPermissions {
+    pub read: bool,
+    pub write: bool,
+    pub execute: bool,
 }
 
 #[derive(Debug, Deserialize, Serialize)]

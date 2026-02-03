@@ -99,6 +99,7 @@ fn lift_stub(
 
     let lifted = Module {
         arch: "aarch64".to_string(),
+        segments: Vec::new(),
         functions: vec![Function {
             name: options.entry_name.clone(),
             ops: vec![Op::Ret],
@@ -183,6 +184,7 @@ fn lift_decode(
 
     let lifted = Module {
         arch: "aarch64".to_string(),
+        segments: Vec::new(),
         functions,
     };
 
