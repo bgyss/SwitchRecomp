@@ -1,7 +1,12 @@
 # SPEC-190: Video-Based Validation
 
 ## Status
-Draft v0.1
+Draft v0.2
+
+## Rationale
+- Added reference timeline and capture templates in `samples/`.
+- Implemented hash-based video/audio comparison with drift reporting.
+- Documented capture and manual review workflow with a macOS capture script.
 
 ## Purpose
 Define a validation workflow that compares recompiled output against a reference gameplay video when no instrumented emulator is available.

@@ -1,7 +1,12 @@
 # SPEC-200: DKCR HD First-Level Milestone (macOS/aarch64)
 
 ## Status
-Draft v0.1
+Draft v0.2
+
+## Rationale
+- Added DKCR HD sample config, placeholder patches, and provenance scaffolding.
+- Implemented runtime boot stubs for services, graphics, audio, and input.
+- Documented a macOS/aarch64 runbook and validation workflow for external assets.
 
 ## Purpose
 Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using video-based validation to confirm the first level is playable.
