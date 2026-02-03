@@ -55,7 +55,7 @@ Define the service architecture and data flow for fully automated static recompi
 }
 ```
 
-- Required events:
+Required events:
 - `recomp.run.requested`
 - `recomp.run.planned`
 - `recomp.run.stage.completed`
