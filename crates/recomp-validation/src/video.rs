@@ -384,7 +384,8 @@ pub fn run_video_validation(
             alignment.offset, reference.thresholds.max_drift_frames
         ));
     }
-    if length_delta.unsigned_abs() > reference.thresholds.max_dropped_frames {
+    let length_delta_abs = length_delta.unsigned_abs() as usize;
+    if length_delta_abs > reference.thresholds.max_dropped_frames {
         failures.push(format!(
             "frame length delta {} exceeds max dropped {}",
             length_delta, reference.thresholds.max_dropped_frames
