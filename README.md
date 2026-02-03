@@ -5,6 +5,7 @@ This repository contains a draft specification set for a Nintendo Switch static 
 ## Contents
 - `specs/` contains the numbered specification series.
 - `crates/` holds the exploratory pipeline/runtime scaffolding.
+- `skills/` provides the Codex skill set used for validation workflows.
 - `ROADMAP.md` provides phased milestones and exit criteria.
 - `RESEARCH.md` lists research directions and required sources.
 - `docs/` contains development notes.
@@ -32,7 +33,7 @@ Legal and provenance policy:
 ## Samples and Flow Docs
 - `samples/memory-image/` shows the memory image initialization flow (segment blob + lifted module).
 - `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline.
-- `docs/validation-matrix-template.md`, `docs/title-run-sheet-template.md`, `docs/thresholds/default.json`, `docs/batch-manifest-schema.md`, and `docs/batch-pipeline-layout.md` are reusable validation templates.
+- `docs/validation-matrix-template.md`, `docs/title-run-sheet-template.md`, `docs/thresholds/default.json`, `docs/batch-manifest-schema.md`, `docs/batch-manifest-schema.json`, and `docs/batch-pipeline-layout.md` are reusable validation templates.
 
 ## Back Pressure Hooks
 These hooks add fast, consistent feedback to keep the repo autonomous and reduce review churn. Hooks are defined in `.pre-commit-config.yaml` and can be run with `prek` (preferred) or `pre-commit`.

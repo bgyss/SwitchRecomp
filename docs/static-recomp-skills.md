@@ -1,9 +1,8 @@
 # Static Recompilation Skills
 
 This project uses a set of Codex skills to accelerate static recompilation
-validation and batch processing. These skills live in the local Codex skills
-folder but are documented here so future projects can reuse the workflow and
-project-level configuration.
+validation and batch processing. Canonical copies live in `skills/` and can be
+installed into a local Codex skills directory for use.
 
 ## Skill Set
 - `static-recomp-scope-plan`:
@@ -21,6 +20,15 @@ project-level configuration.
 - `static-recomp-regression-triage`:
   Regression classification and root-cause workflow.
 
+## Repo Skill Copies
+The skill definitions are stored in `skills/` so contributors can install them
+locally and keep them in sync with project workflows.
+
+Install example:
+```bash
+rsync -a skills/static-recomp-av-compare/ "$CODEX_HOME/skills/static-recomp-av-compare/"
+```
+
 ## Project-Level Configuration
 Use these repo templates to keep validation and reporting consistent across
 future titles and projects.
@@ -30,6 +38,7 @@ future titles and projects.
 - Default A/V thresholds: `docs/thresholds/default.json`
 - Batch manifest schema: `docs/batch-manifest-schema.md`
 - Batch pipeline layout: `docs/batch-pipeline-layout.md`
+- Batch manifest JSON schema: `docs/batch-manifest-schema.json`
 
 ## Recommended Practice
 - Keep all proprietary inputs outside the repo.

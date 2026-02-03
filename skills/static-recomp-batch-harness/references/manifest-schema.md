@@ -1,7 +1,5 @@
 # Batch Manifest Schema (v1)
 
-Machine-validated JSON schema: `docs/batch-manifest-schema.json`.
-
 This schema is intended for catalog-scale batch runs. It records per-title inputs,
 validation targets, and status. Store as JSON or TOML; keys below are canonical.
 
