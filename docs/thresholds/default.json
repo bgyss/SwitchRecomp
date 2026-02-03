@@ -1,0 +1,7 @@
+{
+  "ssim_min": 0.95,
+  "psnr_min": 35.0,
+  "vmaf_min": 90.0,
+  "audio_lufs_delta_max": 2.0,
+  "audio_peak_delta_max": 2.0
+}

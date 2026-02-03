@@ -5,3 +5,7 @@
 /.devenv.flake.nix
 /devenv.lock
 /game-data/
+
+# Python cache
+__pycache__/
+*.pyc
