@@ -1,24 +1,35 @@
 use std::fmt;
 
+mod audio;
+mod boot;
 mod homebrew;
+mod input;
 mod memory;
 
 pub const ABI_VERSION: &str = "0.1.0";
 
+pub use audio::{AudioBackend, AudioBuffer, AudioError, StubAudioBackend};
+pub use boot::{
+    BootAssets, BootContext, BootError, BootPlan, BootStep, BootTrace, ServiceCallSpec,
+};
 pub use homebrew::{
     entrypoint_shim, DeterministicClock, InputEvent, InputQueue, LoaderConfig, LoaderConfigBuilder,
     LoaderConfigEntry, LoaderConfigKey, NroEntrypoint, RuntimeManifest, ServiceStub, NRO_ENTRY_X1,
 };
+pub use input::{InputBackend, InputFrame, StubInputBackend};
 pub use memory::{
     init_memory, recomp_mem_load_u16, recomp_mem_load_u32, recomp_mem_load_u64, recomp_mem_load_u8,
     recomp_mem_store_u16, recomp_mem_store_u32, recomp_mem_store_u64, recomp_mem_store_u8,
     MemoryInitSegment, MemoryLayout, MemoryLayoutError, MemoryPermissions, MemoryRegionSpec,
     MemoryStatus, MemoryZeroSegment,
 };
-pub use recomp_gfx::{CommandStream, GraphicsBackend, GraphicsError, StubBackend};
+pub use recomp_gfx::{
+    CommandStream, FrameDescriptor, GraphicsBackend, GraphicsError, GraphicsPresenter, StubBackend,
+    StubPresenter,
+};
 pub use recomp_services::{
-    stub_handler, ServiceAccessControl, ServiceCall, ServiceError, ServiceLogger, ServiceRegistry,
-    StubBehavior,
+    register_stubbed_services, stub_handler, ServiceAccessControl, ServiceCall, ServiceError,
+    ServiceLogger, ServiceRegistry, ServiceStubSpec, StubBehavior,
 };
 pub use recomp_timing::Scheduler;
 

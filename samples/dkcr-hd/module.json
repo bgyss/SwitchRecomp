@@ -1,0 +1,17 @@
+{
+  "arch": "aarch64",
+  "functions": [
+    {
+      "name": "entry",
+      "ops": [
+        { "op": "syscall", "name": "svc_boot", "args": [] },
+        { "op": "syscall", "name": "svc_sm", "args": [] },
+        { "op": "syscall", "name": "svc_fs", "args": [] },
+        { "op": "syscall", "name": "svc_vi", "args": [] },
+        { "op": "syscall", "name": "svc_hid", "args": [] },
+        { "op": "syscall", "name": "svc_audout", "args": [] },
+        { "op": "ret" }
+      ]
+    }
+  ]
+}
