@@ -1,0 +1,22 @@
+schema_version = "1"
+
+[title]
+name = "Memory Image Sample"
+title_id = "0100000000000000"
+version = "1.0.0"
+region = "US"
+
+[collection]
+device = "demo"
+collected_at = "2026-02-03"
+
+[collection.tool]
+name = "manual"
+version = "1.0"
+
+[[inputs]]
+path = "module.json"
+format = "lifted_json"
+sha256 = "f65421a9c7eb28523992c99ae2a4cb690ff375d599f820ff8a1697f91944f89b"
+size = 635
+role = "lifted_module"

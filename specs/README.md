@@ -8,6 +8,9 @@ This folder contains the project specs for the Switch static recompilation prese
 - SPEC-020-INPUTS-PROVENANCE.md
 - SPEC-030-RECOMP-PIPELINE.md
 - SPEC-040-RUNTIME-ABI.md
+- SPEC-045-RUNTIME-MEMORY.md
+- SPEC-046-RUNTIME-MEMORY-CONFIG.md
+- SPEC-047-MEMORY-IMAGE-INIT.md
 - SPEC-050-CPU-ISA.md
 - SPEC-060-GPU-GRAPHICS.md
 - SPEC-070-OS-SERVICES.md

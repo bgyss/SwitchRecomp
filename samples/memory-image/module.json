@@ -1,0 +1,26 @@
+{
+  "arch": "aarch64",
+  "segments": [
+    {
+      "name": "data",
+      "base": 4096,
+      "size": 8,
+      "permissions": { "read": true, "write": true, "execute": false },
+      "init_path": "data.bin",
+      "init_size": 4,
+      "zero_fill": true
+    }
+  ],
+  "functions": [
+    {
+      "name": "entry",
+      "ops": [
+        { "op": "const_i64", "dst": "x0", "imm": 4096 },
+        { "op": "load_i32", "dst": "x1", "addr": "x0", "offset": 0 },
+        { "op": "add_i64", "dst": "x2", "lhs": "x1", "rhs": "x1" },
+        { "op": "store_i32", "src": "x2", "addr": "x0", "offset": 4 },
+        { "op": "ret" }
+      ]
+    }
+  ]
+}

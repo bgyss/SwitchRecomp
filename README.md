@@ -28,6 +28,10 @@ Legal and provenance policy:
 - The dev environment is managed with Nix + devenv.
 - See `docs/DEVELOPMENT.md` for commands and sample usage.
 
+## Samples and Flow Docs
+- `samples/memory-image/` shows the memory image initialization flow (segment blob + lifted module).
+- `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline.
+
 ## Back Pressure Hooks
 These hooks add fast, consistent feedback to keep the repo autonomous and reduce review churn. Hooks are defined in `.pre-commit-config.yaml` and can be run with `prek` (preferred) or `pre-commit`.
 

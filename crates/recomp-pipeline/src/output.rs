@@ -1,4 +1,7 @@
-use crate::pipeline::{ensure_dir, FunctionBody, RustFunction, RustProgram, RustTerminator};
+use crate::memory::{MemoryImageDescriptor, MemoryLayoutDescriptor};
+use crate::pipeline::{
+    ensure_dir, FunctionBody, MemoryImageSource, RustFunction, RustProgram, RustTerminator,
+};
 use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::fs;
@@ -16,6 +19,9 @@ pub struct BuildManifest {
     pub config_sha256: String,
     pub provenance_sha256: String,
     pub inputs: Vec<InputSummary>,
+    pub memory_layout: MemoryLayoutDescriptor,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub memory_image: Option<MemoryImageDescriptor>,
     pub manifest_self_hash_basis: String,
     pub generated_files: Vec<GeneratedFile>,
 }
@@ -42,6 +48,7 @@ pub fn emit_project(
     runtime_rel: &Path,
     program: &RustProgram,
     manifest: &BuildManifest,
+    memory_sources: &[MemoryImageSource],
 ) -> Result<(Vec<PathBuf>, BuildManifest), String> {
     ensure_dir(out_dir).map_err(|err| err.to_string())?;
 
@@ -68,6 +75,23 @@ pub fn emit_project(
         sha256: sha256_bytes(main_rs.as_bytes()),
         size: main_rs.len() as u64,
     });
+
+    if !memory_sources.is_empty() {
+        for source in memory_sources {
+            let dest_path = out_dir.join(&source.dest_path);
+            if let Some(parent) = dest_path.parent() {
+                ensure_dir(parent).map_err(|err| err.to_string())?;
+            }
+            let bytes = fs::read(&source.source_path).map_err(|err| err.to_string())?;
+            fs::write(&dest_path, &bytes).map_err(|err| err.to_string())?;
+            written.push(dest_path.clone());
+            generated_files.push(GeneratedFile {
+                path: source.dest_path.to_string_lossy().to_string(),
+                sha256: sha256_bytes(&bytes),
+                size: bytes.len() as u64,
+            });
+        }
+    }
 
     let manifest_path = out_dir.join("manifest.json");
     let mut updated_manifest = manifest.clone();
@@ -175,6 +199,8 @@ fn emit_main_rs(program: &RustProgram) -> String {
     });
     out.push_str(");\n");
     out.push_str("    recomp_runtime::init(&runtime_config);\n");
+    emit_memory_layout_init(&mut out, &program.memory_layout);
+    emit_memory_image_init(&mut out, program.memory_image.as_ref());
     out.push_str(&format!("    {}()?;\n", program.entry));
     out.push_str(
         "    Ok(())\n}
@@ -187,6 +213,51 @@ fn emit_main_rs(program: &RustProgram) -> String {
     }
 
     out
+}
+
+fn emit_memory_layout_init(out: &mut String, layout: &MemoryLayoutDescriptor) {
+    out.push_str("    let memory_layout = recomp_runtime::MemoryLayout::new(vec![\n");
+    for region in &layout.regions {
+        out.push_str(&format!(
+            "        recomp_runtime::MemoryRegionSpec::new(\"{}\", {:#x}, {:#x}, recomp_runtime::MemoryPermissions::new({}, {}, {})),\n",
+            region.name,
+            region.base,
+            region.size,
+            region.permissions.read,
+            region.permissions.write,
+            region.permissions.execute
+        ));
+    }
+    out.push_str("    ]);\n");
+    out.push_str("    recomp_runtime::init_memory(memory_layout)?;\n");
+}
+
+fn emit_memory_image_init(out: &mut String, image: Option<&MemoryImageDescriptor>) {
+    let Some(image) = image else {
+        return;
+    };
+
+    out.push_str("    let mut init_segments = Vec::new();\n");
+    for segment in &image.init_segments {
+        out.push_str(&format!(
+            "    let bytes = std::fs::read(\"{}\").map_err(|err| recomp_runtime::RuntimeError::Io {{ message: err.to_string() }})?;\n",
+            segment.init_path
+        ));
+        out.push_str(&format!(
+            "    init_segments.push(recomp_runtime::MemoryInitSegment::new(\"{}\", {:#x}, {:#x}, bytes));\n",
+            segment.name, segment.base, segment.size
+        ));
+    }
+
+    out.push_str("    let zero_segments = vec![\n");
+    for segment in &image.zero_segments {
+        out.push_str(&format!(
+            "        recomp_runtime::MemoryZeroSegment::new(\"{}\", {:#x}, {:#x}),\n",
+            segment.name, segment.base, segment.size
+        ));
+    }
+    out.push_str("    ];\n");
+    out.push_str("    recomp_runtime::apply_memory_image(&init_segments, &zero_segments)?;\n");
 }
 
 fn emit_function(function: &RustFunction) -> String {

@@ -5,5 +5,36 @@ abi_version = "0.1.0"
 [runtime]
 performance_mode = "handheld"
 
+[memory_layout]
+[[memory_layout.regions]]
+name = "code"
+base = 0x1000_0000
+size = 0x0001_0000
+permissions = { read = true, write = false, execute = true }
+
+[[memory_layout.regions]]
+name = "rodata"
+base = 0x1001_0000
+size = 0x0001_0000
+permissions = { read = true, write = false, execute = false }
+
+[[memory_layout.regions]]
+name = "data"
+base = 0x1002_0000
+size = 0x0001_0000
+permissions = { read = true, write = true, execute = false }
+
+[[memory_layout.regions]]
+name = "heap"
+base = 0x2000_0000
+size = 0x0004_0000
+permissions = { read = true, write = true, execute = false }
+
+[[memory_layout.regions]]
+name = "stack"
+base = 0x3000_0000
+size = 0x0004_0000
+permissions = { read = true, write = true, execute = false }
+
 [stubs]
 svc_log = "log"

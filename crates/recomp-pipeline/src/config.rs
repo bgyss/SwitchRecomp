@@ -1,3 +1,4 @@
+use crate::memory::{MemoryLayoutDescriptor, MemoryPermissionsDescriptor, MemoryRegionDescriptor};
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::str::FromStr;
@@ -40,10 +41,32 @@ impl FromStr for PerformanceMode {
     }
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Default)]
 struct RawRuntimeConfig {
     #[serde(default)]
     performance_mode: Option<String>,
+    #[serde(default)]
+    memory_layout: Option<RawMemoryLayoutConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawMemoryLayoutConfig {
+    regions: Vec<RawMemoryRegionConfig>,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawMemoryRegionConfig {
+    name: String,
+    base: u64,
+    size: u64,
+    permissions: RawMemoryPermissionsConfig,
+}
+
+#[derive(Debug, Deserialize)]
+struct RawMemoryPermissionsConfig {
+    read: bool,
+    write: bool,
+    execute: bool,
 }
 
 #[derive(Debug)]
@@ -69,6 +92,7 @@ pub struct TitleConfig {
     pub abi_version: String,
     pub stubs: BTreeMap<String, StubBehavior>,
     pub runtime: RuntimeConfig,
+    pub memory_layout: MemoryLayoutDescriptor,
 }
 
 impl TitleConfig {
@@ -80,17 +104,44 @@ impl TitleConfig {
             let parsed = StubBehavior::from_str(&behavior)?;
             stubs.insert(name, parsed);
         }
-        let runtime_mode = raw
-            .runtime
-            .and_then(|runtime| runtime.performance_mode)
+        let runtime = raw.runtime.unwrap_or_default();
+        let runtime_mode = runtime
+            .performance_mode
             .unwrap_or_else(|| "handheld".to_string());
         let performance_mode = PerformanceMode::from_str(&runtime_mode)?;
+        let memory_layout = match runtime.memory_layout {
+            Some(layout) => parse_memory_layout(layout)?,
+            None => MemoryLayoutDescriptor::minimal_default(),
+        };
         Ok(TitleConfig {
             title: raw.title,
             entry: raw.entry,
             abi_version: raw.abi_version,
             stubs,
             runtime: RuntimeConfig { performance_mode },
+            memory_layout,
         })
     }
+}
+
+fn parse_memory_layout(layout: RawMemoryLayoutConfig) -> Result<MemoryLayoutDescriptor, String> {
+    let regions = layout
+        .regions
+        .into_iter()
+        .map(|region| {
+            MemoryRegionDescriptor::new(
+                region.name,
+                region.base,
+                region.size,
+                MemoryPermissionsDescriptor::new(
+                    region.permissions.read,
+                    region.permissions.write,
+                    region.permissions.execute,
+                ),
+            )
+        })
+        .collect();
+    let descriptor = MemoryLayoutDescriptor { regions };
+    descriptor.validate()?;
+    Ok(descriptor)
 }
