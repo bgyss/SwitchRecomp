@@ -20,6 +20,9 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-150 Homebrew Asset Packaging
 - SPEC-160 AArch64 Decode Coverage
 - SPEC-170 Function Discovery and Control-Flow Graph
+- SPEC-180 XCI Title Intake
+- SPEC-190 Video-Based Validation
+- SPEC-200 DKCR HD First-Level Milestone (macOS/aarch64)
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -271,3 +274,51 @@ Exit criteria (from SPEC-170)
 - A synthetic binary with a conditional branch yields at least two blocks and correct edges.
 - Direct call targets are discovered and lifted as separate functions.
 - The lifted module is deterministic when run twice on the same input.
+
+## SPEC-180: XCI Title Intake
+Outcome
+- Intake XCI inputs with user-supplied keys and extract code/assets deterministically.
+
+Work items
+- [ ] Define the XCI intake CLI path and config schema extensions.
+- [ ] Integrate keyset validation and explicit Program NCA selection.
+- [ ] Extract ExeFS/NSO into deterministic segment blobs with hashes recorded.
+- [ ] Emit RomFS assets to a separate asset output root and record in manifest.
+- [ ] Add non-proprietary tests for intake validation and asset separation rules.
+
+Exit criteria (from SPEC-180)
+- XCI intake emits deterministic ExeFS/NSO outputs and a manifest with hashes.
+- Missing keys or ambiguous Program NCA selection fails with clear errors.
+- Code outputs and assets remain separated in all outputs.
+
+## SPEC-190: Video-Based Validation
+Outcome
+- Validate the recompiled output against a reference gameplay video without emulator traces.
+
+Work items
+- [ ] Define a reference timeline for the first level and store it in `reference_video.toml`.
+- [ ] Implement a capture workflow for macOS/aarch64 runtime output.
+- [ ] Add a comparison step that computes video and audio similarity metrics.
+- [ ] Generate a `validation-report.json` with pass/fail and drift summaries.
+- [ ] Document manual review steps for mismatches.
+
+Exit criteria (from SPEC-190)
+- A single run produces a validation report for the first level.
+- Similarity metrics are stable across two consecutive runs.
+- Validation artifacts remain external and are referenced via provenance metadata.
+
+## SPEC-200: DKCR HD First-Level Milestone (macOS/aarch64)
+Outcome
+- Produce a macOS/aarch64 static recompilation of DKCR HD that reaches and plays the first level.
+
+Work items
+- [ ] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
+- [ ] Identify required OS services and implement or stub them in the runtime.
+- [ ] Implement the minimal GPU translation path needed for the first level.
+- [ ] Create a per-title config and patch set for DKCR HD.
+- [ ] Run video-based validation against the first level (SPEC-190).
+
+Exit criteria (from SPEC-200)
+- The macOS/aarch64 build boots and reaches the first playable level.
+- First-level gameplay matches the reference video within defined tolerances.
+- No proprietary assets or keys are stored in the repo or build outputs.

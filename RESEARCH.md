@@ -77,6 +77,12 @@ Needed research:
 - Switch NSO format and compression: https://switchbrew.org/wiki/NSO
 - Homebrew ABI entrypoint and loader config: https://switchbrew.org/wiki/Homebrew_ABI
 - NACP title metadata format: https://switchbrew.org/wiki/NACP
+- Switch NCA container format: https://switchbrew.org/wiki/NCA
+- hactool (XCI/NCA extraction and keyset handling): https://github.com/SciresM/hactool
+- hactoolnet (XCI/NCA extraction with user keys): https://github.com/Thealexbarney/hactoolnet
+- nstool (XCI/NCA/NSO extraction): https://github.com/jakcron/nstool
+- Ghidra SLEIGH language reference (p-code semantics): https://github.com/NationalSecurityAgency/ghidra/blob/master/GhidraDocs/languages/html/sleigh.html
+- sleigh library (p-code lifting implementation): https://github.com/lifting-bits/sleigh
 
 ## Research Deliverables
 - A research summary for each category with sources.

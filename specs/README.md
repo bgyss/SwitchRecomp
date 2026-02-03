@@ -26,6 +26,9 @@ This folder contains the project specs for the Switch static recompilation prese
 - SPEC-150-HOMEBREW-ASSET-PACKAGING.md
 - SPEC-160-AARCH64-DECODE-COVERAGE.md
 - SPEC-170-FUNCTION-DISCOVERY-CFG.md
+- SPEC-180-XCI-INTAKE.md
+- SPEC-190-VIDEO-BASED-VALIDATION.md
+- SPEC-200-DKCR-HD-FIRST-LEVEL.md
 
 ## Template
 - SPEC-TEMPLATE.md
