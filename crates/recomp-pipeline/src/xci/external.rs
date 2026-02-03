@@ -349,7 +349,10 @@ fn parse_title_listing(output: &str) -> Vec<ProgramMetadata> {
 }
 
 fn after_colon(line: &str) -> String {
-    line.splitn(2, ':').nth(1).unwrap_or("").trim().to_string()
+    line.split_once(':')
+        .map(|(_, value)| value.trim())
+        .unwrap_or("")
+        .to_string()
 }
 
 fn collect_nca_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
@@ -363,7 +366,7 @@ fn collect_nca_files(dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> {
         if path
             .extension()
             .and_then(|ext| ext.to_str())
-            .map_or(false, |ext| ext.eq_ignore_ascii_case("nca"))
+            .is_some_and(|ext| ext.eq_ignore_ascii_case("nca"))
         {
             out.push(path);
         }
