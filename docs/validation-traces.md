@@ -28,6 +28,12 @@ Manual steps:
 Use an external capture path and keep outputs outside the repo.
 
 Suggested workflow:
+- Use the helper script to capture a fixed-duration run:
+```
+scripts/capture_video.sh --out /Volumes/External/Captures/dkcr-hd-first-level.mp4 \
+  --duration 360 --fps 60 --video-device 1 --audio-device 0 --resolution 1920x1080
+```
+- Use `scripts/capture_video.sh --list-devices` to list available device indices.
 - Launch the recompiled runtime and reach the target segment.
 - Capture the primary display (or a specific window) with `ffmpeg`:
 ```
