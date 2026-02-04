@@ -66,6 +66,17 @@ Needed research:
 - Jurisdiction-specific rules affecting preservation.
 - Best practices for open source preservation tooling.
 
+### 8) Automation, Input Replay, and Media Normalization
+- Define a stable automation loop for intake, build, capture, and validation.
+- Normalize reference media and capture outputs into comparable artifacts.
+- Model deterministic input replay aligned to reference timelines.
+
+Needed research:
+- Capture tooling behavior and determinism guarantees.
+- Input timing and latency characteristics for Switch titles.
+- Video/audio similarity metrics and drift analysis.
+- Operational checklist for DKCR validation artifacts (see `docs/dkcr-validation-prereqs.md`).
+
 ## Seed Resources (Reviewed)
 - Jamulator write-up on static recompilation pitfalls and concurrency: https://andrewkelley.me/post/jamulator.html
 - N64Recomp repository for pipeline patterns: https://github.com/N64Recomp/N64Recomp
@@ -81,8 +92,15 @@ Needed research:
 - hactool (XCI/NCA extraction and keyset handling): https://github.com/SciresM/hactool
 - hactoolnet (XCI/NCA extraction with user keys): https://github.com/Thealexbarney/hactoolnet
 - nstool (XCI/NCA/NSO extraction): https://github.com/jakcron/nstool
+- Switch HID input services: https://switchbrew.org/wiki/HID
+- FFmpeg documentation (capture, formats, filters): https://ffmpeg.org/ffmpeg.html
+- FFmpeg filters (SSIM/PSNR references): https://ffmpeg.org/ffmpeg-filters.html
 - Ghidra SLEIGH language reference (p-code semantics): https://github.com/NationalSecurityAgency/ghidra/blob/master/GhidraDocs/languages/html/sleigh.html
 - sleigh library (p-code lifting implementation): https://github.com/lifting-bits/sleigh
+- Resurrecting Crimsonland (banteg, 2026-02-01): headless Ghidra pipeline with evidence-backed rename map and regen loop, plus runtime instrumentation (WinDbg/cdb, Frida) for behavior capture; useful automation and validation ideas. https://banteg.xyz/posts/crimsonland/
+- FFmpeg filter reference for SSIM/PSNR/EBU R128 audio analysis: https://manpages.debian.org/bookworm/ffmpeg/ffmpeg-filters.1.en.html
+- FFmpeg libvmaf filter usage notes: https://manpages.opensuse.org/Tumbleweed/ffmpeg/ffmpeg-filters.1.en.html
+- EBU R 128 loudness recommendation (audio loudness measurement): https://tech.ebu.ch/publications/r128
 
 ## Research Deliverables
 - A research summary for each category with sources.
@@ -94,3 +112,4 @@ Needed research:
 - Which OS services are required to reach a game loop without patches?
 - What is the simplest graphics path that still produces correct output?
 - How can we generate reference traces without distributing proprietary content?
+- What is the minimal input script fidelity needed for stable validation?

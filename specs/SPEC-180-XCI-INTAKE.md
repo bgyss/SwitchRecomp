@@ -1,7 +1,13 @@
 # SPEC-180: XCI Title Intake
 
 ## Status
-Implemented v0.1
+Draft v0.2
+
+## Rationale
+- Added XCI intake CLI wiring with optional program selection config.
+- Enforced provenance inputs for XCI images and keysets.
+- Implemented deterministic ExeFS/NSO extraction and RomFS asset separation.
+- Added non-proprietary tests using a mock extractor.
 
 ## Purpose
 Define how the pipeline ingests a user-supplied XCI and extracts code and assets while preserving legal separation and deterministic outputs.

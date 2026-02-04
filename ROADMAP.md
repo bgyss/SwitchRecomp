@@ -34,6 +34,7 @@ Exit criteria:
 - Implement a basic GPU command path or a thin translation layer.
 - Render a test scene from recompiled code.
 - Add graphics conformance tests.
+- Define the automation loop inputs/outputs needed for validation.
 
 Exit criteria:
 - A test scene renders deterministically.
@@ -43,10 +44,12 @@ Exit criteria:
 - Select a preservation-safe title and provide a public build pipeline.
 - Expand instruction coverage to what the title needs.
 - Document limitations and required assets.
+- Stand up the automated recompilation loop with input replay and video validation.
 
 Exit criteria:
 - Title boots and reaches gameplay.
 - Performance targets met on baseline host.
+- Automated validation produces a report with stable metrics.
 
 ## Phase 5: Stabilization
 - Harden tooling, improve diagnostics, and expand coverage.

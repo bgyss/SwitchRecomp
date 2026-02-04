@@ -63,6 +63,8 @@ pub enum InputFormatHint {
     Nrr0,
     Npdm,
     LiftedJson,
+    Xci,
+    Keyset,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -77,6 +79,8 @@ pub enum InputFormat {
     Nrr0,
     Npdm,
     LiftedJson,
+    Xci,
+    Keyset,
 }
 
 impl InputFormat {
@@ -92,6 +96,8 @@ impl InputFormat {
             InputFormat::Nrr0 => "nrr0",
             InputFormat::Npdm => "npdm",
             InputFormat::LiftedJson => "lifted_json",
+            InputFormat::Xci => "xci",
+            InputFormat::Keyset => "keyset",
         }
     }
 }
@@ -197,6 +203,8 @@ impl ProvenanceManifest {
                     InputFormatHint::Nrr0 => InputFormat::Nrr0,
                     InputFormatHint::Npdm => InputFormat::Npdm,
                     InputFormatHint::LiftedJson => InputFormat::LiftedJson,
+                    InputFormatHint::Xci => InputFormat::Xci,
+                    InputFormatHint::Keyset => InputFormat::Keyset,
                 };
                 if expected != detected {
                     return Err(format!(

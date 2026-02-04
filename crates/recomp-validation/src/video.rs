@@ -1,1048 +1,890 @@
-use crate::{ValidationCase, ValidationReport, ValidationStatus};
+use crate::ValidationStatus;
 use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use sha2::{Digest, Sha256};
+use std::cmp::Ordering;
+use std::fmt;
+use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
-use std::time::Instant;
 
-#[derive(Debug)]
-pub struct VideoValidationPaths {
-    pub reference_config: PathBuf,
-    pub test_video: Option<PathBuf>,
-    pub summary_path: Option<PathBuf>,
-    pub out_dir: PathBuf,
-    pub scripts_dir: Option<PathBuf>,
-    pub thresholds_path: Option<PathBuf>,
-    pub event_observations: Option<PathBuf>,
-    pub strict: bool,
-    pub python: Option<PathBuf>,
-}
+const AUDIO_CHUNK_BYTES: usize = 4096;
 
-#[derive(Debug, Serialize)]
-pub struct VideoValidationSummary {
-    pub label: String,
-    pub summary_path: String,
-    pub thresholds: ValidationThresholds,
-    pub checks: Vec<MetricCheck>,
-    pub status: ValidationStatus,
-    pub failures: usize,
-    pub drift: DriftSummary,
-}
-
-#[derive(Debug, Serialize)]
-#[serde(rename_all = "snake_case")]
-pub enum CheckStatus {
-    Pass,
-    Fail,
-    Missing,
-}
-
-#[derive(Debug, Serialize)]
-pub struct MetricCheck {
-    pub metric: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub value: Option<f64>,
-    pub threshold: f64,
-    pub status: CheckStatus,
-}
-
-#[derive(Debug, Serialize, Clone)]
-pub struct ValidationThresholds {
-    pub ssim_min: f64,
-    pub psnr_min: f64,
-    pub vmaf_min: f64,
-    pub audio_lufs_delta_max: f64,
-    pub audio_peak_delta_max: f64,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub event_drift_max_seconds: Option<f64>,
-}
-
-impl Default for ValidationThresholds {
-    fn default() -> Self {
-        Self {
-            ssim_min: 0.95,
-            psnr_min: 35.0,
-            vmaf_min: 90.0,
-            audio_lufs_delta_max: 2.0,
-            audio_peak_delta_max: 2.0,
-            event_drift_max_seconds: None,
-        }
-    }
-}
-
-#[derive(Debug, Default, Clone)]
-struct ThresholdOverrides {
-    ssim_min: Option<f64>,
-    psnr_min: Option<f64>,
-    vmaf_min: Option<f64>,
-    audio_lufs_delta_max: Option<f64>,
-    audio_peak_delta_max: Option<f64>,
-    event_drift_max_seconds: Option<f64>,
-}
-
-impl ValidationThresholds {
-    fn apply_overrides(&mut self, overrides: ThresholdOverrides) {
-        if let Some(value) = overrides.ssim_min {
-            self.ssim_min = value;
-        }
-        if let Some(value) = overrides.psnr_min {
-            self.psnr_min = value;
-        }
-        if let Some(value) = overrides.vmaf_min {
-            self.vmaf_min = value;
-        }
-        if let Some(value) = overrides.audio_lufs_delta_max {
-            self.audio_lufs_delta_max = value;
-        }
-        if let Some(value) = overrides.audio_peak_delta_max {
-            self.audio_peak_delta_max = value;
-        }
-        if overrides.event_drift_max_seconds.is_some() {
-            self.event_drift_max_seconds = overrides.event_drift_max_seconds;
-        }
-    }
-}
-
-#[derive(Debug)]
-struct ReferenceVideo {
-    label: String,
-    reference_video: PathBuf,
-    expected: ExpectedVideo,
-    comparison: ComparisonSettings,
-    thresholds: ThresholdOverrides,
-    events: Vec<ReferenceEvent>,
-}
-
-#[derive(Debug, Default)]
-pub struct ExpectedVideo {
-    pub width: Option<u32>,
-    pub height: Option<u32>,
-    pub fps: Option<f64>,
-    pub audio_rate: Option<u32>,
-}
-
-#[derive(Debug, Default)]
-pub struct ComparisonSettings {
-    pub offset_seconds: f64,
-    pub trim_start_seconds: f64,
-    pub duration_seconds: Option<f64>,
-    pub no_vmaf: bool,
-    pub thresholds_path: Option<PathBuf>,
-}
-
-#[derive(Debug, Clone)]
-pub struct ReferenceEvent {
-    pub id: String,
-    pub label: Option<String>,
-    pub timecode: String,
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct Timecode {
     pub seconds: f64,
 }
 
-#[derive(Debug, Serialize)]
+impl Timecode {
+    pub fn from_seconds(seconds: f64) -> Result<Self, String> {
+        if seconds.is_finite() && seconds >= 0.0 {
+            Ok(Self { seconds })
+        } else {
+            Err(format!("invalid timecode seconds: {seconds}"))
+        }
+    }
+
+    pub fn parse(value: &str) -> Result<Self, String> {
+        let trimmed = value.trim();
+        if trimmed.is_empty() {
+            return Err("timecode is empty".to_string());
+        }
+        if let Ok(seconds) = trimmed.parse::<f64>() {
+            return Self::from_seconds(seconds);
+        }
+        let parts: Vec<&str> = trimmed.split(':').collect();
+        if parts.len() > 3 {
+            return Err(format!("timecode has too many segments: {value}"));
+        }
+        let mut secs = 0.0;
+        let mut multiplier = 1.0;
+        for (idx, part) in parts.iter().rev().enumerate() {
+            if idx == 0 {
+                secs += part
+                    .parse::<f64>()
+                    .map_err(|_| format!("invalid timecode seconds segment: {value}"))?;
+            } else {
+                let unit = part
+                    .parse::<u64>()
+                    .map_err(|_| format!("invalid timecode segment: {value}"))?;
+                multiplier *= 60.0;
+                secs += unit as f64 * multiplier;
+            }
+        }
+        Self::from_seconds(secs)
+    }
+
+    pub fn to_frame_index(&self, fps: f32) -> Result<usize, String> {
+        if !fps.is_finite() || fps <= 0.0 {
+            return Err(format!("invalid fps: {fps}"));
+        }
+        let frame = (self.seconds * fps as f64).round();
+        if frame < 0.0 {
+            Err("timecode produced negative frame index".to_string())
+        } else {
+            Ok(frame as usize)
+        }
+    }
+}
+
+impl fmt::Display for Timecode {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let total_ms = (self.seconds * 1000.0).round() as u64;
+        let ms = total_ms % 1000;
+        let total_secs = total_ms / 1000;
+        let secs = total_secs % 60;
+        let total_mins = total_secs / 60;
+        let mins = total_mins % 60;
+        let hours = total_mins / 60;
+        write!(f, "{hours:02}:{mins:02}:{secs:02}.{ms:03}")
+    }
+}
+
+impl Serialize for Timecode {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+
+impl<'de> Deserialize<'de> for Timecode {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        struct TimecodeVisitor;
+
+        impl serde::de::Visitor<'_> for TimecodeVisitor {
+            type Value = Timecode;
+
+            fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+                formatter.write_str("timecode string (HH:MM:SS.mmm) or seconds value")
+            }
+
+            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Timecode::parse(value).map_err(E::custom)
+            }
+
+            fn visit_f64<E>(self, value: f64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Timecode::from_seconds(value).map_err(E::custom)
+            }
+
+            fn visit_i64<E>(self, value: i64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Timecode::from_seconds(value as f64).map_err(E::custom)
+            }
+
+            fn visit_u64<E>(self, value: u64) -> Result<Self::Value, E>
+            where
+                E: serde::de::Error,
+            {
+                Timecode::from_seconds(value as f64).map_err(E::custom)
+            }
+        }
+
+        deserializer.deserialize_any(TimecodeVisitor)
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct VideoSpec {
+    pub path: PathBuf,
+    pub width: u32,
+    pub height: u32,
+    pub fps: f32,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct NormalizationProfile {
+    pub width: u32,
+    pub height: u32,
+    pub fps: f32,
+    pub audio_sample_rate: u32,
+    #[serde(default)]
+    pub audio_channels: Option<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct NormalizationConfig {
+    pub source_path: PathBuf,
+    pub normalized_path: PathBuf,
+    pub profile: NormalizationProfile,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct Timeline {
+    pub start: Timecode,
+    pub end: Timecode,
+    #[serde(default)]
+    pub events: Vec<TimelineEvent>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct TimelineEvent {
+    pub name: String,
+    pub time: Timecode,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub enum DriftStatus {
-    Observed,
-    Missing,
+pub enum HashFormat {
+    List,
+    Directory,
+    File,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HashSource {
+    pub format: HashFormat,
+    pub path: PathBuf,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct HashSources {
+    pub frames: HashSource,
+    #[serde(default)]
+    pub audio: Option<HashSource>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct VideoThresholds {
+    pub frame_match_ratio: f32,
+    #[serde(default)]
+    pub audio_match_ratio: Option<f32>,
+    pub max_drift_frames: i32,
+    #[serde(default)]
+    pub max_dropped_frames: usize,
+    #[serde(default)]
+    pub max_audio_drift_chunks: Option<i32>,
+}
+
+impl Default for VideoThresholds {
+    fn default() -> Self {
+        Self {
+            frame_match_ratio: 0.92,
+            audio_match_ratio: Some(0.9),
+            max_drift_frames: 3,
+            max_dropped_frames: 0,
+            max_audio_drift_chunks: None,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
+pub struct ValidationConfig {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub require_audio: Option<bool>,
+    #[serde(default)]
+    pub thresholds: Option<VideoThresholds>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ValidationConfigFile {
+    #[serde(default)]
+    pub schema_version: Option<String>,
+    #[serde(flatten)]
+    pub validation: ValidationConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ReferenceVideoConfig {
+    #[serde(default)]
+    pub schema_version: Option<String>,
+    #[serde(default)]
+    pub normalization: Option<NormalizationConfig>,
+    pub video: VideoSpec,
+    pub timeline: Timeline,
+    #[serde(default)]
+    pub hashes: Option<HashSources>,
+    #[serde(default)]
+    pub thresholds: Option<VideoThresholds>,
+    #[serde(default)]
+    pub validation: Option<ValidationConfig>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct CaptureVideoConfig {
+    pub video: VideoSpec,
+    pub hashes: HashSources,
 }
 
 #[derive(Debug, Serialize)]
-pub struct DriftEvent {
-    pub id: String,
+pub struct VideoValidationReport {
+    pub status: ValidationStatus,
+    pub validation_config: ValidationConfigSummary,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub label: Option<String>,
-    pub expected_timecode: String,
-    pub expected_seconds: f64,
+    pub normalization: Option<NormalizationConfig>,
+    pub triage: TriageSummary,
+    pub reference: VideoRunSummary,
+    pub capture: VideoRunSummary,
+    pub timeline: TimelineSummary,
+    pub frame_comparison: HashComparisonReport,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub observed_timecode: Option<String>,
+    pub audio_comparison: Option<HashComparisonReport>,
+    pub drift: DriftSummary,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub failures: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ValidationConfigSummary {
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub observed_seconds: Option<f64>,
+    pub schema_version: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub drift_seconds: Option<f64>,
-    pub status: DriftStatus,
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    pub require_audio: bool,
+    pub thresholds: VideoThresholds,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TriageSummary {
+    pub status: ValidationStatus,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<TriageCategory>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub findings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suggestions: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TriageCategory {
+    Pass,
+    ConfigMismatch,
+    ReferenceCoverage,
+    FrameMismatch,
+    AudioMismatch,
+    AudioMissing,
+    Unknown,
+}
+
+#[derive(Debug, Serialize)]
+pub struct VideoRunSummary {
+    pub path: String,
+    pub width: u32,
+    pub height: u32,
+    pub fps: f32,
+    pub frame_hashes: usize,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub audio_hashes: Option<usize>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TimelineSummary {
+    pub start: Timecode,
+    pub end: Timecode,
+    pub start_frame: usize,
+    pub end_frame: usize,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub events: Vec<TimelineEvent>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct HashComparisonReport {
+    pub matched: usize,
+    pub compared: usize,
+    pub match_ratio: f32,
+    pub threshold: f32,
+    pub offset: i32,
+    pub length_delta: i32,
+    pub reference_total: usize,
+    pub capture_total: usize,
 }
 
 #[derive(Debug, Serialize)]
 pub struct DriftSummary {
-    pub events: Vec<DriftEvent>,
+    pub frame_offset: i32,
+    pub frame_offset_seconds: f64,
+    pub length_delta_frames: i32,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub max_abs_drift_seconds: Option<f64>,
+    pub audio_offset_chunks: Option<i32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub average_abs_drift_seconds: Option<f64>,
-    pub missing_events: usize,
+    pub audio_length_delta_chunks: Option<i32>,
 }
 
-#[derive(Debug, Deserialize)]
-struct AvSummary {
-    label: Option<String>,
-    video: Option<SummaryVideo>,
-    audio: Option<SummaryAudio>,
-    events: Option<Vec<SummaryEvent>>,
+#[derive(Debug)]
+struct Alignment {
+    offset: i32,
+    compared: usize,
+    matched: usize,
+    match_ratio: f32,
 }
 
-#[derive(Debug, Deserialize)]
-struct SummaryVideo {
-    ssim: Option<SummaryMetric>,
-    psnr: Option<SummaryMetric>,
-    vmaf: Option<SummaryVmaf>,
+#[derive(Debug, Copy, Clone)]
+enum HashRole {
+    Frames,
+    Audio,
 }
 
-#[derive(Debug, Deserialize)]
-struct SummaryMetric {
-    average: Option<f64>,
+pub fn run_video_validation(
+    reference_path: &Path,
+    capture_path: &Path,
+) -> Result<VideoValidationReport, String> {
+    run_video_validation_with_config(reference_path, capture_path, None)
 }
 
-#[derive(Debug, Deserialize)]
-struct SummaryVmaf {
-    average: Option<f64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SummaryAudio {
-    reference: Option<SummaryAudioMetric>,
-    test: Option<SummaryAudioMetric>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SummaryAudioMetric {
-    integrated_lufs: Option<f64>,
-    true_peak_dbtp: Option<f64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct SummaryEvent {
-    id: String,
-    observed_timecode: Option<String>,
-    observed_seconds: Option<f64>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EventObservationFile {
-    schema_version: Option<String>,
-    observations: Vec<EventObservationEntry>,
-}
-
-#[derive(Debug, Deserialize)]
-struct EventObservationEntry {
-    id: String,
-    observed_timecode: Option<String>,
-    observed_seconds: Option<f64>,
-}
-
-pub fn run_video_validation(paths: VideoValidationPaths) -> Result<ValidationReport, String> {
-    let start = Instant::now();
-    let reference = load_reference_video_toml(&paths.reference_config)?;
-
-    let summary_path = if let Some(summary_path) = paths.summary_path.clone() {
-        summary_path
-    } else {
-        let test_video = paths
-            .test_video
-            .clone()
-            .ok_or_else(|| "test video is required when summary is not provided".to_string())?;
-        let scripts_dir = paths
-            .scripts_dir
-            .clone()
-            .unwrap_or_else(default_scripts_dir);
-        let python = paths
-            .python
-            .clone()
-            .unwrap_or_else(|| PathBuf::from("python3"));
-        run_compare_av(
-            &python,
-            &scripts_dir,
-            &reference,
-            &test_video,
-            &paths.out_dir,
-        )?
+pub fn run_video_validation_with_config(
+    reference_path: &Path,
+    capture_path: &Path,
+    validation_path: Option<&Path>,
+) -> Result<VideoValidationReport, String> {
+    let reference_src = fs::read_to_string(reference_path).map_err(|err| err.to_string())?;
+    let capture_src = fs::read_to_string(capture_path).map_err(|err| err.to_string())?;
+    let reference: ReferenceVideoConfig =
+        toml::from_str(&reference_src).map_err(|err| format!("invalid reference config: {err}"))?;
+    let capture: CaptureVideoConfig =
+        toml::from_str(&capture_src).map_err(|err| format!("invalid capture config: {err}"))?;
+    let validation_override = match validation_path {
+        Some(path) => Some(load_validation_config(path)?),
+        None => None,
     };
 
-    let summary = load_summary(&summary_path)?;
-    let thresholds = resolve_thresholds(&reference, paths.thresholds_path.as_deref())?;
+    let reference_dir = reference_path
+        .parent()
+        .ok_or_else(|| "reference config has no parent dir".to_string())?;
+    let capture_dir = capture_path
+        .parent()
+        .ok_or_else(|| "capture config has no parent dir".to_string())?;
 
-    let observations = if let Some(path) = &paths.event_observations {
-        Some(load_event_observations(path)?)
-    } else {
-        None
-    };
-
-    let video_summary = evaluate_summary(
-        &summary,
-        &summary_path,
-        &reference,
-        thresholds,
-        paths.strict,
-        observations.as_ref(),
-    )?;
-
-    let status = video_summary.status;
-    let duration_ms = start.elapsed().as_millis();
-    let case = ValidationCase {
-        name: "video_av_compare".to_string(),
-        status,
-        duration_ms,
-        details: Some(format!("summary: {}", summary_path.display())),
-    };
-
-    let (passed, failed) = match status {
-        ValidationStatus::Passed => (1, 0),
-        ValidationStatus::Failed => (0, 1),
-    };
-
-    Ok(ValidationReport {
-        generated_at: chrono_stamp(),
-        total: 1,
-        passed,
-        failed,
-        cases: vec![case],
-        video: Some(video_summary),
-    })
-}
-
-fn load_summary(path: &Path) -> Result<AvSummary, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|err| format!("read summary {}: {err}", path.display()))?;
-    serde_json::from_str(&text).map_err(|err| format!("parse summary json: {err}"))
-}
-
-fn resolve_thresholds(
-    reference: &ReferenceVideo,
-    thresholds_path: Option<&Path>,
-) -> Result<ValidationThresholds, String> {
-    let mut thresholds = ValidationThresholds::default();
-
-    if let Some(path) = reference.comparison.thresholds_path.as_deref() {
-        thresholds.apply_overrides(load_thresholds_json(path)?);
-    }
-    if let Some(path) = thresholds_path {
-        thresholds.apply_overrides(load_thresholds_json(path)?);
-    }
-    thresholds.apply_overrides(reference.thresholds.clone());
-
-    Ok(thresholds)
-}
-
-fn load_thresholds_json(path: &Path) -> Result<ThresholdOverrides, String> {
-    let text = std::fs::read_to_string(path).map_err(|err| format!("read thresholds: {err}"))?;
-    #[derive(Deserialize, Default)]
-    struct ThresholdFile {
-        ssim_min: Option<f64>,
-        psnr_min: Option<f64>,
-        vmaf_min: Option<f64>,
-        audio_lufs_delta_max: Option<f64>,
-        audio_peak_delta_max: Option<f64>,
-        event_drift_max_seconds: Option<f64>,
-    }
-    let parsed: ThresholdFile =
-        serde_json::from_str(&text).map_err(|err| format!("parse thresholds json: {err}"))?;
-    Ok(ThresholdOverrides {
-        ssim_min: parsed.ssim_min,
-        psnr_min: parsed.psnr_min,
-        vmaf_min: parsed.vmaf_min,
-        audio_lufs_delta_max: parsed.audio_lufs_delta_max,
-        audio_peak_delta_max: parsed.audio_peak_delta_max,
-        event_drift_max_seconds: parsed.event_drift_max_seconds,
-    })
-}
-
-fn evaluate_summary(
-    summary: &AvSummary,
-    summary_path: &Path,
-    reference: &ReferenceVideo,
-    thresholds: ValidationThresholds,
-    strict: bool,
-    observations: Option<&EventObservationFile>,
-) -> Result<VideoValidationSummary, String> {
-    let label = summary
-        .label
+    let reference_hashes = reference
+        .hashes
         .clone()
-        .unwrap_or_else(|| reference.label.clone());
-
-    let ssim_avg = summary
-        .video
+        .ok_or_else(|| "reference hashes missing".to_string())?;
+    let reference_validation = reference.validation.clone().unwrap_or_default();
+    let override_validation = validation_override
         .as_ref()
-        .and_then(|video| video.ssim.as_ref())
-        .and_then(|metric| metric.average);
-    let psnr_avg = summary
-        .video
-        .as_ref()
-        .and_then(|video| video.psnr.as_ref())
-        .and_then(|metric| metric.average);
-    let vmaf_avg = summary
-        .video
-        .as_ref()
-        .and_then(|video| video.vmaf.as_ref())
-        .and_then(|metric| metric.average);
+        .map(|cfg| cfg.validation.clone());
+    let merged_validation = ValidationConfig {
+        name: override_validation
+            .as_ref()
+            .and_then(|validation| validation.name.clone())
+            .or(reference_validation.name),
+        notes: override_validation
+            .as_ref()
+            .and_then(|validation| validation.notes.clone())
+            .or(reference_validation.notes),
+        require_audio: override_validation
+            .as_ref()
+            .and_then(|validation| validation.require_audio)
+            .or(reference_validation.require_audio),
+        thresholds: override_validation
+            .as_ref()
+            .and_then(|validation| validation.thresholds.clone())
+            .or(reference_validation.thresholds),
+    };
+    let thresholds = merged_validation
+        .thresholds
+        .clone()
+        .or_else(|| reference.thresholds.clone())
+        .unwrap_or_default();
+    let ref_frames = load_hashes(&reference_hashes.frames, reference_dir, HashRole::Frames)?;
+    let ref_audio = match &reference_hashes.audio {
+        Some(source) => Some(load_hashes(source, reference_dir, HashRole::Audio)?),
+        None => None,
+    };
 
-    let (ref_lufs, test_lufs, ref_peak, test_peak) = extract_audio_metrics(summary);
-    let lufs_delta = ref_lufs.zip(test_lufs).map(|(a, b)| (a - b).abs());
-    let peak_delta = ref_peak.zip(test_peak).map(|(a, b)| (a - b).abs());
+    let capture_frames = load_hashes(&capture.hashes.frames, capture_dir, HashRole::Frames)?;
+    let capture_audio = match &capture.hashes.audio {
+        Some(source) => Some(load_hashes(source, capture_dir, HashRole::Audio)?),
+        None => None,
+    };
+    let require_audio = merged_validation
+        .require_audio
+        .unwrap_or_else(|| reference_hashes.audio.is_some());
 
-    let mut checks = Vec::new();
-    let mut failures = 0usize;
-
-    check_min(
-        "ssim_avg",
-        ssim_avg,
-        thresholds.ssim_min,
-        strict,
-        &mut checks,
-        &mut failures,
-    );
-    check_min(
-        "psnr_avg",
-        psnr_avg,
-        thresholds.psnr_min,
-        strict,
-        &mut checks,
-        &mut failures,
-    );
-
-    if vmaf_avg.is_some() {
-        check_min(
-            "vmaf_avg",
-            vmaf_avg,
-            thresholds.vmaf_min,
-            strict,
-            &mut checks,
-            &mut failures,
-        );
-    } else {
-        checks.push(MetricCheck {
-            metric: "vmaf_avg".to_string(),
-            value: None,
-            threshold: thresholds.vmaf_min,
-            status: CheckStatus::Missing,
-        });
-        if strict {
-            failures += 1;
-        }
+    let timeline_start = reference
+        .timeline
+        .start
+        .to_frame_index(reference.video.fps)?;
+    let timeline_end = reference.timeline.end.to_frame_index(reference.video.fps)?;
+    if timeline_end <= timeline_start {
+        return Err("timeline end must be after start".to_string());
+    }
+    if timeline_start >= ref_frames.len() {
+        return Err("timeline start beyond reference frame hashes".to_string());
     }
 
-    check_max(
-        "audio_lufs_delta",
-        lufs_delta,
-        thresholds.audio_lufs_delta_max,
-        strict,
-        &mut checks,
-        &mut failures,
-    );
-    check_max(
-        "audio_peak_delta",
-        peak_delta,
-        thresholds.audio_peak_delta_max,
-        strict,
-        &mut checks,
-        &mut failures,
-    );
-
-    let (drift_summary, drift_max) = build_drift_summary(summary, reference, observations)?;
-
-    if let Some(max_allowed) = thresholds.event_drift_max_seconds {
-        check_max(
-            "event_drift_max_seconds",
-            drift_max,
-            max_allowed,
-            strict,
-            &mut checks,
-            &mut failures,
-        );
+    let mut failures = Vec::new();
+    let clamped_end = timeline_end.min(ref_frames.len());
+    if timeline_end > ref_frames.len() {
+        failures.push(format!(
+            "reference frame hashes cover {}, timeline ends at {}",
+            ref_frames.len(),
+            timeline_end
+        ));
     }
 
-    let status = if failures > 0 {
-        ValidationStatus::Failed
+    let mut config_mismatch = false;
+    let reference_coverage = timeline_end > ref_frames.len();
+    let mut frame_mismatch = false;
+    let mut audio_mismatch = false;
+    let mut audio_missing = false;
+
+    if reference.video.width != capture.video.width
+        || reference.video.height != capture.video.height
+    {
+        failures.push(format!(
+            "resolution mismatch: reference {}x{}, capture {}x{}",
+            reference.video.width,
+            reference.video.height,
+            capture.video.width,
+            capture.video.height
+        ));
+        config_mismatch = true;
+    }
+    if (reference.video.fps - capture.video.fps).abs() > f32::EPSILON {
+        failures.push(format!(
+            "fps mismatch: reference {:.3}, capture {:.3}",
+            reference.video.fps, capture.video.fps
+        ));
+        config_mismatch = true;
+    }
+
+    let ref_slice = &ref_frames[timeline_start..clamped_end];
+    let max_drift = thresholds.max_drift_frames;
+    let alignment = best_alignment(ref_slice, &capture_frames, max_drift);
+    let length_delta = capture_frames.len() as i32 - ref_slice.len() as i32;
+    let frame_match_ratio = if alignment.compared == 0 {
+        0.0
     } else {
-        ValidationStatus::Passed
+        alignment.match_ratio
     };
+    if frame_match_ratio < thresholds.frame_match_ratio {
+        failures.push(format!(
+            "frame match ratio {:.3} below threshold {:.3}",
+            frame_match_ratio, thresholds.frame_match_ratio
+        ));
+        frame_mismatch = true;
+    }
+    if alignment.offset.abs() > thresholds.max_drift_frames {
+        failures.push(format!(
+            "frame drift {} exceeds max {}",
+            alignment.offset, thresholds.max_drift_frames
+        ));
+        frame_mismatch = true;
+    }
+    let length_delta_abs = length_delta.unsigned_abs() as usize;
+    if length_delta_abs > thresholds.max_dropped_frames {
+        failures.push(format!(
+            "frame length delta {} exceeds max dropped {}",
+            length_delta, thresholds.max_dropped_frames
+        ));
+        frame_mismatch = true;
+    }
 
-    Ok(VideoValidationSummary {
-        label,
-        summary_path: summary_path.display().to_string(),
-        thresholds,
-        checks,
-        status,
-        failures,
-        drift: drift_summary,
-    })
-}
-
-fn extract_audio_metrics(
-    summary: &AvSummary,
-) -> (Option<f64>, Option<f64>, Option<f64>, Option<f64>) {
-    let ref_audio = summary
-        .audio
-        .as_ref()
-        .and_then(|audio| audio.reference.as_ref());
-    let test_audio = summary.audio.as_ref().and_then(|audio| audio.test.as_ref());
-
-    let ref_lufs = ref_audio.and_then(|metric| metric.integrated_lufs);
-    let test_lufs = test_audio.and_then(|metric| metric.integrated_lufs);
-    let ref_peak = ref_audio.and_then(|metric| metric.true_peak_dbtp);
-    let test_peak = test_audio.and_then(|metric| metric.true_peak_dbtp);
-
-    (ref_lufs, test_lufs, ref_peak, test_peak)
-}
-
-fn check_min(
-    label: &str,
-    value: Option<f64>,
-    threshold: f64,
-    strict: bool,
-    checks: &mut Vec<MetricCheck>,
-    failures: &mut usize,
-) {
-    let status = match value {
-        None => {
-            if strict {
-                *failures += 1;
-            }
-            CheckStatus::Missing
-        }
-        Some(current) if current < threshold => {
-            *failures += 1;
-            CheckStatus::Fail
-        }
-        Some(_) => CheckStatus::Pass,
-    };
-
-    checks.push(MetricCheck {
-        metric: label.to_string(),
-        value,
-        threshold,
-        status,
-    });
-}
-
-fn check_max(
-    label: &str,
-    value: Option<f64>,
-    threshold: f64,
-    strict: bool,
-    checks: &mut Vec<MetricCheck>,
-    failures: &mut usize,
-) {
-    let status = match value {
-        None => {
-            if strict {
-                *failures += 1;
-            }
-            CheckStatus::Missing
-        }
-        Some(current) if current > threshold => {
-            *failures += 1;
-            CheckStatus::Fail
-        }
-        Some(_) => CheckStatus::Pass,
-    };
-
-    checks.push(MetricCheck {
-        metric: label.to_string(),
-        value,
-        threshold,
-        status,
-    });
-}
-
-fn build_drift_summary(
-    summary: &AvSummary,
-    reference: &ReferenceVideo,
-    observations: Option<&EventObservationFile>,
-) -> Result<(DriftSummary, Option<f64>), String> {
-    let observed = if let Some(observations) = observations {
-        build_observation_map(&observations.observations)?
-    } else if let Some(events) = &summary.events {
-        build_observation_map(events)?
-    } else {
-        BTreeMap::new()
-    };
-
-    let mut events = Vec::new();
-    let mut drift_values = Vec::new();
-    let mut missing = 0usize;
-
-    for reference_event in &reference.events {
-        let observed_entry = observed.get(&reference_event.id);
-        let (observed_timecode, observed_seconds) = match observed_entry {
-            Some(entry) => (entry.timecode.clone(), Some(entry.seconds)),
-            None => (None, None),
-        };
-
-        let drift_seconds = observed_seconds.map(|seconds| seconds - reference_event.seconds);
-        if let Some(drift) = drift_seconds {
-            drift_values.push(drift.abs());
-        } else {
-            missing += 1;
-        }
-
-        events.push(DriftEvent {
-            id: reference_event.id.clone(),
-            label: reference_event.label.clone(),
-            expected_timecode: reference_event.timecode.clone(),
-            expected_seconds: reference_event.seconds,
-            observed_timecode,
-            observed_seconds,
-            drift_seconds,
-            status: if observed_seconds.is_some() {
-                DriftStatus::Observed
+    let mut triage_categories = Vec::new();
+    let audio_report = match (ref_audio.as_ref(), capture_audio.as_ref()) {
+        (Some(reference_audio), Some(capture_audio)) => {
+            let max_audio_drift = thresholds
+                .max_audio_drift_chunks
+                .unwrap_or(thresholds.max_drift_frames);
+            let audio_alignment = best_alignment(reference_audio, capture_audio, max_audio_drift);
+            let audio_length_delta = capture_audio.len() as i32 - reference_audio.len() as i32;
+            let audio_match_ratio = if audio_alignment.compared == 0 {
+                0.0
             } else {
-                DriftStatus::Missing
-            },
-        });
-    }
-
-    let max_abs_drift_seconds = drift_values
-        .iter()
-        .cloned()
-        .max_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    let average_abs_drift_seconds = if drift_values.is_empty() {
-        None
-    } else {
-        Some(drift_values.iter().sum::<f64>() / drift_values.len() as f64)
-    };
-
-    let summary = DriftSummary {
-        events,
-        max_abs_drift_seconds,
-        average_abs_drift_seconds,
-        missing_events: missing,
-    };
-
-    Ok((summary, max_abs_drift_seconds))
-}
-
-struct ObservedEvent {
-    timecode: Option<String>,
-    seconds: f64,
-}
-
-fn build_observation_map<T>(entries: &[T]) -> Result<BTreeMap<String, ObservedEvent>, String>
-where
-    T: ObservationLike,
-{
-    let mut map = BTreeMap::new();
-    for entry in entries {
-        let id = entry.id().to_string();
-        let timecode = entry.observed_timecode().map(|value| value.to_string());
-        let seconds = if let Some(value) = entry.observed_seconds() {
-            value
-        } else if let Some(value) = entry.observed_timecode() {
-            parse_timecode_to_seconds(value)?
-        } else {
-            return Err(format!(
-                "event {id} missing observed_seconds or observed_timecode"
-            ));
-        };
-        map.insert(id, ObservedEvent { timecode, seconds });
-    }
-    Ok(map)
-}
-
-trait ObservationLike {
-    fn id(&self) -> &str;
-    fn observed_timecode(&self) -> Option<&str>;
-    fn observed_seconds(&self) -> Option<f64>;
-}
-
-impl ObservationLike for EventObservationEntry {
-    fn id(&self) -> &str {
-        &self.id
-    }
-
-    fn observed_timecode(&self) -> Option<&str> {
-        self.observed_timecode.as_deref()
-    }
-
-    fn observed_seconds(&self) -> Option<f64> {
-        self.observed_seconds
-    }
-}
-
-impl ObservationLike for SummaryEvent {
-    fn id(&self) -> &str {
-        &self.id
-    }
-
-    fn observed_timecode(&self) -> Option<&str> {
-        self.observed_timecode.as_deref()
-    }
-
-    fn observed_seconds(&self) -> Option<f64> {
-        self.observed_seconds
-    }
-}
-
-fn load_reference_video_toml(path: &Path) -> Result<ReferenceVideo, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|err| format!("read reference video config {}: {err}", path.display()))?;
-    parse_reference_video_toml(&text).map_err(|err| format!("{} ({})", err, path.display()))
-}
-
-fn parse_reference_video_toml(text: &str) -> Result<ReferenceVideo, String> {
-    #[derive(Copy, Clone)]
-    enum Section {
-        Root,
-        Expected,
-        Comparison,
-        Thresholds,
-        Event,
-    }
-
-    let mut section = Section::Root;
-    let mut schema_version = None;
-    let mut label = None;
-    let mut reference_video = None;
-    let mut expected = ExpectedVideo::default();
-    let mut comparison = ComparisonSettings::default();
-    let mut thresholds = ThresholdOverrides::default();
-    let mut events: Vec<ReferenceEvent> = Vec::new();
-    let mut current_event: Option<ReferenceEvent> = None;
-
-    for (index, raw_line) in text.lines().enumerate() {
-        let mut line = raw_line.trim();
-        if line.is_empty() || line.starts_with('#') {
-            continue;
-        }
-        if let Some((prefix, _)) = line.split_once('#') {
-            line = prefix.trim();
-        }
-        if line.is_empty() {
-            continue;
-        }
-
-        if line.starts_with("[[") && line.ends_with("]]") {
-            if let Some(event) = current_event.take() {
-                events.push(event);
-            }
-            let name = &line[2..line.len() - 2];
-            if name.trim() != "events" {
-                return Err(format!("unsupported table array [{}]", name.trim()));
-            }
-            section = Section::Event;
-            current_event = Some(ReferenceEvent {
-                id: String::new(),
-                label: None,
-                timecode: String::new(),
-                seconds: 0.0,
-            });
-            continue;
-        }
-
-        if line.starts_with('[') && line.ends_with(']') {
-            if let Some(event) = current_event.take() {
-                events.push(event);
-            }
-            let name = &line[1..line.len() - 1];
-            section = match name.trim() {
-                "expected" => Section::Expected,
-                "comparison" => Section::Comparison,
-                "thresholds" => Section::Thresholds,
-                other => {
-                    return Err(format!("unsupported section [{}]", other));
-                }
+                audio_alignment.match_ratio
             };
-            continue;
-        }
-
-        let (key, value) = line
-            .split_once('=')
-            .ok_or_else(|| format!("line {} missing '='", index + 1))?;
-        let key = key.trim();
-        let value = value.trim();
-
-        match section {
-            Section::Root => match key {
-                "schema_version" => schema_version = Some(parse_string(value)?),
-                "label" => label = Some(parse_string(value)?),
-                "reference_video" => reference_video = Some(PathBuf::from(parse_string(value)?)),
-                _ => return Err(format!("unknown root key '{}'", key)),
-            },
-            Section::Expected => match key {
-                "width" => expected.width = Some(parse_u32(value)?),
-                "height" => expected.height = Some(parse_u32(value)?),
-                "fps" => expected.fps = Some(parse_f64(value)?),
-                "audio_rate" => expected.audio_rate = Some(parse_u32(value)?),
-                _ => return Err(format!("unknown expected key '{}'", key)),
-            },
-            Section::Comparison => match key {
-                "offset_seconds" => comparison.offset_seconds = parse_f64(value)?,
-                "trim_start_seconds" => comparison.trim_start_seconds = parse_f64(value)?,
-                "duration_seconds" => comparison.duration_seconds = Some(parse_f64(value)?),
-                "no_vmaf" => comparison.no_vmaf = parse_bool(value)?,
-                "thresholds_path" => {
-                    comparison.thresholds_path = Some(PathBuf::from(parse_string(value)?))
-                }
-                _ => return Err(format!("unknown comparison key '{}'", key)),
-            },
-            Section::Thresholds => match key {
-                "ssim_min" => thresholds.ssim_min = Some(parse_f64(value)?),
-                "psnr_min" => thresholds.psnr_min = Some(parse_f64(value)?),
-                "vmaf_min" => thresholds.vmaf_min = Some(parse_f64(value)?),
-                "audio_lufs_delta_max" => thresholds.audio_lufs_delta_max = Some(parse_f64(value)?),
-                "audio_peak_delta_max" => thresholds.audio_peak_delta_max = Some(parse_f64(value)?),
-                "event_drift_max_seconds" => {
-                    thresholds.event_drift_max_seconds = Some(parse_f64(value)?)
-                }
-                _ => return Err(format!("unknown thresholds key '{}'", key)),
-            },
-            Section::Event => {
-                let event = current_event
-                    .as_mut()
-                    .ok_or_else(|| "event entry missing".to_string())?;
-                match key {
-                    "id" => event.id = parse_string(value)?,
-                    "label" => event.label = Some(parse_string(value)?),
-                    "timecode" => {
-                        let timecode = parse_string(value)?;
-                        let seconds = parse_timecode_to_seconds(&timecode)?;
-                        event.timecode = timecode;
-                        event.seconds = seconds;
-                    }
-                    _ => return Err(format!("unknown event key '{}'", key)),
+            if let Some(threshold) = thresholds.audio_match_ratio {
+                if audio_match_ratio < threshold {
+                    failures.push(format!(
+                        "audio match ratio {:.3} below threshold {:.3}",
+                        audio_match_ratio, threshold
+                    ));
+                    audio_mismatch = true;
                 }
             }
+            if audio_alignment.offset.abs() > max_audio_drift {
+                failures.push(format!(
+                    "audio drift {} exceeds max {}",
+                    audio_alignment.offset, max_audio_drift
+                ));
+                audio_mismatch = true;
+            }
+            Some(HashComparisonReport {
+                matched: audio_alignment.matched,
+                compared: audio_alignment.compared,
+                match_ratio: audio_match_ratio,
+                threshold: thresholds.audio_match_ratio.unwrap_or(0.0),
+                offset: audio_alignment.offset,
+                length_delta: audio_length_delta,
+                reference_total: reference_audio.len(),
+                capture_total: capture_audio.len(),
+            })
         }
-    }
-
-    if let Some(event) = current_event.take() {
-        events.push(event);
-    }
-
-    let schema_version = schema_version.ok_or_else(|| "schema_version is required".to_string())?;
-    if schema_version != "v1" {
-        return Err(format!("unsupported schema_version '{}'", schema_version));
-    }
-
-    let label = label.unwrap_or_else(|| "reference-video".to_string());
-    let reference_video =
-        reference_video.ok_or_else(|| "reference_video is required".to_string())?;
-
-    for event in &events {
-        if event.id.is_empty() {
-            return Err("event id is required".to_string());
+        (None, None) => None,
+        _ => {
+            if require_audio {
+                failures.push("audio hashes missing on one side".to_string());
+                triage_categories.push(TriageCategory::AudioMissing);
+                audio_missing = true;
+            }
+            None
         }
-        if event.timecode.is_empty() {
-            return Err(format!("event {} missing timecode", event.id));
-        }
+    };
+
+    let status = if failures.is_empty() {
+        ValidationStatus::Passed
+    } else {
+        ValidationStatus::Failed
+    };
+
+    if config_mismatch {
+        triage_categories.push(TriageCategory::ConfigMismatch);
+    }
+    if reference_coverage {
+        triage_categories.push(TriageCategory::ReferenceCoverage);
+    }
+    if frame_mismatch {
+        triage_categories.push(TriageCategory::FrameMismatch);
+    }
+    if audio_mismatch {
+        triage_categories.push(TriageCategory::AudioMismatch);
+    }
+    if audio_missing && !triage_categories.contains(&TriageCategory::AudioMissing) {
+        triage_categories.push(TriageCategory::AudioMissing);
+    }
+    if triage_categories.is_empty() && status == ValidationStatus::Passed {
+        triage_categories.push(TriageCategory::Pass);
+    }
+    if triage_categories.is_empty() {
+        triage_categories.push(TriageCategory::Unknown);
     }
 
-    Ok(ReferenceVideo {
-        label,
-        reference_video,
-        expected,
-        comparison,
-        thresholds,
-        events,
+    let mut suggestions = Vec::new();
+    if triage_categories.contains(&TriageCategory::ConfigMismatch) {
+        suggestions.push(
+            "normalize capture to the reference profile or update video metadata".to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::ReferenceCoverage) {
+        suggestions.push(
+            "regenerate reference hashes or adjust timeline coverage to match available frames"
+                .to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::FrameMismatch) {
+        suggestions.push(
+            "inspect frame hashes near the reported drift offset for deterministic mismatches"
+                .to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::AudioMismatch) {
+        suggestions.push(
+            "compare audio hashes near the reported chunk offset and verify extraction settings"
+                .to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::AudioMissing) {
+        suggestions.push(
+            "generate audio hashes for both reference and capture or set validation.require_audio = false"
+                .to_string(),
+        );
+    }
+
+    let drift = DriftSummary {
+        frame_offset: alignment.offset,
+        frame_offset_seconds: alignment.offset as f64 / reference.video.fps as f64,
+        length_delta_frames: length_delta,
+        audio_offset_chunks: audio_report.as_ref().map(|report| report.offset),
+        audio_length_delta_chunks: audio_report.as_ref().map(|report| report.length_delta),
+    };
+
+    let frame_report = HashComparisonReport {
+        matched: alignment.matched,
+        compared: alignment.compared,
+        match_ratio: frame_match_ratio,
+        threshold: thresholds.frame_match_ratio,
+        offset: alignment.offset,
+        length_delta,
+        reference_total: ref_slice.len(),
+        capture_total: capture_frames.len(),
+    };
+
+    let validation_schema_version = validation_override
+        .as_ref()
+        .and_then(|cfg| cfg.schema_version.clone())
+        .or_else(|| reference.schema_version.clone());
+
+    Ok(VideoValidationReport {
+        status,
+        validation_config: ValidationConfigSummary {
+            schema_version: validation_schema_version,
+            name: merged_validation.name,
+            notes: merged_validation.notes,
+            require_audio,
+            thresholds,
+        },
+        normalization: reference.normalization.clone(),
+        triage: TriageSummary {
+            status,
+            categories: triage_categories,
+            findings: failures.clone(),
+            suggestions,
+        },
+        reference: VideoRunSummary {
+            path: reference.video.path.display().to_string(),
+            width: reference.video.width,
+            height: reference.video.height,
+            fps: reference.video.fps,
+            frame_hashes: ref_frames.len(),
+            audio_hashes: ref_audio.as_ref().map(|items| items.len()),
+        },
+        capture: VideoRunSummary {
+            path: capture.video.path.display().to_string(),
+            width: capture.video.width,
+            height: capture.video.height,
+            fps: capture.video.fps,
+            frame_hashes: capture_frames.len(),
+            audio_hashes: capture_audio.as_ref().map(|items| items.len()),
+        },
+        timeline: TimelineSummary {
+            start: reference.timeline.start,
+            end: reference.timeline.end,
+            start_frame: timeline_start,
+            end_frame: clamped_end,
+            events: reference.timeline.events.clone(),
+        },
+        frame_comparison: frame_report,
+        audio_comparison: audio_report,
+        drift,
+        failures,
     })
 }
 
-fn parse_string(value: &str) -> Result<String, String> {
-    let value = value.trim();
-    if value.starts_with('"') && value.ends_with('"') {
-        Ok(value[1..value.len() - 1].to_string())
-    } else {
-        Err(format!("expected quoted string, got '{}'", value))
-    }
+pub fn hash_frames_dir(path: &Path) -> Result<Vec<String>, String> {
+    load_dir_hashes(path)
 }
 
-fn parse_u32(value: &str) -> Result<u32, String> {
-    value
-        .trim()
-        .parse::<u32>()
-        .map_err(|err| format!("invalid integer '{}': {err}", value))
+pub fn hash_audio_file(path: &Path) -> Result<Vec<String>, String> {
+    load_file_hashes(path)
 }
 
-fn parse_f64(value: &str) -> Result<f64, String> {
-    value
-        .trim()
-        .parse::<f64>()
-        .map_err(|err| format!("invalid number '{}': {err}", value))
+pub fn write_hash_list(path: &Path, hashes: &[String]) -> Result<(), String> {
+    if hashes.is_empty() {
+        return Err("hash list is empty".to_string());
+    }
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("create hash list dir {}: {err}", parent.display()))?;
+    }
+    let mut output = String::new();
+    for hash in hashes {
+        output.push_str(hash);
+        output.push('\n');
+    }
+    fs::write(path, output).map_err(|err| format!("write hash list {}: {err}", path.display()))
 }
 
-fn parse_bool(value: &str) -> Result<bool, String> {
-    match value.trim() {
-        "true" => Ok(true),
-        "false" => Ok(false),
-        other => Err(format!("invalid bool '{}'", other)),
-    }
-}
+fn best_alignment(reference: &[String], capture: &[String], max_offset: i32) -> Alignment {
+    let mut best = Alignment {
+        offset: 0,
+        compared: 0,
+        matched: 0,
+        match_ratio: 0.0,
+    };
 
-fn parse_timecode_to_seconds(value: &str) -> Result<f64, String> {
-    let parts: Vec<&str> = value.split(':').collect();
-    if parts.is_empty() || parts.len() > 3 {
-        return Err(format!("invalid timecode '{}'", value));
-    }
-
-    let mut seconds = 0.0;
-    let mut multiplier = 1.0;
-    for part in parts.iter().rev() {
-        let component: f64 = part
-            .trim()
-            .parse()
-            .map_err(|err| format!("invalid timecode segment '{}': {err}", part))?;
-        seconds += component * multiplier;
-        multiplier *= 60.0;
-    }
-    Ok(seconds)
-}
-
-fn default_scripts_dir() -> PathBuf {
-    if let Ok(home) = std::env::var("CODEX_HOME") {
-        PathBuf::from(home).join("skills/static-recomp-av-compare/scripts")
-    } else {
-        PathBuf::from("skills/static-recomp-av-compare/scripts")
-    }
-}
-
-fn run_compare_av(
-    python: &Path,
-    scripts_dir: &Path,
-    reference: &ReferenceVideo,
-    test_video: &Path,
-    out_dir: &Path,
-) -> Result<PathBuf, String> {
-    let compare_script = scripts_dir.join("compare_av.py");
-    let compare_out_dir = out_dir.join("av-compare");
-    std::fs::create_dir_all(&compare_out_dir)
-        .map_err(|err| format!("create compare dir: {err}"))?;
-
-    let mut cmd = Command::new(python);
-    cmd.arg(compare_script)
-        .arg("--ref")
-        .arg(&reference.reference_video)
-        .arg("--test")
-        .arg(test_video)
-        .arg("--out-dir")
-        .arg(&compare_out_dir)
-        .arg("--label")
-        .arg(&reference.label);
-
-    if let Some(width) = reference.expected.width {
-        cmd.arg("--width").arg(width.to_string());
-    }
-    if let Some(height) = reference.expected.height {
-        cmd.arg("--height").arg(height.to_string());
-    }
-    if let Some(fps) = reference.expected.fps {
-        cmd.arg("--fps").arg(fps.to_string());
-    }
-    if let Some(audio_rate) = reference.expected.audio_rate {
-        cmd.arg("--audio-rate").arg(audio_rate.to_string());
-    }
-    if reference.comparison.offset_seconds != 0.0 {
-        cmd.arg("--offset")
-            .arg(reference.comparison.offset_seconds.to_string());
-    }
-    if reference.comparison.trim_start_seconds != 0.0 {
-        cmd.arg("--trim-start")
-            .arg(reference.comparison.trim_start_seconds.to_string());
-    }
-    if let Some(duration) = reference.comparison.duration_seconds {
-        cmd.arg("--duration").arg(duration.to_string());
-    }
-    if reference.comparison.no_vmaf {
-        cmd.arg("--no-vmaf");
-    }
-
-    let status = cmd
-        .status()
-        .map_err(|err| format!("run compare_av.py: {err}"))?;
-    if !status.success() {
-        return Err(format!("compare_av.py failed with status {}", status));
-    }
-
-    Ok(compare_out_dir.join("summary.json"))
-}
-
-fn load_event_observations(path: &Path) -> Result<EventObservationFile, String> {
-    let text = std::fs::read_to_string(path)
-        .map_err(|err| format!("read event observations {}: {err}", path.display()))?;
-    let parsed: EventObservationFile =
-        serde_json::from_str(&text).map_err(|err| format!("parse event observations: {err}"))?;
-    if let Some(schema_version) = parsed.schema_version.as_deref() {
-        if schema_version != "v1" {
-            return Err(format!(
-                "unsupported event observation schema '{}'",
-                schema_version
-            ));
+    for offset in -max_offset..=max_offset {
+        let mut matched = 0;
+        let mut compared = 0;
+        for (idx, reference_hash) in reference.iter().enumerate() {
+            let capture_idx = idx as i32 + offset;
+            if capture_idx < 0 || capture_idx >= capture.len() as i32 {
+                continue;
+            }
+            compared += 1;
+            if reference_hash == &capture[capture_idx as usize] {
+                matched += 1;
+            }
+        }
+        if compared == 0 {
+            continue;
+        }
+        let ratio = matched as f32 / compared as f32;
+        let ordering = ratio
+            .partial_cmp(&best.match_ratio)
+            .unwrap_or(Ordering::Less);
+        let better = match ordering {
+            Ordering::Greater => true,
+            Ordering::Equal => {
+                if compared > best.compared {
+                    true
+                } else {
+                    let offset_abs = offset.abs();
+                    let best_abs = best.offset.abs();
+                    compared == best.compared && offset_abs < best_abs
+                }
+            }
+            Ordering::Less => false,
+        };
+        if better {
+            best = Alignment {
+                offset,
+                compared,
+                matched,
+                match_ratio: ratio,
+            };
         }
     }
-    Ok(parsed)
+
+    best
 }
 
-fn chrono_stamp() -> String {
-    let now = std::time::SystemTime::now();
-    let secs = now
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default()
-        .as_secs();
-    format!("{secs}")
+fn load_hashes(
+    source: &HashSource,
+    base_dir: &Path,
+    role: HashRole,
+) -> Result<Vec<String>, String> {
+    let resolved = resolve_path(base_dir, &source.path);
+    match source.format {
+        HashFormat::List => load_hash_list(&resolved),
+        HashFormat::Directory => match role {
+            HashRole::Frames => load_dir_hashes(&resolved),
+            HashRole::Audio => Err("audio hashes do not support directory format".to_string()),
+        },
+        HashFormat::File => match role {
+            HashRole::Audio => load_file_hashes(&resolved),
+            HashRole::Frames => Err("frame hashes do not support file format".to_string()),
+        },
+    }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn repo_root() -> PathBuf {
-        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
-        manifest_dir
-            .parent()
-            .and_then(|path| path.parent())
-            .unwrap_or(&manifest_dir)
-            .to_path_buf()
+fn resolve_path(base_dir: &Path, path: &Path) -> PathBuf {
+    if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        base_dir.join(path)
     }
+}
 
-    #[test]
-    fn parse_reference_video_config() {
-        let path = repo_root().join("samples/validation/reference_video.toml");
-        let reference = load_reference_video_toml(&path).expect("load reference config");
-        assert_eq!(reference.label, "sample-first-level");
-        assert_eq!(reference.expected.width, Some(1920));
-        assert_eq!(reference.expected.height, Some(1080));
-        assert_eq!(reference.expected.fps, Some(60.0));
-        assert_eq!(reference.events.len(), 3);
+fn load_validation_config(path: &Path) -> Result<ValidationConfigFile, String> {
+    let content = fs::read_to_string(path)
+        .map_err(|err| format!("read validation config {}: {err}", path.display()))?;
+    toml::from_str(&content).map_err(|err| format!("invalid validation config: {err}"))
+}
+
+fn load_hash_list(path: &Path) -> Result<Vec<String>, String> {
+    let content = fs::read_to_string(path)
+        .map_err(|err| format!("read hash list {}: {err}", path.display()))?;
+    let mut hashes = Vec::new();
+    for (line_num, line) in content.lines().enumerate() {
+        let trimmed = line.trim();
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let parts: Vec<&str> = trimmed.split_whitespace().collect();
+        let hash = match parts.len() {
+            1 => parts[0],
+            2 => parts[1],
+            _ => {
+                return Err(format!(
+                    "invalid hash list entry at {}:{}",
+                    path.display(),
+                    line_num + 1
+                ))
+            }
+        };
+        hashes.push(hash.to_string());
     }
-
-    #[test]
-    fn summary_passes_with_observations() {
-        let root = repo_root();
-        let summary_path = root.join("samples/validation/summary_pass.json");
-        let summary = load_summary(&summary_path).expect("load summary");
-        let reference =
-            load_reference_video_toml(&root.join("samples/validation/reference_video.toml"))
-                .expect("reference");
-        let thresholds = resolve_thresholds(&reference, None).expect("thresholds");
-        let observations =
-            load_event_observations(&root.join("samples/validation/event_observations.json"))
-                .expect("observations");
-
-        let report = evaluate_summary(
-            &summary,
-            &summary_path,
-            &reference,
-            thresholds,
-            true,
-            Some(&observations),
-        )
-        .expect("evaluate summary");
-
-        assert_eq!(report.status, ValidationStatus::Passed);
-        assert_eq!(report.failures, 0);
-        assert!(report.drift.max_abs_drift_seconds.is_some());
+    if hashes.is_empty() {
+        return Err(format!("hash list {} is empty", path.display()));
     }
+    Ok(hashes)
+}
 
-    #[test]
-    fn summary_fails_on_thresholds() {
-        let root = repo_root();
-        let summary_path = root.join("samples/validation/summary_fail.json");
-        let summary = load_summary(&summary_path).expect("load summary");
-        let reference =
-            load_reference_video_toml(&root.join("samples/validation/reference_video.toml"))
-                .expect("reference");
-        let thresholds = resolve_thresholds(&reference, None).expect("thresholds");
-
-        let report = evaluate_summary(&summary, &summary_path, &reference, thresholds, false, None)
-            .expect("evaluate summary");
-
-        assert_eq!(report.status, ValidationStatus::Failed);
-        assert!(report.failures > 0);
+fn load_dir_hashes(path: &Path) -> Result<Vec<String>, String> {
+    let mut entries: Vec<PathBuf> = fs::read_dir(path)
+        .map_err(|err| format!("read hash dir {}: {err}", path.display()))?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .filter(|entry| entry.is_file())
+        .collect();
+    entries.sort();
+    if entries.is_empty() {
+        return Err(format!("hash dir {} is empty", path.display()));
     }
+    let mut hashes = Vec::new();
+    for entry in entries {
+        let bytes =
+            fs::read(&entry).map_err(|err| format!("read hash file {}: {err}", entry.display()))?;
+        hashes.push(sha256_bytes(&bytes));
+    }
+    Ok(hashes)
+}
+
+fn load_file_hashes(path: &Path) -> Result<Vec<String>, String> {
+    let bytes =
+        fs::read(path).map_err(|err| format!("read hash file {}: {err}", path.display()))?;
+    if bytes.is_empty() {
+        return Err(format!("hash file {} is empty", path.display()));
+    }
+    let mut hashes = Vec::new();
+    for chunk in bytes.chunks(AUDIO_CHUNK_BYTES) {
+        hashes.push(sha256_bytes(chunk));
+    }
+    Ok(hashes)
+}
+
+fn sha256_bytes(bytes: &[u8]) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(bytes);
+    let digest = hasher.finalize();
+    format!("{:x}", digest)
 }

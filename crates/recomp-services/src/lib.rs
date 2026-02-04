@@ -72,6 +72,27 @@ pub fn stub_handler(
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceStubSpec {
+    pub name: String,
+    pub behavior: StubBehavior,
+}
+
+impl ServiceStubSpec {
+    pub fn new(name: impl Into<String>, behavior: StubBehavior) -> Self {
+        Self {
+            name: name.into(),
+            behavior,
+        }
+    }
+}
+
+pub fn register_stubbed_services(registry: &mut ServiceRegistry, stubs: &[ServiceStubSpec]) {
+    for stub in stubs {
+        registry.register(&stub.name, stub_handler(stub.behavior));
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct ServiceAccessControl {
     allowed: BTreeSet<String>,
@@ -197,5 +218,20 @@ mod tests {
         };
 
         assert!(dispatcher.dispatch(&call).is_ok());
+    }
+
+    #[test]
+    fn register_stubbed_services_installs_handlers() {
+        let mut registry = ServiceRegistry::new();
+        register_stubbed_services(
+            &mut registry,
+            &[ServiceStubSpec::new("svc_stub", StubBehavior::Noop)],
+        );
+        let call = ServiceCall {
+            client: "demo".to_string(),
+            service: "svc_stub".to_string(),
+            args: vec![],
+        };
+        assert!(registry.call(&call).is_ok());
     }
 }

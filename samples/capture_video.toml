@@ -1,0 +1,15 @@
+schema_version = "1"
+
+[video]
+path = "artifacts/capture/capture.mp4"
+width = 1280
+height = 720
+fps = 30.0
+
+[hashes.frames]
+format = "list"
+path = "artifacts/capture/frames.hashes"
+
+[hashes.audio]
+format = "list"
+path = "artifacts/capture/audio.hashes"

@@ -4,10 +4,11 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-mod video;
-
+pub mod video;
 pub use video::{
-    run_video_validation, ValidationThresholds, VideoValidationPaths, VideoValidationSummary,
+    hash_audio_file, hash_frames_dir, run_video_validation, run_video_validation_with_config,
+    write_hash_list, CaptureVideoConfig, HashFormat, HashSource, HashSources, ReferenceVideoConfig,
+    Timecode, ValidationConfigFile, VideoValidationReport,
 };
 
 #[derive(Debug, Serialize)]
@@ -18,7 +19,7 @@ pub struct ValidationReport {
     pub failed: usize,
     pub cases: Vec<ValidationCase>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub video: Option<VideoValidationSummary>,
+    pub video: Option<VideoValidationReport>,
 }
 
 #[derive(Debug, Serialize)]
@@ -30,7 +31,7 @@ pub struct ValidationCase {
     pub details: Option<String>,
 }
 
-#[derive(Debug, Serialize, PartialEq, Eq, Clone, Copy)]
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationStatus {
     Passed,
@@ -163,34 +164,94 @@ fn render_text_report(report: &ValidationReport) -> String {
         }
     }
     if let Some(video) = &report.video {
-        out.push_str("\nVideo Validation Summary\n");
-        out.push_str(&format!("label: {}\n", video.label));
+        out.push_str("\nVideo validation summary\n");
+        out.push_str(&format!("status: {:?}\n", video.status));
+        if let Some(schema_version) = &video.validation_config.schema_version {
+            out.push_str(&format!("schema_version: {schema_version}\n"));
+        }
+        if let Some(name) = &video.validation_config.name {
+            out.push_str(&format!("validation_name: {name}\n"));
+        }
         out.push_str(&format!(
-            "status: {:?} failures: {}\n",
-            video.status, video.failures
+            "frame match: {:.3} ({} of {}, offset {} frames)\n",
+            video.frame_comparison.match_ratio,
+            video.frame_comparison.matched,
+            video.frame_comparison.compared,
+            video.frame_comparison.offset
         ));
-        out.push_str("checks:\n");
-        for check in &video.checks {
+        out.push_str(&format!(
+            "frame drift: {} frames ({:.3} sec)\n",
+            video.drift.frame_offset, video.drift.frame_offset_seconds
+        ));
+        if let Some(audio) = &video.audio_comparison {
             out.push_str(&format!(
-                "- {}: {:?} value={:?} threshold={}\n",
-                check.metric, check.status, check.value, check.threshold
+                "audio match: {:.3} ({} of {}, offset {} chunks)\n",
+                audio.match_ratio, audio.matched, audio.compared, audio.offset
             ));
         }
-        out.push_str("drift:\n");
-        if video.drift.events.is_empty() {
-            out.push_str("- no drift events recorded\n");
-        } else {
-            if let Some(max_drift) = video.drift.max_abs_drift_seconds {
-                out.push_str(&format!("- max_abs_drift_seconds: {max_drift}\n"));
+        if !video.triage.categories.is_empty() {
+            let categories: Vec<String> = video
+                .triage
+                .categories
+                .iter()
+                .map(|category| format!("{category:?}"))
+                .collect();
+            out.push_str(&format!("triage: {}\n", categories.join(", ")));
+        }
+        if !video.failures.is_empty() {
+            out.push_str("video failures:\n");
+            for failure in &video.failures {
+                out.push_str(&format!("- {failure}\n"));
             }
-            if let Some(avg_drift) = video.drift.average_abs_drift_seconds {
-                out.push_str(&format!("- average_abs_drift_seconds: {avg_drift}\n"));
+        }
+        if !video.triage.suggestions.is_empty() {
+            out.push_str("triage suggestions:\n");
+            for suggestion in &video.triage.suggestions {
+                out.push_str(&format!("- {suggestion}\n"));
             }
-            out.push_str(&format!(
-                "- missing_events: {}\n",
-                video.drift.missing_events
-            ));
         }
     }
     out
+}
+
+pub fn run_video_suite(
+    reference_path: &Path,
+    capture_path: &Path,
+    validation_path: Option<&Path>,
+) -> ValidationReport {
+    let start = Instant::now();
+    let mut cases = Vec::new();
+    let (status, details, video_report) =
+        match run_video_validation_with_config(reference_path, capture_path, validation_path) {
+            Ok(report) => (
+                report.status,
+                Some(format!(
+                    "frame_match_ratio={:.3} drift_frames={}",
+                    report.frame_comparison.match_ratio, report.drift.frame_offset
+                )),
+                Some(report),
+            ),
+            Err(err) => (ValidationStatus::Failed, Some(err), None),
+        };
+    let duration_ms = start.elapsed().as_millis();
+    cases.push(ValidationCase {
+        name: "video_validation".to_string(),
+        status,
+        duration_ms,
+        details,
+    });
+
+    let (passed, failed) = cases.iter().fold((0, 0), |acc, case| match case.status {
+        ValidationStatus::Passed => (acc.0 + 1, acc.1),
+        ValidationStatus::Failed => (acc.0, acc.1 + 1),
+    });
+
+    ValidationReport {
+        generated_at: chrono_stamp(),
+        total: cases.len(),
+        passed,
+        failed,
+        cases,
+        video: video_report,
+    }
 }

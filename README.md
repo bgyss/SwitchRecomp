@@ -5,10 +5,12 @@ This repository contains a draft specification set for a Nintendo Switch static 
 ## Contents
 - `specs/` contains the numbered specification series.
 - `crates/` holds the exploratory pipeline/runtime scaffolding.
+- `skills/` provides the Codex skill set used for validation workflows.
 - `ROADMAP.md` provides phased milestones and exit criteria.
 - `RESEARCH.md` lists research directions and required sources.
 - `docs/` contains development notes.
  - `docs/LEGAL-POLICY.md` defines legal use and asset separation rules.
+ - `docs/static-recomp-skills.md` documents the Codex skill set and project-level validation templates.
 
 ## How to Use the Specs
 - Read `specs/README.md` for ordering.

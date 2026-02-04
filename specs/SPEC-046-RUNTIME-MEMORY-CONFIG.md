@@ -1,7 +1,12 @@
 # SPEC-046: Runtime Memory Layout Configuration
 
 ## Status
-Implemented v0.1
+Draft v0.2
+
+## Rationale
+- Implemented `runtime.memory_layout` parsing with defaults and validation.
+- Emitted configured layouts in the build manifest and runtime init code.
+- Added tests for default and custom layouts.
 
 ## Purpose
 Allow runtime memory layout to be configured via `title.toml`, with safe defaults when omitted.

@@ -1,0 +1,42 @@
+schema_version = "1"
+
+[metadata]
+title = "Sample Replay"
+controller = "pro_controller"
+timing_mode = "ms"
+recorded_at = "2026-02-03T00:00:00Z"
+notes = "Synthetic input sequence for testing input replay."
+
+[[events]]
+time_ms = 0
+control = 100
+value = 1
+note = "Start button down"
+
+[[events]]
+time_ms = 100
+control = 100
+value = 0
+note = "Start button up"
+
+[[events]]
+time_ms = 120
+control = 200
+value = 1
+note = "A button down"
+
+[[events]]
+time_ms = 180
+control = 200
+value = 0
+note = "A button up"
+
+[[markers]]
+name = "boot"
+time_ms = 0
+note = "Boot marker"
+
+[[markers]]
+name = "first_input"
+time_ms = 120
+note = "First interaction"

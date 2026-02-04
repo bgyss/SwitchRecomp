@@ -29,6 +29,10 @@ Define a validation workflow that compares recompiled output against a reference
 - Validation artifacts must remain outside the repo and be referenced via provenance metadata.
 - Validation must accept precomputed `summary.json` outputs or invoke the comparison scripts directly.
 
+## Operator Inputs
+- External reference and capture artifacts are required to run DKCR validation.
+- Absolute paths and timeline confirmations are tracked in `docs/dkcr-validation-prereqs.md`.
+
 ## Interfaces and Data
 - Provenance metadata should record the reference capture as an input:
   - `format = "video_mp4"` for MP4 reference videos.

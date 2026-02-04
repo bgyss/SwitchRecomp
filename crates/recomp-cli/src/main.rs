@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
+mod automation;
+use automation::run_automation;
 use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
