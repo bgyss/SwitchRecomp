@@ -69,6 +69,45 @@ impl TraceRecorder {
     }
 }
 
+#[derive(Debug, Clone)]
+pub struct TraceReplayer {
+    events: Vec<Event>,
+    cursor: usize,
+}
+
+impl TraceReplayer {
+    pub fn new(events: Vec<Event>) -> Self {
+        Self { events, cursor: 0 }
+    }
+
+    pub fn from_slice(events: &[Event]) -> Self {
+        Self::new(events.to_vec())
+    }
+
+    pub fn replay_until<F>(&mut self, time: u64, mut handler: F)
+    where
+        F: FnMut(&Event),
+    {
+        while self.cursor < self.events.len() {
+            let event = &self.events[self.cursor];
+            if event.time <= time {
+                handler(event);
+                self.cursor += 1;
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn remaining(&self) -> usize {
+        self.events.len().saturating_sub(self.cursor)
+    }
+
+    pub fn reset(&mut self) {
+        self.cursor = 0;
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -107,5 +146,55 @@ mod tests {
         let second = recorder.snapshot();
 
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn replayer_replays_trace_in_chunks() {
+        let mut scheduler = Scheduler::new();
+        scheduler.schedule(2, "tick-1");
+        scheduler.schedule(4, "tick-2");
+        scheduler.schedule(4, "tick-3");
+
+        let mut recorder = TraceRecorder::default();
+        scheduler.run_until(10, |event| recorder.record(event));
+        let trace = recorder.snapshot();
+
+        let mut replayer = TraceReplayer::from_slice(&trace);
+        let mut labels = Vec::new();
+
+        replayer.replay_until(2, |event| labels.push(event.label.clone()));
+        assert_eq!(labels, vec!["tick-1"]);
+        assert_eq!(replayer.remaining(), 2);
+
+        replayer.replay_until(4, |event| labels.push(event.label.clone()));
+        assert_eq!(labels, vec!["tick-1", "tick-2", "tick-3"]);
+        assert_eq!(replayer.remaining(), 0);
+    }
+
+    #[test]
+    fn replayer_can_reset_and_replay() {
+        let events = vec![
+            Event {
+                time: 1,
+                id: 0,
+                label: "alpha".to_string(),
+            },
+            Event {
+                time: 3,
+                id: 1,
+                label: "beta".to_string(),
+            },
+        ];
+
+        let mut replayer = TraceReplayer::new(events);
+        let mut labels = Vec::new();
+        replayer.replay_until(3, |event| labels.push(event.label.clone()));
+        assert_eq!(labels, vec!["alpha", "beta"]);
+
+        replayer.reset();
+        labels.clear();
+        replayer.replay_until(1, |event| labels.push(event.label.clone()));
+        assert_eq!(labels, vec!["alpha"]);
+        assert_eq!(replayer.remaining(), 1);
     }
 }
