@@ -1,0 +1,15 @@
+{
+  "arch": "aarch64",
+  "functions": [
+    {
+      "name": "entry",
+      "ops": [
+        { "op": "const_i64", "dst": "x0", "imm": 1 },
+        { "op": "const_i64", "dst": "x1", "imm": 2 },
+        { "op": "add_i64", "dst": "x2", "lhs": "x0", "rhs": "x1" },
+        { "op": "syscall", "name": "svc_log", "args": ["x2"] },
+        { "op": "ret" }
+      ]
+    }
+  ]
+}

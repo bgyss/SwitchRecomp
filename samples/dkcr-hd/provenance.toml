@@ -1,0 +1,48 @@
+schema_version = "1"
+
+[title]
+name = "DKCR HD First-Level"
+title_id = "TBD"
+version = "TBD"
+region = "US"
+
+[collection]
+device = "macos-aarch64"
+collected_at = "2026-02-04"
+notes = "Scaffolding metadata. Update with real capture details for DKCR HD inputs."
+
+[collection.tool]
+name = "manual"
+version = "0.1"
+
+[collection.decryption_tool]
+name = "placeholder"
+version = "0.0"
+
+[[inputs]]
+path = "module.json"
+format = "lifted_json"
+sha256 = "e38352960726df12d5784205e7a0bcd482806de976376ade5ef23ebc43b2e470"
+size = 368
+role = "placeholder_module"
+
+[[inputs]]
+path = "/Volumes/External/DKCR_HD/game.xci"
+format = "xci"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size = 0
+role = "xci"
+
+[[inputs]]
+path = "/Volumes/External/SwitchKeys/prod.keys"
+format = "keyset"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size = 0
+role = "keyset"
+
+[[inputs]]
+path = "/Volumes/External/DKCR_HD/reference/first-level.mp4"
+format = "video_mp4"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size = 0
+role = "reference_video"

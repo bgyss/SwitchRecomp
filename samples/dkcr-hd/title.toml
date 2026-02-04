@@ -1,0 +1,49 @@
+title = "DKCR HD First-Level"
+entry = "entry"
+abi_version = "0.1.0"
+
+[stubs]
+svc_log = "log"
+svc_sleep = "noop"
+"sm:" = "log"
+"sm:m" = "log"
+"fs" = "log"
+"fs:ldr" = "log"
+"fs:pr" = "log"
+"hid" = "log"
+"irs" = "log"
+"audout" = "log"
+"audren" = "log"
+"appletOE" = "log"
+"acc:u0" = "log"
+"ns:am2" = "log"
+"nifm:u" = "noop"
+
+[runtime]
+performance_mode = "docked"
+
+[assets]
+romfs_path = "/Volumes/External/DKCR_HD/romfs"
+shader_cache_path = "/Volumes/External/DKCR_HD/shader-cache"
+save_data_dir = "/Volumes/External/DKCR_HD/save-data"
+
+[keys]
+prod_keys_path = "/Volumes/External/SwitchKeys/prod.keys"
+title_keys_path = "/Volumes/External/SwitchKeys/title.keys"
+
+[inputs]
+xci_path = "/Volumes/External/DKCR_HD/game.xci"
+program_nca_path = "/Volumes/External/DKCR_HD/program.nca"
+exefs_dir = "/Volumes/External/DKCR_HD/exefs"
+
+[patches]
+patch_set = "patches/patches.toml"
+
+[validation]
+reference_video_path = "/Volumes/External/DKCR_HD/reference/first-level.mp4"
+segment_start = "00:00:00"
+segment_end = "00:06:00"
+
+[gpu]
+backend = "metal"
+notes = "Placeholder for Maxwell-to-Metal mapping during first-level validation."
