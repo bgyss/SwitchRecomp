@@ -4,6 +4,12 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+mod video;
+
+pub use video::{
+    run_video_validation, ValidationThresholds, VideoValidationPaths, VideoValidationSummary,
+};
+
 #[derive(Debug, Serialize)]
 pub struct ValidationReport {
     pub generated_at: String,
@@ -11,6 +17,8 @@ pub struct ValidationReport {
     pub passed: usize,
     pub failed: usize,
     pub cases: Vec<ValidationCase>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub video: Option<VideoValidationSummary>,
 }
 
 #[derive(Debug, Serialize)]
@@ -22,7 +30,7 @@ pub struct ValidationCase {
     pub details: Option<String>,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, PartialEq, Eq, Clone, Copy)]
 #[serde(rename_all = "snake_case")]
 pub enum ValidationStatus {
     Passed,
@@ -89,6 +97,7 @@ pub fn run_baseline(paths: BaselinePaths) -> ValidationReport {
         passed,
         failed,
         cases,
+        video: None,
     }
 }
 
@@ -138,7 +147,7 @@ pub fn write_report(out_dir: &Path, report: &ValidationReport) -> Result<(), Str
 
 fn render_text_report(report: &ValidationReport) -> String {
     let mut out = String::new();
-    out.push_str("SwitchRecomp Baseline Validation Report\n");
+    out.push_str("SwitchRecomp Validation Report\n");
     out.push_str(&format!("generated_at: {}\n", report.generated_at));
     out.push_str(&format!(
         "total: {} passed: {} failed: {}\n\n",
@@ -151,6 +160,36 @@ fn render_text_report(report: &ValidationReport) -> String {
         ));
         if let Some(details) = &case.details {
             out.push_str(&format!("  details: {details}\n"));
+        }
+    }
+    if let Some(video) = &report.video {
+        out.push_str("\nVideo Validation Summary\n");
+        out.push_str(&format!("label: {}\n", video.label));
+        out.push_str(&format!(
+            "status: {:?} failures: {}\n",
+            video.status, video.failures
+        ));
+        out.push_str("checks:\n");
+        for check in &video.checks {
+            out.push_str(&format!(
+                "- {}: {:?} value={:?} threshold={}\n",
+                check.metric, check.status, check.value, check.threshold
+            ));
+        }
+        out.push_str("drift:\n");
+        if video.drift.events.is_empty() {
+            out.push_str("- no drift events recorded\n");
+        } else {
+            if let Some(max_drift) = video.drift.max_abs_drift_seconds {
+                out.push_str(&format!("- max_abs_drift_seconds: {max_drift}\n"));
+            }
+            if let Some(avg_drift) = video.drift.average_abs_drift_seconds {
+                out.push_str(&format!("- average_abs_drift_seconds: {avg_drift}\n"));
+            }
+            out.push_str(&format!(
+                "- missing_events: {}\n",
+                video.drift.missing_events
+            ));
         }
     }
     out
