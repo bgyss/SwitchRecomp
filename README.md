@@ -30,7 +30,7 @@ Legal and provenance policy:
 
 ## Samples and Flow Docs
 - `samples/memory-image/` shows the memory image initialization flow (segment blob + lifted module).
-- `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline.
+- `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline (see the Real XCI intake section for external-tool usage).
 
 ## Back Pressure Hooks
 These hooks add fast, consistent feedback to keep the repo autonomous and reduce review churn. Hooks are defined in `.pre-commit-config.yaml` and can be run with `prek` (preferred) or `pre-commit`.

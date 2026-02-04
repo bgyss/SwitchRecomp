@@ -71,6 +71,7 @@ nix develop --impure
 - Replace `samples/dkcr-hd/module.json` with lifted output when available.
 
 2a. (Optional) Extract ExeFS and RomFS from a real XCI using external tooling:
+See `docs/static-recompilation-flow.md` (Real XCI intake) for a short how-to and CLI notes.
 ```
 cargo run -p recomp-cli -- xci-intake \
   --xci /Volumes/External/DKCR_HD/game.xci \
