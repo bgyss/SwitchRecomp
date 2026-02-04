@@ -83,6 +83,7 @@ Needed research:
 - nstool (XCI/NCA/NSO extraction): https://github.com/jakcron/nstool
 - Ghidra SLEIGH language reference (p-code semantics): https://github.com/NationalSecurityAgency/ghidra/blob/master/GhidraDocs/languages/html/sleigh.html
 - sleigh library (p-code lifting implementation): https://github.com/lifting-bits/sleigh
+- Resurrecting Crimsonland (banteg, 2026-02-01): headless Ghidra pipeline with evidence-backed rename map and regen loop, plus runtime instrumentation (WinDbg/cdb, Frida) for behavior capture; useful automation and validation ideas. https://banteg.xyz/posts/crimsonland/
 
 ## Research Deliverables
 - A research summary for each category with sources.
