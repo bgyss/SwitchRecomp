@@ -97,6 +97,9 @@ Needed research:
 - FFmpeg filters (SSIM/PSNR references): https://ffmpeg.org/ffmpeg-filters.html
 - Ghidra SLEIGH language reference (p-code semantics): https://github.com/NationalSecurityAgency/ghidra/blob/master/GhidraDocs/languages/html/sleigh.html
 - sleigh library (p-code lifting implementation): https://github.com/lifting-bits/sleigh
+- FFmpeg filter reference for SSIM/PSNR/EBU R128 audio analysis: https://manpages.debian.org/bookworm/ffmpeg/ffmpeg-filters.1.en.html
+- FFmpeg libvmaf filter usage notes: https://manpages.opensuse.org/Tumbleweed/ffmpeg/ffmpeg-filters.1.en.html
+- EBU R 128 loudness recommendation (audio loudness measurement): https://tech.ebu.ch/publications/r128
 
 ## Research Deliverables
 - A research summary for each category with sources.

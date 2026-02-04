@@ -1,0 +1,153 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "batch-manifest-schema.json",
+  "title": "Static Recomp Batch Manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "batch_id",
+    "created_at",
+    "toolchain",
+    "titles"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "v1"
+    },
+    "batch_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "created_at": {
+      "type": "string",
+      "format": "date-time"
+    },
+    "toolchain": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "pipeline_version": { "type": "string" },
+        "runtime_version": { "type": "string" },
+        "ffmpeg_version": { "type": "string" },
+        "emulator_version": { "type": "string" }
+      }
+    },
+    "global_defaults": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "resolution": { "type": "string" },
+        "frame_rate": { "type": "number" },
+        "audio_rate": { "type": "number" },
+        "renderer_settings": { "type": "string" },
+        "metrics_thresholds": { "$ref": "#/$defs/metrics_thresholds" }
+      }
+    },
+    "titles": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "$ref": "#/$defs/title" }
+    }
+  },
+  "$defs": {
+    "metrics_thresholds": {
+      "type": "object",
+      "additionalProperties": true,
+      "properties": {
+        "ssim_min": { "type": "number" },
+        "psnr_min": { "type": "number" },
+        "vmaf_min": { "type": "number" },
+        "audio_lufs_delta_max": { "type": "number" },
+        "audio_peak_delta_max": { "type": "number" }
+      }
+    },
+    "inputs": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["provenance_record", "reference_captures", "input_traces"],
+      "properties": {
+        "provenance_record": { "type": "string" },
+        "reference_captures": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "input_traces": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      }
+    },
+    "validation": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["scene_list", "targets"],
+      "properties": {
+        "scene_list": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "targets": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "resolution": { "type": "string" },
+            "frame_rate": { "type": "number" },
+            "audio_rate": { "type": "number" }
+          }
+        },
+        "metrics_thresholds": { "$ref": "#/$defs/metrics_thresholds" }
+      }
+    },
+    "status": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "last_updated"],
+      "properties": {
+        "state": {
+          "type": "string",
+          "enum": ["pending", "running", "passed", "failed", "needs_review"]
+        },
+        "last_updated": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "notes": { "type": "string" }
+      }
+    },
+    "artifacts": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "report_path": { "type": "string" },
+        "metrics_dir": { "type": "string" },
+        "captures_dir": { "type": "string" }
+      }
+    },
+    "title": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": [
+        "title_id",
+        "title_name",
+        "version",
+        "region",
+        "inputs",
+        "validation",
+        "status"
+      ],
+      "properties": {
+        "title_id": { "type": "string" },
+        "title_name": { "type": "string" },
+        "version": { "type": "string" },
+        "region": { "type": "string" },
+        "build_id": { "type": "string" },
+        "inputs": { "$ref": "#/$defs/inputs" },
+        "validation": { "$ref": "#/$defs/validation" },
+        "status": { "$ref": "#/$defs/status" },
+        "artifacts": { "$ref": "#/$defs/artifacts" }
+      }
+    }
+  }
+}
