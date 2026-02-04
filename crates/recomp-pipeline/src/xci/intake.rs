@@ -496,13 +496,8 @@ fn select_program_entry<'a>(
 
 fn parse_title_id(raw: &str) -> Result<u64, String> {
     let trimmed = raw.trim();
-    let value = if let Some(stripped) = trimmed.strip_prefix("0x") {
-        u64::from_str_radix(stripped, 16)
-    } else if trimmed.starts_with('0') && trimmed.len() > 1 {
-        u64::from_str_radix(trimmed, 16)
-    } else {
-        u64::from_str_radix(trimmed, 16)
-    };
+    let trimmed = trimmed.strip_prefix("0x").unwrap_or(trimmed);
+    let value = u64::from_str_radix(trimmed, 16);
     value.map_err(|err| format!("invalid title id '{raw}': {err}"))
 }
 
@@ -590,7 +585,7 @@ fn read_c_string(bytes: &[u8], offset: usize) -> Result<String, String> {
         .map_err(|_| "invalid string table entry".to_string())
 }
 
-fn slice_region<'a>(bytes: &'a [u8], offset: u64, size: u64) -> Result<&'a [u8], String> {
+fn slice_region(bytes: &[u8], offset: u64, size: u64) -> Result<&[u8], String> {
     let start = offset as usize;
     let end = start
         .checked_add(size as usize)
@@ -714,7 +709,7 @@ fn read_u64(bytes: &[u8], offset: usize) -> Result<u64, String> {
     ))
 }
 
-fn read_bytes<'a>(bytes: &'a [u8], offset: usize, size: usize) -> Result<&'a [u8], String> {
+fn read_bytes(bytes: &[u8], offset: usize, size: usize) -> Result<&[u8], String> {
     let end = offset
         .checked_add(size)
         .ok_or_else(|| "offset overflow".to_string())?;
