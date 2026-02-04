@@ -1,7 +1,7 @@
 # SPEC-046: Runtime Memory Layout Configuration
 
 ## Status
-Draft v0.1
+Implemented v0.1
 
 ## Purpose
 Allow runtime memory layout to be configured via `title.toml`, with safe defaults when omitted.

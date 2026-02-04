@@ -1,7 +1,7 @@
 # SPEC-047: Memory Image Initialization From Module Segments
 
 ## Status
-Draft v0.1
+Implemented v0.1
 
 ## Purpose
 Populate runtime memory regions with initial data derived from module segments (code/rodata/data/bss) so lifted output can execute meaningful memory-backed logic.
