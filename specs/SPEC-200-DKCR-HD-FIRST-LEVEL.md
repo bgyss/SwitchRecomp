@@ -1,7 +1,11 @@
 # SPEC-200: DKCR HD First-Level Milestone (macOS/aarch64)
 
 ## Status
-Draft v0.1
+Draft v0.3
+
+## Rationale
+- DKCR validation is paused until the automation loop, input replay, and normalization specs land.
+- The existing scaffold remains, but the end-to-end validation loop is not yet automated.
 
 ## Purpose
 Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using video-based validation to confirm the first level is playable.
@@ -27,6 +31,10 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 - Runtime must implement enough OS services, GPU translation, audio, and input to reach the first level.
 - RomFS assets must be loaded from an external, user-managed path.
 - Validation must compare the first level segment against the reference video and record results.
+
+## Operator Inputs
+- DKCR validation depends on external reference and capture artifacts.
+- Absolute paths and timeline confirmations are tracked in `docs/dkcr-validation-prereqs.md`.
 
 ## Interfaces and Data
 - `title.toml` for DKCR HD configuration (stubbed services, patches, asset paths).

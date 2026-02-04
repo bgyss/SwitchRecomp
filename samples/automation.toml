@@ -1,0 +1,33 @@
+schema_version = "1"
+
+[inputs]
+mode = "lifted"
+module_json = "samples/minimal/module.json"
+provenance = "samples/minimal/provenance.toml"
+config = "samples/minimal/title.toml"
+runtime_path = "crates/recomp-runtime"
+
+[outputs]
+work_root = "out/automation-minimal"
+
+[reference]
+reference_video_toml = "samples/reference_video.toml"
+capture_video_toml = "samples/capture_video.toml"
+validation_config_toml = "samples/validation_config.toml"
+
+[capture]
+video_path = "artifacts/capture/capture.mp4"
+frames_dir = "artifacts/capture/frames"
+audio_file = "artifacts/capture/audio.wav"
+
+[commands]
+build = ["cargo", "build", "--manifest-path", "out/automation-minimal/build/Cargo.toml"]
+run = ["/path/to/recompiled/binary"]
+capture = ["scripts/capture-video-macos.sh", "artifacts/capture"]
+extract_frames = ["ffmpeg", "-i", "artifacts/capture/capture.mp4", "artifacts/capture/frames/%08d.png"]
+extract_audio = ["ffmpeg", "-i", "artifacts/capture/capture.mp4", "-vn", "-acodec", "pcm_s16le", "artifacts/capture/audio.wav"]
+
+[run]
+resume = true
+lift_entry = "entry"
+lift_mode = "decode"

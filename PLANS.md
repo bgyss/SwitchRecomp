@@ -23,6 +23,10 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-180 XCI Title Intake
 - SPEC-190 Video-Based Validation
 - SPEC-200 DKCR HD First-Level Milestone (macOS/aarch64)
+- SPEC-210 Automated Recompilation Loop
+- SPEC-220 Input Replay and Interaction Scripts
+- SPEC-230 Reference Media Normalization
+- SPEC-240 Validation Orchestration and Triage
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -85,10 +89,10 @@ Outcome
 - Runtime memory layout is configurable via `title.toml` while preserving a safe default.
 
 Work items
-- [ ] Extend `title.toml` schema to include `runtime.memory_layout` regions.
-- [ ] Validate region overlap, zero sizes, and overflow errors.
-- [ ] Emit configured memory layout in `manifest.json` and generated runtime init.
-- [ ] Add tests for default layout and custom layout parsing.
+- [x] Extend `title.toml` schema to include `runtime.memory_layout` regions.
+- [x] Validate region overlap, zero sizes, and overflow errors.
+- [x] Emit configured memory layout in `manifest.json` and generated runtime init.
+- [x] Add tests for default layout and custom layout parsing.
 
 Exit criteria (from SPEC-046)
 - Custom memory layout in `title.toml` is parsed and emitted in `manifest.json`.
@@ -100,10 +104,10 @@ Outcome
 - Runtime memory is initialized from module segment metadata (code/rodata/data/bss).
 
 Work items
-- [ ] Define segment descriptor schema and carry it through pipeline output metadata.
-- [ ] Populate runtime memory regions with initial segment bytes and zeroed bss.
-- [ ] Validate init sizes and bounds during initialization.
-- [ ] Add tests covering initialized load/store behavior and error paths.
+- [x] Define segment descriptor schema and carry it through pipeline output metadata.
+- [x] Populate runtime memory regions with initial segment bytes and zeroed bss.
+- [x] Validate init sizes and bounds during initialization.
+- [x] Add tests covering initialized load/store behavior and error paths.
 
 Exit criteria (from SPEC-047)
 - A sample module with init bytes executes a load/store path against initialized memory.
@@ -280,11 +284,11 @@ Outcome
 - Intake XCI inputs with user-supplied keys and extract code/assets deterministically.
 
 Work items
-- [ ] Define the XCI intake CLI path and config schema extensions.
-- [ ] Integrate keyset validation and explicit Program NCA selection.
-- [ ] Extract ExeFS/NSO into deterministic segment blobs with hashes recorded.
-- [ ] Emit RomFS assets to a separate asset output root and record in manifest.
-- [ ] Add non-proprietary tests for intake validation and asset separation rules.
+- [x] Define the XCI intake CLI path and config schema extensions.
+- [x] Integrate keyset validation and explicit Program NCA selection.
+- [x] Extract ExeFS/NSO into deterministic segment blobs with hashes recorded.
+- [x] Emit RomFS assets to a separate asset output root and record in manifest.
+- [x] Add non-proprietary tests for intake validation and asset separation rules.
 
 Exit criteria (from SPEC-180)
 - XCI intake emits deterministic ExeFS/NSO outputs and a manifest with hashes.
@@ -295,12 +299,19 @@ Exit criteria (from SPEC-180)
 Outcome
 - Validate the recompiled output against a reference gameplay video without emulator traces.
 
+Note
+- DKCR validation is paused until the automation loop, input replay, and normalization specs land (SPEC-210/220/230/240).
+
 Work items
-- [ ] Define a reference timeline for the first level and store it in `reference_video.toml`.
-- [ ] Implement a capture workflow for macOS/aarch64 runtime output.
-- [ ] Add a comparison step that computes video and audio similarity metrics.
-- [ ] Generate a `validation-report.json` with pass/fail and drift summaries.
-- [ ] Document manual review steps for mismatches.
+- [x] Define a reference timeline for the first level and store it in `reference_video.toml`.
+- [x] Implement a capture workflow for macOS/aarch64 runtime output.
+- [x] Add a comparison step that computes video and audio similarity metrics.
+- [x] Generate a `validation-report.json` with pass/fail and drift summaries.
+- [x] Document manual review steps for mismatches.
+
+External prerequisites (see `docs/dkcr-validation-prereqs.md`)
+- Absolute paths to reference and capture artifacts (video or hashes).
+- Confirmed first-level start and end timecodes.
 
 Exit criteria (from SPEC-190)
 - A single run produces a validation report for the first level.
@@ -311,14 +322,80 @@ Exit criteria (from SPEC-190)
 Outcome
 - Produce a macOS/aarch64 static recompilation of DKCR HD that reaches and plays the first level.
 
+Note
+- DKCR validation is paused until SPEC-210/220/230/240 are implemented.
+
 Work items
-- [ ] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
-- [ ] Identify required OS services and implement or stub them in the runtime.
-- [ ] Implement the minimal GPU translation path needed for the first level.
-- [ ] Create a per-title config and patch set for DKCR HD.
-- [ ] Run video-based validation against the first level (SPEC-190).
+- [x] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
+- [x] Identify required OS services and implement or stub them in the runtime.
+- [x] Implement the minimal GPU translation path needed for the first level.
+- [x] Create a per-title config and patch set for DKCR HD.
+- [x] Run video-based validation against the first level (SPEC-190).
+
+External prerequisites (see `docs/dkcr-validation-prereqs.md`)
+- Absolute paths to DKCR reference and capture artifacts.
+- Confirmed first-level start and end timecodes.
 
 Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.
 - First-level gameplay matches the reference video within defined tolerances.
 - No proprietary assets or keys are stored in the repo or build outputs.
+
+## SPEC-210: Automated Recompilation Loop
+Outcome
+- Provide a one-command automation loop for intake, build, capture, and validation.
+
+Work items
+- [x] Define `automation.toml` schema and validator.
+- [x] Implement an orchestrator CLI that runs intake -> lift -> build -> run -> capture -> validate.
+- [x] Emit a deterministic `run-manifest.json` with step timings and artifact hashes.
+- [x] Add resume/caching logic keyed by input hashes.
+- [x] Add integration tests using non-proprietary fixtures.
+
+Exit criteria (from SPEC-210)
+- One command runs the full loop and produces a run manifest and validation report.
+- Re-running with identical inputs yields identical artifacts.
+- Proprietary assets remain external.
+
+## SPEC-220: Input Replay and Interaction Scripts
+Outcome
+- Deterministic input playback aligned to reference timelines.
+
+Work items
+- [x] Define `input_script.toml` schema with events and markers.
+- [x] Implement input script loader and runtime playback module.
+- [x] Add tools/tests for deterministic playback and alignment.
+- [x] Document authoring and replay workflows.
+
+Exit criteria (from SPEC-220)
+- Input scripts replay deterministically across two runs.
+- Playback order is stable for simultaneous events.
+- Markers align to reference timecodes.
+
+## SPEC-230: Reference Media Normalization
+Outcome
+- Normalize reference video/audio into a canonical, comparable format.
+
+Work items
+- [x] Define canonical reference profile (resolution, fps, audio).
+- [x] Implement normalization workflow and metadata capture.
+- [x] Update `reference_video.toml` schema to record normalization details.
+- [x] Add hash generation tests for normalized outputs.
+
+Exit criteria (from SPEC-230)
+- Reference media can be normalized deterministically.
+- Hashes for normalized outputs are stable across runs.
+
+## SPEC-240: Validation Orchestration and Triage
+Outcome
+- Automated validation with structured reports and triage summaries.
+
+Work items
+- [x] Define `validation-config.toml` and report schema extensions.
+- [x] Implement triage summary generation (drift, likely causes).
+- [x] Integrate validation orchestration into the automation loop.
+- [x] Add tests for report determinism and failure summaries.
+
+Exit criteria (from SPEC-240)
+- Validation runs emit deterministic reports and triage summaries.
+- Failures include actionable context and artifact references.

@@ -1,0 +1,51 @@
+title = "DKCR HD Sample"
+entry = "entry"
+abi_version = "0.1.0"
+
+[runtime]
+performance_mode = "handheld"
+
+[runtime.memory_layout]
+[[runtime.memory_layout.regions]]
+name = "code"
+base = 0x1000_0000
+size = 0x0008_0000
+permissions = { read = true, write = false, execute = true }
+
+[[runtime.memory_layout.regions]]
+name = "rodata"
+base = 0x1008_0000
+size = 0x0004_0000
+permissions = { read = true, write = false, execute = false }
+
+[[runtime.memory_layout.regions]]
+name = "data"
+base = 0x100c_0000
+size = 0x0008_0000
+permissions = { read = true, write = true, execute = false }
+
+[[runtime.memory_layout.regions]]
+name = "heap"
+base = 0x2000_0000
+size = 0x0040_0000
+permissions = { read = true, write = true, execute = false }
+
+[[runtime.memory_layout.regions]]
+name = "stack"
+base = 0x3000_0000
+size = 0x0010_0000
+permissions = { read = true, write = true, execute = false }
+
+[assets]
+romfs_root = "game-data/dkcr-hd/romfs"
+
+[patches]
+patch_set = "patches/first-level.toml"
+
+[stubs]
+svc_boot = "log"
+svc_sm = "log"
+svc_fs = "log"
+svc_vi = "log"
+svc_hid = "log"
+svc_audout = "log"
