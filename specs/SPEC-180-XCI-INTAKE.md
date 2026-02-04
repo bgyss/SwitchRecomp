@@ -1,7 +1,7 @@
 # SPEC-180: XCI Title Intake
 
 ## Status
-Draft v0.1
+Implemented v0.1
 
 ## Purpose
 Define how the pipeline ingests a user-supplied XCI and extracts code and assets while preserving legal separation and deterministic outputs.
@@ -31,7 +31,10 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 
 ## Interfaces and Data
 - Inputs
-  - `input.xci_path` and `input.keys_path` in provenance metadata.
+  - `[[inputs]]` entries in provenance metadata with:
+    - `format = "xci"` for the XCI file.
+    - `format = "keyset"` for the keyset file (`*.keys`).
+  - Keyset files are expected to use `name = hex` lines (32 or 64 hex chars).
   - Optional `title.toml` overrides for main program selection.
 - Outputs
   - `intake/` directory with NCA metadata, ExeFS, and NSO segment blobs.
@@ -42,6 +45,11 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 - CLI intake command that accepts an XCI plus keyset and emits deterministic extraction outputs.
 - A validator that enforces asset separation and provenance requirements for XCI inputs.
 - Documentation describing the intake flow and supported keyset formats.
+
+## Implementation Notes
+- The current intake accepts an unencrypted `XCI0` fixture layout (magic `XCI0`) for
+  deterministic tests. Real encrypted XCI inputs require user-provided keys and
+  external extraction tooling.
 
 ## Open Questions
 - How should update and DLC NCAs be layered or merged?

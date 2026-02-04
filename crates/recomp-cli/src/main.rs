@@ -3,6 +3,7 @@ use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
+use recomp_pipeline::xci::{intake_xci, IntakeOptions as XciIntakeOptions, ProgramSelection};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -19,6 +20,7 @@ enum Command {
     Package(PackageArgs),
     HomebrewIntake(HomebrewIntakeArgs),
     HomebrewLift(HomebrewLiftArgs),
+    XciIntake(XciIntakeArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -69,6 +71,22 @@ struct HomebrewLiftArgs {
     entry: String,
     #[arg(long, value_enum, default_value = "decode")]
     mode: HomebrewLiftMode,
+}
+
+#[derive(Parser, Debug)]
+struct XciIntakeArgs {
+    #[arg(long)]
+    xci: PathBuf,
+    #[arg(long)]
+    keys: PathBuf,
+    #[arg(long)]
+    provenance: PathBuf,
+    #[arg(long)]
+    out_dir: PathBuf,
+    #[arg(long, conflicts_with = "program_name")]
+    program_title_id: Option<String>,
+    #[arg(long)]
+    program_name: Option<String>,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -190,6 +208,39 @@ fn main() {
                 }
                 Err(err) => {
                     eprintln!("Homebrew lift error: {err}");
+                    std::process::exit(1);
+                }
+            }
+        }
+        Command::XciIntake(intake) => {
+            let program = if let Some(title_id) = intake.program_title_id {
+                ProgramSelection::TitleId(title_id)
+            } else if let Some(name) = intake.program_name {
+                ProgramSelection::Name(name)
+            } else {
+                eprintln!("XCI intake requires --program-title-id or --program-name");
+                std::process::exit(2);
+            };
+
+            let options = XciIntakeOptions {
+                xci_path: intake.xci,
+                keys_path: intake.keys,
+                provenance_path: intake.provenance,
+                out_dir: intake.out_dir,
+                program,
+            };
+            match intake_xci(options) {
+                Ok(report) => {
+                    println!(
+                        "XCI intake wrote {} files to {}",
+                        report.files_written.len(),
+                        report.out_dir.display()
+                    );
+                    println!("module.json: {}", report.module_json_path.display());
+                    println!("manifest.json: {}", report.manifest_path.display());
+                }
+                Err(err) => {
+                    eprintln!("XCI intake error: {err}");
                     std::process::exit(1);
                 }
             }
