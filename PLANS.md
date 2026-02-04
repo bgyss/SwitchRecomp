@@ -309,6 +309,10 @@ Work items
 - [x] Generate a `validation-report.json` with pass/fail and drift summaries.
 - [x] Document manual review steps for mismatches.
 
+External prerequisites (see `docs/dkcr-validation-prereqs.md`)
+- Absolute paths to reference and capture artifacts (video or hashes).
+- Confirmed first-level start and end timecodes.
+
 Exit criteria (from SPEC-190)
 - A single run produces a validation report for the first level.
 - Similarity metrics are stable across two consecutive runs.
@@ -327,6 +331,10 @@ Work items
 - [x] Implement the minimal GPU translation path needed for the first level.
 - [x] Create a per-title config and patch set for DKCR HD.
 - [x] Run video-based validation against the first level (SPEC-190).
+
+External prerequisites (see `docs/dkcr-validation-prereqs.md`)
+- Absolute paths to DKCR reference and capture artifacts.
+- Confirmed first-level start and end timecodes.
 
 Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.

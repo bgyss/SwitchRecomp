@@ -32,6 +32,10 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 - RomFS assets must be loaded from an external, user-managed path.
 - Validation must compare the first level segment against the reference video and record results.
 
+## Operator Inputs
+- DKCR validation depends on external reference and capture artifacts.
+- Absolute paths and timeline confirmations are tracked in `docs/dkcr-validation-prereqs.md`.
+
 ## Interfaces and Data
 - `title.toml` for DKCR HD configuration (stubbed services, patches, asset paths).
 - `provenance.toml` for XCI and reference video inputs.

@@ -32,6 +32,10 @@ Define a validation workflow that compares recompiled output against a reference
 - The report must highlight drift, dropped frames, or audio desync beyond thresholds.
 - Validation artifacts must remain outside the repo and be referenced via provenance metadata.
 
+## Operator Inputs
+- External reference and capture artifacts are required to run DKCR validation.
+- Absolute paths and timeline confirmations are tracked in `docs/dkcr-validation-prereqs.md`.
+
 ## Interfaces and Data
 - `reference_video.toml` with:
   - input video path

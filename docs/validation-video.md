@@ -25,6 +25,11 @@ and be passed with `--validation-config`.
 - `[validation]`: optional name, notes, thresholds, and `require_audio` for the comparison.
 See `docs/reference-media.md` for the normalization flow.
 
+## DKCR Prerequisites
+Before running DKCR validation, gather the external artifacts listed in
+`docs/dkcr-validation-prereqs.md`. The reference and capture paths must be absolute, and the
+first-level start/end timecodes must be confirmed.
+
 ## Hash Generation
 Generate hash lists from deterministic inputs:
 
