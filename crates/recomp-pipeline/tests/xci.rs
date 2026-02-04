@@ -125,7 +125,7 @@ fn build_xci(entries: Vec<ProgramEntry>) -> Vec<u8> {
     let header_size = 0x20;
     let entry_size = 0x40;
     let table_size = entry_size * entries.len();
-    let mut data_offset = header_size + table_size;
+    let data_offset = header_size + table_size;
     let total_size: usize = data_offset
         + entries
             .iter()
