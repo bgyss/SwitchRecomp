@@ -1,10 +1,22 @@
-schema_version = "1"
+schema_version = "2"
 
 [video]
-path = "/path/to/reference.mp4"
+path = "artifacts/reference/reference-normalized.mp4"
 width = 1280
 height = 720
 fps = 30.0
+
+[normalization]
+source_path = "/path/to/source.mov"
+normalized_path = "artifacts/reference/reference-normalized.mp4"
+notes = "Normalized to the canonical profile for hashing."
+
+[normalization.profile]
+width = 1280
+height = 720
+fps = 30.0
+audio_sample_rate = 48000
+audio_channels = 2
 
 [timeline]
 start = "00:00:05.000"
@@ -26,7 +38,12 @@ path = "artifacts/reference/frames.hashes"
 format = "list"
 path = "artifacts/reference/audio.hashes"
 
-[thresholds]
+[validation]
+name = "reference-run"
+notes = "First-level timeline."
+require_audio = true
+
+[validation.thresholds]
 frame_match_ratio = 0.92
 audio_match_ratio = 0.9
 max_drift_frames = 3

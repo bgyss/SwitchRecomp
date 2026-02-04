@@ -1,7 +1,12 @@
 # SPEC-220: Input Replay and Interaction Scripts
 
 ## Status
-Draft v0.1
+Draft v0.2
+
+## Rationale
+- Added an input script parser/validator and deterministic playback queue in the runtime.
+- Added sample input script data plus docs to align with reference timelines.
+- Added unit tests for ordering and marker alignment.
 
 ## Purpose
 Define a deterministic input replay format and runtime integration so validation runs can mirror reference video interactions.

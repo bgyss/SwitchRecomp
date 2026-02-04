@@ -143,6 +143,25 @@ pub struct VideoSpec {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct NormalizationProfile {
+    pub width: u32,
+    pub height: u32,
+    pub fps: f32,
+    pub audio_sample_rate: u32,
+    #[serde(default)]
+    pub audio_channels: Option<u8>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct NormalizationConfig {
+    pub source_path: PathBuf,
+    pub normalized_path: PathBuf,
+    pub profile: NormalizationProfile,
+    #[serde(default)]
+    pub notes: Option<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct Timeline {
     pub start: Timecode,
     pub end: Timecode,
@@ -156,7 +175,7 @@ pub struct TimelineEvent {
     pub time: Timecode,
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone, Copy)]
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
 pub enum HashFormat {
     List,
@@ -202,13 +221,50 @@ impl Default for VideoThresholds {
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ValidationConfig {
+    #[serde(default)]
+    pub name: Option<String>,
+    #[serde(default)]
+    pub notes: Option<String>,
+    #[serde(default)]
+    pub require_audio: Option<bool>,
+    #[serde(default)]
+    pub thresholds: Option<VideoThresholds>,
+}
+
+impl Default for ValidationConfig {
+    fn default() -> Self {
+        Self {
+            name: None,
+            notes: None,
+            require_audio: None,
+            thresholds: None,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
+pub struct ValidationConfigFile {
+    #[serde(default)]
+    pub schema_version: Option<String>,
+    #[serde(flatten)]
+    pub validation: ValidationConfig,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone)]
 pub struct ReferenceVideoConfig {
+    #[serde(default)]
+    pub schema_version: Option<String>,
+    #[serde(default)]
+    pub normalization: Option<NormalizationConfig>,
     pub video: VideoSpec,
     pub timeline: Timeline,
     #[serde(default)]
     pub hashes: Option<HashSources>,
     #[serde(default)]
-    pub thresholds: VideoThresholds,
+    pub thresholds: Option<VideoThresholds>,
+    #[serde(default)]
+    pub validation: Option<ValidationConfig>,
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
@@ -220,6 +276,10 @@ pub struct CaptureVideoConfig {
 #[derive(Debug, Serialize)]
 pub struct VideoValidationReport {
     pub status: ValidationStatus,
+    pub validation_config: ValidationConfigSummary,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub normalization: Option<NormalizationConfig>,
+    pub triage: TriageSummary,
     pub reference: VideoRunSummary,
     pub capture: VideoRunSummary,
     pub timeline: TimelineSummary,
@@ -229,6 +289,41 @@ pub struct VideoValidationReport {
     pub drift: DriftSummary,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub failures: Vec<String>,
+}
+
+#[derive(Debug, Serialize)]
+pub struct ValidationConfigSummary {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema_version: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub name: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub notes: Option<String>,
+    pub require_audio: bool,
+    pub thresholds: VideoThresholds,
+}
+
+#[derive(Debug, Serialize)]
+pub struct TriageSummary {
+    pub status: ValidationStatus,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub categories: Vec<TriageCategory>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub findings: Vec<String>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub suggestions: Vec<String>,
+}
+
+#[derive(Debug, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum TriageCategory {
+    Pass,
+    ConfigMismatch,
+    ReferenceCoverage,
+    FrameMismatch,
+    AudioMismatch,
+    AudioMissing,
+    Unknown,
 }
 
 #[derive(Debug, Serialize)]
@@ -293,12 +388,24 @@ pub fn run_video_validation(
     reference_path: &Path,
     capture_path: &Path,
 ) -> Result<VideoValidationReport, String> {
+    run_video_validation_with_config(reference_path, capture_path, None)
+}
+
+pub fn run_video_validation_with_config(
+    reference_path: &Path,
+    capture_path: &Path,
+    validation_path: Option<&Path>,
+) -> Result<VideoValidationReport, String> {
     let reference_src = fs::read_to_string(reference_path).map_err(|err| err.to_string())?;
     let capture_src = fs::read_to_string(capture_path).map_err(|err| err.to_string())?;
     let reference: ReferenceVideoConfig =
         toml::from_str(&reference_src).map_err(|err| format!("invalid reference config: {err}"))?;
     let capture: CaptureVideoConfig =
         toml::from_str(&capture_src).map_err(|err| format!("invalid capture config: {err}"))?;
+    let validation_override = match validation_path {
+        Some(path) => Some(load_validation_config(path)?),
+        None => None,
+    };
 
     let reference_dir = reference_path
         .parent()
@@ -311,6 +418,33 @@ pub fn run_video_validation(
         .hashes
         .clone()
         .ok_or_else(|| "reference hashes missing".to_string())?;
+    let reference_validation = reference.validation.clone().unwrap_or_default();
+    let override_validation = validation_override
+        .as_ref()
+        .map(|cfg| cfg.validation.clone());
+    let merged_validation = ValidationConfig {
+        name: override_validation
+            .as_ref()
+            .and_then(|validation| validation.name.clone())
+            .or(reference_validation.name),
+        notes: override_validation
+            .as_ref()
+            .and_then(|validation| validation.notes.clone())
+            .or(reference_validation.notes),
+        require_audio: override_validation
+            .as_ref()
+            .and_then(|validation| validation.require_audio)
+            .or(reference_validation.require_audio),
+        thresholds: override_validation
+            .as_ref()
+            .and_then(|validation| validation.thresholds.clone())
+            .or(reference_validation.thresholds),
+    };
+    let thresholds = merged_validation
+        .thresholds
+        .clone()
+        .or_else(|| reference.thresholds.clone())
+        .unwrap_or_default();
     let ref_frames = load_hashes(&reference_hashes.frames, reference_dir, HashRole::Frames)?;
     let ref_audio = match &reference_hashes.audio {
         Some(source) => Some(load_hashes(source, reference_dir, HashRole::Audio)?),
@@ -322,6 +456,9 @@ pub fn run_video_validation(
         Some(source) => Some(load_hashes(source, capture_dir, HashRole::Audio)?),
         None => None,
     };
+    let require_audio = merged_validation
+        .require_audio
+        .unwrap_or_else(|| reference_hashes.audio.is_some());
 
     let timeline_start = reference
         .timeline
@@ -345,6 +482,12 @@ pub fn run_video_validation(
         ));
     }
 
+    let mut config_mismatch = false;
+    let reference_coverage = timeline_end > ref_frames.len();
+    let mut frame_mismatch = false;
+    let mut audio_mismatch = false;
+    let mut audio_missing = false;
+
     if reference.video.width != capture.video.width
         || reference.video.height != capture.video.height
     {
@@ -355,16 +498,18 @@ pub fn run_video_validation(
             capture.video.width,
             capture.video.height
         ));
+        config_mismatch = true;
     }
     if (reference.video.fps - capture.video.fps).abs() > f32::EPSILON {
         failures.push(format!(
             "fps mismatch: reference {:.3}, capture {:.3}",
             reference.video.fps, capture.video.fps
         ));
+        config_mismatch = true;
     }
 
     let ref_slice = &ref_frames[timeline_start..clamped_end];
-    let max_drift = reference.thresholds.max_drift_frames;
+    let max_drift = thresholds.max_drift_frames;
     let alignment = best_alignment(ref_slice, &capture_frames, max_drift);
     let length_delta = capture_frames.len() as i32 - ref_slice.len() as i32;
     let frame_match_ratio = if alignment.compared == 0 {
@@ -372,32 +517,35 @@ pub fn run_video_validation(
     } else {
         alignment.match_ratio
     };
-    if frame_match_ratio < reference.thresholds.frame_match_ratio {
+    if frame_match_ratio < thresholds.frame_match_ratio {
         failures.push(format!(
             "frame match ratio {:.3} below threshold {:.3}",
-            frame_match_ratio, reference.thresholds.frame_match_ratio
+            frame_match_ratio, thresholds.frame_match_ratio
         ));
+        frame_mismatch = true;
     }
-    if alignment.offset.abs() > reference.thresholds.max_drift_frames {
+    if alignment.offset.abs() > thresholds.max_drift_frames {
         failures.push(format!(
             "frame drift {} exceeds max {}",
-            alignment.offset, reference.thresholds.max_drift_frames
+            alignment.offset, thresholds.max_drift_frames
         ));
+        frame_mismatch = true;
     }
     let length_delta_abs = length_delta.unsigned_abs() as usize;
-    if length_delta_abs > reference.thresholds.max_dropped_frames {
+    if length_delta_abs > thresholds.max_dropped_frames {
         failures.push(format!(
             "frame length delta {} exceeds max dropped {}",
-            length_delta, reference.thresholds.max_dropped_frames
+            length_delta, thresholds.max_dropped_frames
         ));
+        frame_mismatch = true;
     }
 
+    let mut triage_categories = Vec::new();
     let audio_report = match (ref_audio.as_ref(), capture_audio.as_ref()) {
         (Some(reference_audio), Some(capture_audio)) => {
-            let max_audio_drift = reference
-                .thresholds
+            let max_audio_drift = thresholds
                 .max_audio_drift_chunks
-                .unwrap_or(reference.thresholds.max_drift_frames);
+                .unwrap_or(thresholds.max_drift_frames);
             let audio_alignment = best_alignment(reference_audio, capture_audio, max_audio_drift);
             let audio_length_delta = capture_audio.len() as i32 - reference_audio.len() as i32;
             let audio_match_ratio = if audio_alignment.compared == 0 {
@@ -405,12 +553,13 @@ pub fn run_video_validation(
             } else {
                 audio_alignment.match_ratio
             };
-            if let Some(threshold) = reference.thresholds.audio_match_ratio {
+            if let Some(threshold) = thresholds.audio_match_ratio {
                 if audio_match_ratio < threshold {
                     failures.push(format!(
                         "audio match ratio {:.3} below threshold {:.3}",
                         audio_match_ratio, threshold
                     ));
+                    audio_mismatch = true;
                 }
             }
             if audio_alignment.offset.abs() > max_audio_drift {
@@ -418,12 +567,13 @@ pub fn run_video_validation(
                     "audio drift {} exceeds max {}",
                     audio_alignment.offset, max_audio_drift
                 ));
+                audio_mismatch = true;
             }
             Some(HashComparisonReport {
                 matched: audio_alignment.matched,
                 compared: audio_alignment.compared,
                 match_ratio: audio_match_ratio,
-                threshold: reference.thresholds.audio_match_ratio.unwrap_or(0.0),
+                threshold: thresholds.audio_match_ratio.unwrap_or(0.0),
                 offset: audio_alignment.offset,
                 length_delta: audio_length_delta,
                 reference_total: reference_audio.len(),
@@ -432,7 +582,11 @@ pub fn run_video_validation(
         }
         (None, None) => None,
         _ => {
-            failures.push("audio hashes missing on one side".to_string());
+            if require_audio {
+                failures.push("audio hashes missing on one side".to_string());
+                triage_categories.push(TriageCategory::AudioMissing);
+                audio_missing = true;
+            }
             None
         }
     };
@@ -442,6 +596,59 @@ pub fn run_video_validation(
     } else {
         ValidationStatus::Failed
     };
+
+    if config_mismatch {
+        triage_categories.push(TriageCategory::ConfigMismatch);
+    }
+    if reference_coverage {
+        triage_categories.push(TriageCategory::ReferenceCoverage);
+    }
+    if frame_mismatch {
+        triage_categories.push(TriageCategory::FrameMismatch);
+    }
+    if audio_mismatch {
+        triage_categories.push(TriageCategory::AudioMismatch);
+    }
+    if audio_missing && !triage_categories.contains(&TriageCategory::AudioMissing) {
+        triage_categories.push(TriageCategory::AudioMissing);
+    }
+    if triage_categories.is_empty() && status == ValidationStatus::Passed {
+        triage_categories.push(TriageCategory::Pass);
+    }
+    if triage_categories.is_empty() {
+        triage_categories.push(TriageCategory::Unknown);
+    }
+
+    let mut suggestions = Vec::new();
+    if triage_categories.contains(&TriageCategory::ConfigMismatch) {
+        suggestions.push(
+            "normalize capture to the reference profile or update video metadata".to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::ReferenceCoverage) {
+        suggestions.push(
+            "regenerate reference hashes or adjust timeline coverage to match available frames"
+                .to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::FrameMismatch) {
+        suggestions.push(
+            "inspect frame hashes near the reported drift offset for deterministic mismatches"
+                .to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::AudioMismatch) {
+        suggestions.push(
+            "compare audio hashes near the reported chunk offset and verify extraction settings"
+                .to_string(),
+        );
+    }
+    if triage_categories.contains(&TriageCategory::AudioMissing) {
+        suggestions.push(
+            "generate audio hashes for both reference and capture or set validation.require_audio = false"
+                .to_string(),
+        );
+    }
 
     let drift = DriftSummary {
         frame_offset: alignment.offset,
@@ -455,15 +662,34 @@ pub fn run_video_validation(
         matched: alignment.matched,
         compared: alignment.compared,
         match_ratio: frame_match_ratio,
-        threshold: reference.thresholds.frame_match_ratio,
+        threshold: thresholds.frame_match_ratio,
         offset: alignment.offset,
         length_delta,
         reference_total: ref_slice.len(),
         capture_total: capture_frames.len(),
     };
 
+    let validation_schema_version = validation_override
+        .as_ref()
+        .and_then(|cfg| cfg.schema_version.clone())
+        .or_else(|| reference.schema_version.clone());
+
     Ok(VideoValidationReport {
         status,
+        validation_config: ValidationConfigSummary {
+            schema_version: validation_schema_version,
+            name: merged_validation.name,
+            notes: merged_validation.notes,
+            require_audio,
+            thresholds,
+        },
+        normalization: reference.normalization.clone(),
+        triage: TriageSummary {
+            status,
+            categories: triage_categories,
+            findings: failures.clone(),
+            suggestions,
+        },
         reference: VideoRunSummary {
             path: reference.video.path.display().to_string(),
             width: reference.video.width,
@@ -597,6 +823,12 @@ fn resolve_path(base_dir: &Path, path: &Path) -> PathBuf {
     } else {
         base_dir.join(path)
     }
+}
+
+fn load_validation_config(path: &Path) -> Result<ValidationConfigFile, String> {
+    let content = fs::read_to_string(path)
+        .map_err(|err| format!("read validation config {}: {err}", path.display()))?;
+    toml::from_str(&content).map_err(|err| format!("invalid validation config: {err}"))
 }
 
 fn load_hash_list(path: &Path) -> Result<Vec<String>, String> {

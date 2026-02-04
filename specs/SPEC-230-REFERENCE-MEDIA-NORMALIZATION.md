@@ -1,7 +1,12 @@
 # SPEC-230: Reference Media Normalization
 
 ## Status
-Draft v0.1
+Draft v0.2
+
+## Rationale
+- Documented the canonical profile and normalization workflow.
+- Added a normalization script plus sample reference metadata.
+- Added tests that validate frame/audio hash stability.
 
 ## Purpose
 Define how reference videos and audio are normalized into comparable artifacts for validation.

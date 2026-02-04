@@ -33,6 +33,8 @@ struct VideoArgs {
     #[arg(long)]
     capture: PathBuf,
     #[arg(long)]
+    validation_config: Option<PathBuf>,
+    #[arg(long)]
     out_dir: PathBuf,
 }
 
@@ -56,7 +58,11 @@ fn main() {
     let args = Cli::parse();
     match args.command {
         Some(Command::Video(cmd)) => {
-            let report = run_video_suite(&cmd.reference, &cmd.capture);
+            let report = run_video_suite(
+                &cmd.reference,
+                &cmd.capture,
+                cmd.validation_config.as_deref(),
+            );
             if let Err(err) = write_report(&cmd.out_dir, &report) {
                 eprintln!("failed to write validation report: {err}");
                 std::process::exit(1);

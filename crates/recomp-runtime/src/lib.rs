@@ -4,6 +4,7 @@ mod audio;
 mod boot;
 mod homebrew;
 mod input;
+mod input_replay;
 mod memory;
 
 pub const ABI_VERSION: &str = "0.1.0";
@@ -17,6 +18,10 @@ pub use homebrew::{
     LoaderConfigEntry, LoaderConfigKey, NroEntrypoint, RuntimeManifest, ServiceStub, NRO_ENTRY_X1,
 };
 pub use input::{InputBackend, InputFrame, StubInputBackend};
+pub use input_replay::{
+    InputMarker, InputMetadata, InputPlayback, InputScript, InputScriptEvent, InputScriptMarker,
+    TimingMode,
+};
 pub use memory::{
     init_memory, recomp_mem_load_u16, recomp_mem_load_u32, recomp_mem_load_u64, recomp_mem_load_u8,
     recomp_mem_store_u16, recomp_mem_store_u32, recomp_mem_store_u64, recomp_mem_store_u8,

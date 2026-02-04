@@ -6,8 +6,9 @@ use std::time::Instant;
 
 pub mod video;
 pub use video::{
-    hash_audio_file, hash_frames_dir, run_video_validation, write_hash_list, CaptureVideoConfig,
-    HashFormat, HashSource, HashSources, ReferenceVideoConfig, Timecode, VideoValidationReport,
+    hash_audio_file, hash_frames_dir, run_video_validation, run_video_validation_with_config,
+    write_hash_list, CaptureVideoConfig, HashFormat, HashSource, HashSources, ReferenceVideoConfig,
+    Timecode, ValidationConfigFile, VideoValidationReport,
 };
 
 #[derive(Debug, Serialize)]
@@ -165,6 +166,12 @@ fn render_text_report(report: &ValidationReport) -> String {
     if let Some(video) = &report.video {
         out.push_str("\nVideo validation summary\n");
         out.push_str(&format!("status: {:?}\n", video.status));
+        if let Some(schema_version) = &video.validation_config.schema_version {
+            out.push_str(&format!("schema_version: {schema_version}\n"));
+        }
+        if let Some(name) = &video.validation_config.name {
+            out.push_str(&format!("validation_name: {name}\n"));
+        }
         out.push_str(&format!(
             "frame match: {:.3} ({} of {}, offset {} frames)\n",
             video.frame_comparison.match_ratio,
@@ -182,30 +189,50 @@ fn render_text_report(report: &ValidationReport) -> String {
                 audio.match_ratio, audio.matched, audio.compared, audio.offset
             ));
         }
+        if !video.triage.categories.is_empty() {
+            let categories: Vec<String> = video
+                .triage
+                .categories
+                .iter()
+                .map(|category| format!("{category:?}"))
+                .collect();
+            out.push_str(&format!("triage: {}\n", categories.join(", ")));
+        }
         if !video.failures.is_empty() {
             out.push_str("video failures:\n");
             for failure in &video.failures {
                 out.push_str(&format!("- {failure}\n"));
             }
         }
+        if !video.triage.suggestions.is_empty() {
+            out.push_str("triage suggestions:\n");
+            for suggestion in &video.triage.suggestions {
+                out.push_str(&format!("- {suggestion}\n"));
+            }
+        }
     }
     out
 }
 
-pub fn run_video_suite(reference_path: &Path, capture_path: &Path) -> ValidationReport {
+pub fn run_video_suite(
+    reference_path: &Path,
+    capture_path: &Path,
+    validation_path: Option<&Path>,
+) -> ValidationReport {
     let start = Instant::now();
     let mut cases = Vec::new();
-    let (status, details, video_report) = match run_video_validation(reference_path, capture_path) {
-        Ok(report) => (
-            report.status,
-            Some(format!(
-                "frame_match_ratio={:.3} drift_frames={}",
-                report.frame_comparison.match_ratio, report.drift.frame_offset
-            )),
-            Some(report),
-        ),
-        Err(err) => (ValidationStatus::Failed, Some(err), None),
-    };
+    let (status, details, video_report) =
+        match run_video_validation_with_config(reference_path, capture_path, validation_path) {
+            Ok(report) => (
+                report.status,
+                Some(format!(
+                    "frame_match_ratio={:.3} drift_frames={}",
+                    report.frame_comparison.match_ratio, report.drift.frame_offset
+                )),
+                Some(report),
+            ),
+            Err(err) => (ValidationStatus::Failed, Some(err), None),
+        };
     let duration_ms = start.elapsed().as_millis();
     cases.push(ValidationCase {
         name: "video_validation".to_string(),

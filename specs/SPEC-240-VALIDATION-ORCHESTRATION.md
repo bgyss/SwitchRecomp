@@ -1,7 +1,12 @@
 # SPEC-240: Validation Orchestration and Triage
 
 ## Status
-Draft v0.1
+Draft v0.2
+
+## Rationale
+- Extended validation reports with triage summaries and normalized metadata.
+- Added optional validation override configs for threshold tuning.
+- Added deterministic tests for report generation and hash stability.
 
 ## Purpose
 Define the orchestration of validation runs, reporting, and triage so regression detection is automated and actionable.
@@ -32,10 +37,10 @@ Validation must be repeatable and consistent across runs. A dedicated orchestrat
 - Store validation metadata alongside the run manifest.
 
 ## Interfaces and Data
-- `validation-config.toml` (optional):
-  - threshold overrides
-  - drift tolerance windows
-  - output artifact paths
+- `reference_video.toml` `[validation]` section:
+  - thresholds, notes, and audio requirements
+- `validation-config.toml` (optional override):
+  - threshold overrides and drift tolerance windows
 - `validation-report.json`:
   - status, metrics, and failure details
   - artifact references (paths and hashes)
