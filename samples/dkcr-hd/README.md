@@ -13,6 +13,17 @@ Notes:
 - Replace `module.json` with lifted output once XCI intake and lifting are wired up.
 - All proprietary assets, keys, and videos remain external to the repo.
 
+XCI intake (external tooling):
+```
+cargo run -p recomp-cli -- xci-intake \
+  --xci /Volumes/External/DKCR_HD/game.xci \
+  --keys /Volumes/External/SwitchKeys/prod.keys \
+  --program-title-id 0100000000000000 \
+  --provenance samples/dkcr-hd/provenance.toml \
+  --out-dir out/dkcr-hd-intake \
+  --xci-tool /usr/local/bin/hactool
+```
+
 Usage (from repo root):
 ```
 cargo run -p recomp-cli -- run \

@@ -3,7 +3,9 @@ use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
-use recomp_pipeline::xci::{intake_xci, IntakeOptions as XciIntakeOptions, ProgramSelection};
+use recomp_pipeline::xci::{
+    intake_xci, IntakeOptions as XciIntakeOptions, ProgramSelection, ToolKind,
+};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -80,13 +82,26 @@ struct XciIntakeArgs {
     #[arg(long)]
     keys: PathBuf,
     #[arg(long)]
+    title_keys: Option<PathBuf>,
+    #[arg(long)]
     provenance: PathBuf,
     #[arg(long)]
     out_dir: PathBuf,
+    #[arg(long)]
+    xci_tool: Option<PathBuf>,
+    #[arg(long, value_enum, default_value = "auto")]
+    xci_tool_kind: XciToolKind,
     #[arg(long, conflicts_with = "program_name")]
     program_title_id: Option<String>,
     #[arg(long)]
     program_name: Option<String>,
+}
+
+#[derive(ValueEnum, Debug, Clone)]
+enum XciToolKind {
+    Auto,
+    Hactool,
+    Hactoolnet,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -100,6 +115,16 @@ impl From<HomebrewLiftMode> for LiftMode {
         match value {
             HomebrewLiftMode::Stub => LiftMode::Stub,
             HomebrewLiftMode::Decode => LiftMode::Decode,
+        }
+    }
+}
+
+impl From<XciToolKind> for ToolKind {
+    fn from(value: XciToolKind) -> Self {
+        match value {
+            XciToolKind::Auto => ToolKind::Auto,
+            XciToolKind::Hactool => ToolKind::Hactool,
+            XciToolKind::Hactoolnet => ToolKind::HactoolNet,
         }
     }
 }
@@ -228,6 +253,9 @@ fn main() {
                 provenance_path: intake.provenance,
                 out_dir: intake.out_dir,
                 program,
+                tool_path: intake.xci_tool,
+                tool_kind: intake.xci_tool_kind.into(),
+                title_keys_path: intake.title_keys,
             };
             match intake_xci(options) {
                 Ok(report) => {

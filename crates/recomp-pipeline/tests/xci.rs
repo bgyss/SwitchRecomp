@@ -1,6 +1,8 @@
-use recomp_pipeline::xci::{intake_xci, IntakeOptions, ProgramSelection};
+use recomp_pipeline::xci::{intake_xci, IntakeOptions, ProgramSelection, ToolKind};
 use sha2::{Digest, Sha256};
 use std::fs;
+#[cfg(unix)]
+use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 
 #[test]
@@ -24,6 +26,9 @@ fn xci_intake_emits_outputs() {
         provenance_path: provenance_path.clone(),
         out_dir: out_dir.clone(),
         program: ProgramSelection::TitleId(format!("{title_id:x}")),
+        tool_path: None,
+        tool_kind: ToolKind::Auto,
+        title_keys_path: None,
     })
     .expect("intake");
 
@@ -65,6 +70,9 @@ fn xci_intake_rejects_invalid_keyset() {
         provenance_path,
         out_dir,
         program: ProgramSelection::TitleId(format!("{title_id:x}")),
+        tool_path: None,
+        tool_kind: ToolKind::Auto,
+        title_keys_path: None,
     })
     .expect_err("intake should fail");
 
@@ -95,10 +103,110 @@ fn xci_intake_rejects_ambiguous_program_selection() {
         provenance_path,
         out_dir,
         program: ProgramSelection::TitleId(format!("{title_id:x}")),
+        tool_path: None,
+        tool_kind: ToolKind::Auto,
+        title_keys_path: None,
     })
     .expect_err("intake should fail");
 
     assert!(err.contains("ambiguous"));
+}
+
+#[test]
+#[cfg(unix)]
+fn xci_intake_uses_external_tool() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let xci_path = temp.path().join("real.xci");
+    let keys_path = temp.path().join("prod.keys");
+    let provenance_path = temp.path().join("provenance.toml");
+    let out_dir = temp.path().join("out");
+    let fake_tool = temp.path().join("fake-hactool.sh");
+    let fake_nca = temp.path().join("program.nca");
+    let fake_nso = temp.path().join("main.nso");
+
+    fs::write(&xci_path, b"REALX").expect("write xci");
+    fs::write(&keys_path, "header_key = 0123456789abcdef0123456789abcdef").expect("write keys");
+    fs::write(&fake_nca, b"NCA3FAKE").expect("write nca");
+    fs::write(&fake_nso, build_nso()).expect("write nso");
+
+    std::env::set_var("RECOMP_FAKE_NCA", &fake_nca);
+    std::env::set_var("RECOMP_FAKE_NSO", &fake_nso);
+
+    let script = r#"#!/bin/sh
+set -e
+outdir=""
+exefsdir=""
+romfs=""
+info=0
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --outdir) outdir="$2"; shift 2;;
+    --outdir=*) outdir="${1#--outdir=}"; shift;;
+    --exefsdir) exefsdir="$2"; shift 2;;
+    --exefsdir=*) exefsdir="${1#--exefsdir=}"; shift;;
+    --romfs) romfs="$2"; shift 2;;
+    --romfs=*) romfs="${1#--romfs=}"; shift;;
+    -i) info=1; shift;;
+    *) shift;;
+  esac
+done
+
+if [ "$info" = "1" ]; then
+  echo "Title ID: 0100000000000000"
+  echo "Content Type: Program"
+  echo "Version: 1"
+  exit 0
+fi
+
+if [ -n "$outdir" ]; then
+  mkdir -p "$outdir/secure"
+  cp "$RECOMP_FAKE_NCA" "$outdir/secure/program.nca"
+  exit 0
+fi
+
+if [ -n "$exefsdir" ]; then
+  mkdir -p "$exefsdir"
+  cp "$RECOMP_FAKE_NSO" "$exefsdir/main"
+  printf "NPDM" > "$exefsdir/main.npdm"
+  if [ -n "$romfs" ]; then
+    printf "ROMFS" > "$romfs"
+  fi
+  exit 0
+fi
+
+exit 0
+"#;
+
+    fs::write(&fake_tool, script).expect("write fake tool");
+    let mut perms = fs::metadata(&fake_tool).expect("metadata").permissions();
+    perms.set_mode(0o755);
+    fs::set_permissions(&fake_tool, perms).expect("chmod");
+
+    write_provenance(&provenance_path, &xci_path, &keys_path);
+
+    let report = intake_xci(IntakeOptions {
+        xci_path,
+        keys_path,
+        provenance_path,
+        out_dir: out_dir.clone(),
+        program: ProgramSelection::TitleId("0100000000000000".to_string()),
+        tool_path: Some(fake_tool),
+        tool_kind: ToolKind::Hactool,
+        title_keys_path: None,
+    })
+    .expect("intake");
+
+    assert!(report.module_json_path.exists());
+    assert!(out_dir.join("intake/exefs/main").exists());
+    assert!(out_dir.join("intake/segments/main-text.bin").exists());
+    assert!(out_dir.join("assets/romfs.bin").exists());
+
+    let manifest_src = fs::read_to_string(out_dir.join("manifest.json")).expect("manifest");
+    let manifest: serde_json::Value = serde_json::from_str(&manifest_src).expect("parse manifest");
+    assert!(manifest
+        .get("tool")
+        .and_then(|tool| tool.get("xci_tool"))
+        .is_some());
 }
 
 struct ProgramEntry {

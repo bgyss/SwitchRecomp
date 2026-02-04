@@ -28,6 +28,9 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 - ExeFS and NSO segments must be extracted deterministically and hashed.
 - RomFS assets must be emitted to a separate asset output root, never mixed with code outputs.
 - The intake manifest must record tool versions, hashes, and extracted file sizes.
+- Use external tooling for decryption and container extraction (for example `hactool`), driven by
+  a keyset in `key_name = HEX` format and passing the XCI/NCA extraction flags needed to emit
+  ExeFS and RomFS outputs. citeturn2view0
 
 ## Interfaces and Data
 - Inputs
@@ -48,8 +51,8 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 
 ## Implementation Notes
 - The current intake accepts an unencrypted `XCI0` fixture layout (magic `XCI0`) for
-  deterministic tests. Real encrypted XCI inputs require user-provided keys and
-  external extraction tooling.
+  deterministic tests and uses external tooling (for example `hactool`) for real
+  XCI extraction. citeturn2view0
 
 ## Open Questions
 - How should update and DLC NCAs be layered or merged?

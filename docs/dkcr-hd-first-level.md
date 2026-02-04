@@ -70,6 +70,17 @@ nix develop --impure
   - Reference video (`format = "video_mp4"`).
 - Replace `samples/dkcr-hd/module.json` with lifted output when available.
 
+2a. (Optional) Extract ExeFS and RomFS from a real XCI using external tooling:
+```
+cargo run -p recomp-cli -- xci-intake \
+  --xci /Volumes/External/DKCR_HD/game.xci \
+  --keys /Volumes/External/SwitchKeys/prod.keys \
+  --program-title-id 0100000000000000 \
+  --provenance samples/dkcr-hd/provenance.toml \
+  --out-dir out/dkcr-hd-intake \
+  --xci-tool /usr/local/bin/hactool
+```
+
 3. Run the pipeline:
 ```
 cargo run -p recomp-cli -- run \

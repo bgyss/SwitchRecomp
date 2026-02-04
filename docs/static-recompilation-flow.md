@@ -32,6 +32,8 @@ repo provides scaffolding versus where future tooling is required.
 - Use the intake tooling to detect and validate formats (NCA, NSO, NRO, NPDM).
 - Store extracted data under a clean, deterministic directory layout.
 - Reject inputs that fail hash or format validation.
+- For XCI inputs, use external tooling (for example `hactool`) with user-provided keys to
+  extract ExeFS/RomFS into separated output roots.
 
 3. Segment extraction and labeling.
 - Extract executable segments (text, rodata, data, bss) and record:
