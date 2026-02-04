@@ -299,7 +299,7 @@ fn intake_fixture_xci(
     )?;
 
     let (romfs_record, romfs_generated) =
-        write_romfs(&romfs_bytes, &dirs.assets_dir, out_dir, &mut files_written)?;
+        write_romfs(romfs_bytes, &dirs.assets_dir, out_dir, &mut files_written)?;
     generated_files.push(romfs_generated);
     let romfs_asset = AssetRecord {
         kind: "romfs".to_string(),
@@ -358,6 +358,7 @@ fn intake_fixture_xci(
     )
 }
 
+#[allow(clippy::too_many_arguments)]
 fn intake_external_xci(
     xci_path: &Path,
     keys_path: &Path,
@@ -511,6 +512,7 @@ struct RomfsRecord {
     size: u64,
 }
 
+#[allow(clippy::too_many_arguments)]
 fn write_manifest_and_finish(
     out_dir: &Path,
     tool: ToolInfo,
