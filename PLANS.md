@@ -6,6 +6,12 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-000 Project Charter and Ethics
 - SPEC-010 Target Platform Baseline
 - SPEC-020 Inputs and Provenance
+- SPEC-030 Static Recompilation Pipeline
+- SPEC-040 Runtime and ABI Contract
+- SPEC-050 CPU ISA Lifting and Semantics
+- SPEC-060 GPU and Graphics Strategy
+- SPEC-070 OS and Services Model
+- SPEC-080 Timing, Scheduling, and Interrupts
 - SPEC-045 Runtime Memory Model and Load/Store Lowering
 - SPEC-046 Runtime Memory Layout Configuration
 - SPEC-047 Memory Image Initialization
@@ -64,6 +70,85 @@ Exit criteria (from SPEC-020)
 - A metadata schema with validation rules.
 - The toolchain refuses to build without provenance metadata.
 - A format detector identifies NCA/ExeFS/NSO0/NRO0/NRR0 inputs and logs the chosen path.
+
+## SPEC-030: Static Recompilation Pipeline
+Outcome
+- Provide a deterministic end-to-end pipeline that emits a buildable native project.
+
+Work items
+- [ ] Add an end-to-end sample pipeline run that compiles emitted output in tests.
+- [ ] Extend `title.toml` support for stubs/patches to cover at least one system call.
+- [ ] Ensure deterministic ordering for emitted files and metadata across runs.
+
+Exit criteria (from SPEC-030)
+- A minimal end-to-end build compiles output for a test binary.
+- A config file can stub at least one system call.
+
+## SPEC-040: Runtime and ABI Contract
+Outcome
+- Provide a stable runtime ABI contract with explicit versioning embedded in outputs.
+
+Work items
+- [ ] Publish ABI contract documentation and versioning rules.
+- [ ] Embed ABI version metadata in build outputs and runtime logs.
+- [ ] Add a test that links and executes a minimal recompiled program.
+
+Exit criteria (from SPEC-040)
+- A unit test links and executes a minimal recompiled program.
+- A defined ABI version is embedded in produced outputs.
+
+## SPEC-050: CPU ISA Lifting and Semantics
+Outcome
+- Expand ISA coverage with deterministic, tested instruction semantics.
+
+Work items
+- [ ] Implement missing instruction classes and flag semantics needed for homebrew targets.
+- [ ] Add per-instruction golden tests and block-level equivalence tests.
+- [ ] Track and document unsupported or stubbed instructions.
+
+Exit criteria (from SPEC-050)
+- 90 percent of targeted instruction classes pass tests.
+- Unsupported or stubbed instructions are documented.
+
+## SPEC-060: GPU and Graphics Strategy
+Outcome
+- Define a stable graphics API boundary with deterministic validation hooks.
+
+Work items
+- [ ] Define the runtime graphics API surface and error model.
+- [ ] Add deterministic command stream validation or checksum reporting.
+- [ ] Build a minimal graphics conformance test scene.
+
+Exit criteria (from SPEC-060)
+- A minimal test scene renders from recompiled code.
+- A graphics conformance test set exists for core features.
+
+## SPEC-070: OS and Services Model
+Outcome
+- Provide a service layer with access control, logging, and stubbed defaults.
+
+Work items
+- [ ] Implement CMIF/TIPC header parsing helpers for IPC decoding.
+- [ ] Add service manager stubs for `sm:`/`sm:m` and handle lookup.
+- [ ] Wire access control checks using NPDM ACID/ACI0 lists.
+- [ ] Add deterministic logging tests for service dispatch.
+
+Exit criteria (from SPEC-070)
+- Service calls are access-checked and logged deterministically.
+- Stubbed services fail with explicit, logged errors.
+
+## SPEC-080: Timing, Scheduling, and Interrupts
+Outcome
+- Provide deterministic scheduling with trace capture and replay.
+
+Work items
+- [ ] Add trace replay helpers for scheduler-driven event playback.
+- [ ] Model interrupt injection points with explicit timing.
+- [ ] Add tests that validate deterministic playback and frame pacing.
+
+Exit criteria (from SPEC-080)
+- Deterministic playback of a trace across two runs.
+- Stable frame pacing for a minimal test scene.
 
 ## SPEC-045: Runtime Memory Model and Load/Store Lowering
 Outcome

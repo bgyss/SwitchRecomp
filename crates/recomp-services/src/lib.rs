@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::atomic::{AtomicU64, Ordering};
+use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 pub struct ServiceCall {
@@ -96,22 +97,67 @@ impl ServiceAccessControl {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ServiceLogEntry {
+    pub id: u64,
+    pub client: String,
+    pub service: String,
+    pub args: Vec<i64>,
+}
+
+pub trait ServiceLogSink: Send + Sync {
+    fn record(&self, entry: ServiceLogEntry);
+}
+
 #[derive(Debug, Default)]
+pub struct StdoutLogSink;
+
+impl ServiceLogSink for StdoutLogSink {
+    fn record(&self, entry: ServiceLogEntry) {
+        println!(
+            "[recomp-services] #{id} client={} service={} args={:?}",
+            entry.client,
+            entry.service,
+            entry.args,
+            id = entry.id
+        );
+    }
+}
+
 pub struct ServiceLogger {
     counter: AtomicU64,
+    sink: Arc<dyn ServiceLogSink>,
+}
+
+impl Default for ServiceLogger {
+    fn default() -> Self {
+        Self::new(Arc::new(StdoutLogSink))
+    }
 }
 
 impl ServiceLogger {
+    pub fn new<S>(sink: Arc<S>) -> Self
+    where
+        S: ServiceLogSink + 'static,
+    {
+        Self {
+            counter: AtomicU64::new(0),
+            sink,
+        }
+    }
+
     pub fn next_id(&self) -> u64 {
         self.counter.fetch_add(1, Ordering::SeqCst)
     }
 
     pub fn log_call(&self, call: &ServiceCall) {
-        let id = self.next_id();
-        println!(
-            "[recomp-services] #{id} client={} service={} args={:?}",
-            call.client, call.service, call.args
-        );
+        let entry = ServiceLogEntry {
+            id: self.next_id(),
+            client: call.client.clone(),
+            service: call.service.clone(),
+            args: call.args.clone(),
+        };
+        self.sink.record(entry);
     }
 }
 
@@ -144,6 +190,7 @@ impl ServiceDispatcher {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
 
     #[test]
     fn registry_calls_handler() {
@@ -197,5 +244,51 @@ mod tests {
         };
 
         assert!(dispatcher.dispatch(&call).is_ok());
+    }
+
+    #[test]
+    fn dispatcher_emits_structured_log_entry() {
+        #[derive(Default)]
+        struct TestLogSink {
+            entries: Mutex<Vec<ServiceLogEntry>>,
+        }
+
+        impl TestLogSink {
+            fn entries(&self) -> Vec<ServiceLogEntry> {
+                self.entries.lock().unwrap().clone()
+            }
+        }
+
+        impl ServiceLogSink for TestLogSink {
+            fn record(&self, entry: ServiceLogEntry) {
+                self.entries.lock().unwrap().push(entry);
+            }
+        }
+
+        let sink = Arc::new(TestLogSink::default());
+        let logger = ServiceLogger::new(Arc::clone(&sink));
+        let mut registry = ServiceRegistry::new();
+        registry.register("svc_ok", |_| Ok(()));
+        let access = ServiceAccessControl::from_allowed(vec!["svc_ok".to_string()]);
+        let dispatcher = ServiceDispatcher::new(registry, access, logger);
+        let call = ServiceCall {
+            client: "demo".to_string(),
+            service: "svc_ok".to_string(),
+            args: vec![7, 8, 9],
+        };
+
+        assert!(dispatcher.dispatch(&call).is_ok());
+
+        let entries = sink.entries();
+        assert_eq!(entries.len(), 1);
+        assert_eq!(
+            entries[0],
+            ServiceLogEntry {
+                id: 0,
+                client: "demo".to_string(),
+                service: "svc_ok".to_string(),
+                args: vec![7, 8, 9],
+            }
+        );
     }
 }

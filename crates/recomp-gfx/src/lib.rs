@@ -19,6 +19,12 @@ pub trait GraphicsBackend {
     fn submit(&mut self, stream: &CommandStream) -> Result<(), GraphicsError>;
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CommandStreamReport {
+    pub word_count: usize,
+    pub checksum: u64,
+}
+
 pub fn checksum_stream(stream: &CommandStream) -> u64 {
     let mut hash = 1469598103934665603u64;
     for word in &stream.words {
@@ -26,6 +32,20 @@ pub fn checksum_stream(stream: &CommandStream) -> u64 {
         hash = hash.wrapping_mul(1099511628211);
     }
     hash
+}
+
+pub fn report_stream(stream: &CommandStream) -> CommandStreamReport {
+    CommandStreamReport {
+        word_count: stream.words.len(),
+        checksum: checksum_stream(stream),
+    }
+}
+
+pub fn validate_stream(stream: &CommandStream) -> Result<CommandStreamReport, GraphicsError> {
+    if stream.words.is_empty() {
+        return Err(GraphicsError::Unsupported);
+    }
+    Ok(report_stream(stream))
 }
 
 #[derive(Debug, Default)]
@@ -59,5 +79,19 @@ mod tests {
         let first = checksum_stream(&stream);
         let second = checksum_stream(&stream);
         assert_eq!(first, second);
+    }
+
+    #[test]
+    fn report_includes_word_count_and_checksum() {
+        let stream = CommandStream::new(vec![4, 5, 6, 7]);
+        let report = report_stream(&stream);
+        assert_eq!(report.word_count, 4);
+        assert_eq!(report.checksum, checksum_stream(&stream));
+    }
+
+    #[test]
+    fn validation_rejects_empty_stream() {
+        let stream = CommandStream::new(Vec::new());
+        assert!(validate_stream(&stream).is_err());
     }
 }
