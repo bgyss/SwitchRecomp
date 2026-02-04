@@ -871,12 +871,10 @@ impl AutomationConfig {
                 ));
             }
         }
-        if self.capture.audio_file.is_some() {
-            if self.commands.extract_audio.is_none() {
-                return Err(
-                    "commands.extract_audio is required when capture.audio_file is set".to_string(),
-                );
-            }
+        if self.capture.audio_file.is_some() && self.commands.extract_audio.is_none() {
+            return Err(
+                "commands.extract_audio is required when capture.audio_file is set".to_string(),
+            );
         }
         Ok(())
     }
@@ -1226,18 +1224,13 @@ fn gather_inputs(
     config_path: &Path,
     paths: &ResolvedPaths,
 ) -> Result<Vec<RunInput>, String> {
-    let mut inputs = Vec::new();
-    inputs.push(run_input("automation_config", config_path)?);
-    inputs.push(run_input("provenance", &config.inputs.provenance)?);
-    inputs.push(run_input("title_config", &config.inputs.config)?);
-    inputs.push(run_input(
-        "reference_video",
-        &config.reference.reference_video_toml,
-    )?);
-    inputs.push(run_input(
-        "capture_video",
-        &config.reference.capture_video_toml,
-    )?);
+    let mut inputs = vec![
+        run_input("automation_config", config_path)?,
+        run_input("provenance", &config.inputs.provenance)?,
+        run_input("title_config", &config.inputs.config)?,
+        run_input("reference_video", &config.reference.reference_video_toml)?,
+        run_input("capture_video", &config.reference.capture_video_toml)?,
+    ];
     if let Some(validation) = &config.reference.validation_config_toml {
         inputs.push(run_input("validation_config", validation)?);
     }

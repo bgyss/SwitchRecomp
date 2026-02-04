@@ -220,7 +220,7 @@ impl Default for VideoThresholds {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize, Clone)]
+#[derive(Debug, Deserialize, Serialize, Clone, Default)]
 pub struct ValidationConfig {
     #[serde(default)]
     pub name: Option<String>,
@@ -230,17 +230,6 @@ pub struct ValidationConfig {
     pub require_audio: Option<bool>,
     #[serde(default)]
     pub thresholds: Option<VideoThresholds>,
-}
-
-impl Default for ValidationConfig {
-    fn default() -> Self {
-        Self {
-            name: None,
-            notes: None,
-            require_audio: None,
-            thresholds: None,
-        }
-    }
 }
 
 #[derive(Debug, Deserialize, Serialize, Clone)]
