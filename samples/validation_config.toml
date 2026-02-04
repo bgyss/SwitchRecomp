@@ -1,0 +1,11 @@
+schema_version = "1"
+name = "override-profile"
+notes = "Adjust validation thresholds for exploratory runs."
+require_audio = false
+
+[thresholds]
+frame_match_ratio = 0.85
+audio_match_ratio = 0.8
+max_drift_frames = 5
+max_dropped_frames = 10
+max_audio_drift_chunks = 5

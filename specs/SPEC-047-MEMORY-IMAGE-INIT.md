@@ -1,7 +1,12 @@
 # SPEC-047: Memory Image Initialization From Module Segments
 
 ## Status
-Draft v0.1
+Draft v0.2
+
+## Rationale
+- Added segment descriptors in module metadata and build manifests.
+- Emit initial segment blobs and zero-fill descriptors into pipeline outputs.
+- Runtime initialization loads init segments and zeroes BSS with tests.
 
 ## Purpose
 Populate runtime memory regions with initial data derived from module segments (code/rodata/data/bss) so lifted output can execute meaningful memory-backed logic.

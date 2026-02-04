@@ -1,7 +1,11 @@
 # SPEC-190: Video-Based Validation
 
 ## Status
-Draft v0.1
+Draft v0.3
+
+## Rationale
+- Validation flow exists, but DKCR validation is paused until the automation loop and input replay are in place.
+- New dependencies: SPEC-210 (automation), SPEC-220 (input replay), SPEC-230 (normalization), SPEC-240 (orchestration).
 
 ## Purpose
 Define a validation workflow that compares recompiled output against a reference gameplay video when no instrumented emulator is available.
@@ -27,6 +31,10 @@ Define a validation workflow that compares recompiled output against a reference
 - A comparison step must compute frame similarity (perceptual hash or SSIM) and audio similarity.
 - The report must highlight drift, dropped frames, or audio desync beyond thresholds.
 - Validation artifacts must remain outside the repo and be referenced via provenance metadata.
+
+## Operator Inputs
+- External reference and capture artifacts are required to run DKCR validation.
+- Absolute paths and timeline confirmations are tracked in `docs/dkcr-validation-prereqs.md`.
 
 ## Interfaces and Data
 - `reference_video.toml` with:

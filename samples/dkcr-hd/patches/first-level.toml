@@ -1,0 +1,23 @@
+schema_version = "1"
+patch_set = "first_level"
+notes = "Placeholder patch set for DKCR HD first-level boot."
+
+[[patches]]
+id = "force-performance-mode"
+kind = "runtime_override"
+target = "nn::oe::GetPerformanceMode"
+value = "handheld"
+notes = "Placeholder: force handheld mode for deterministic output."
+
+[[patches]]
+id = "skip-boot-logo"
+kind = "branch-nop"
+target = "func:nnMain+0x0000_1000"
+notes = "Placeholder: skip boot logo when enabled."
+
+[[patches]]
+id = "stub-network"
+kind = "service-stub"
+target = "nn::nifm::IStaticService"
+value = "stub"
+notes = "Placeholder: stub network service to unblock first-level boot."

@@ -20,6 +20,8 @@ fn detect_supported_formats() {
         ("homebrew.nro", "nro0"),
         ("plugins.nrr", "nrr0"),
         ("main.npdm", "npdm"),
+        ("sample.xci", "xci"),
+        ("sample.keys", "keyset"),
     ];
 
     for (file, expected) in cases {
