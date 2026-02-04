@@ -42,6 +42,11 @@ Configured hooks:
 - Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
 - Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
 
+## Testing Expectations
+- Always run the full test suite (`cargo test`) after changes.
+- PRs must include a Testing section that lists the command and outcome.
+- Do not mark tests as "Not run" unless you have explicit approval to skip them.
+
 ## Workspace Commands
 - Run all tests:
 

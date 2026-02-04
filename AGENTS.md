@@ -30,7 +30,8 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 ## Testing Guidelines
 - Use `cargo test` for Rust workspace tests.
 - Test files live under `crates/*/tests/` or inline in modules.
-- Always run the full suite after changes unless the user explicitly says not to.
+- Always run the full suite after changes.
+- Do not skip tests unless the user explicitly approves; record the approval and reason in the PR.
 
 ## Back Pressure Hooks
 Pre-commit hooks provide fast feedback; `prek` is a drop-in replacement that reads the same `.pre-commit-config.yaml`.
@@ -47,6 +48,8 @@ Pre-commit hooks provide fast feedback; `prek` is a drop-in replacement that rea
 No established commit conventions are present yet. Until standards are set:
 - Use clear, imperative commit messages (e.g., "Add SPEC-070 OS services draft").
 - PRs should include a short summary, a list of files touched, and any open questions.
+- PRs must include a Testing section with the full suite (`cargo test`) and results.
+- Do not use "Testing: Not run" unless the user explicitly approved skipping tests.
 - Link related issues if available.
 
 ## Research & Sources

@@ -322,3 +322,55 @@ Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.
 - First-level gameplay matches the reference video within defined tolerances.
 - No proprietary assets or keys are stored in the repo or build outputs.
+
+## Future Work Notes: DKCR HD Video Validation (SPEC-190/200)
+Requirements to finalize:
+- Define the capture spec (resolution, fps, audio sample rate/bit depth, constant frame rate).
+- Document acceptable drift thresholds for both audio and video and the minimum match window.
+- Capture runtime configuration (performance mode, GPU backend) alongside the validation report.
+- Record the hash of the XCI intake outputs and the recompiled build commit hash.
+
+Artifact paths and naming (external only):
+- Reference captures: `/Volumes/External/validation/dkcr-hd/reference/YYYY-MM-DD/`.
+- Recompiled captures: `/Volumes/External/validation/dkcr-hd/recompiled/YYYY-MM-DD/`.
+- Alignment outputs: `/Volumes/External/validation/dkcr-hd/alignment/YYYY-MM-DD/`.
+- Reports: `/Volumes/External/validation/dkcr-hd/reports/YYYY-MM-DD/validation-report.json`.
+- Provenance entries should include the external paths and file hashes.
+
+Timeline checklist (per validation run):
+- Day 0: capture reference footage and compute hashes.
+- Day 1: capture recompiled footage under matching settings.
+- Day 1-2: run alignment + metric generation, record drift windows.
+- Day 2: manual review of flagged windows and finalize report.
+- Day 3: summarize deltas and file follow-up issues.
+
+## Future Work Notes: Automation Ideas (Local + Cloud)
+Local automation ideas:
+- A `scripts/run_recomp_pipeline.sh` wrapper that runs intake, lift, pipeline, build, and validation
+  with consistent logging and a summary JSON.
+- Cache build artifacts under `out/` with per-run timestamps and a manifest index.
+- Emit a single `run.log` plus `summary.json` so automation can surface failures quickly.
+
+Cloud automation ideas:
+- Containerize the pipeline (Rust toolchain + hactool/hactoolnet + ffmpeg).
+- Use object storage for XCI intake outputs, validation artifacts, and reports.
+- Inject key material via a secrets manager; never write keys to persistent storage.
+- Run jobs on ephemeral workers with a per-run working directory and explicit cleanup.
+
+Agent-driven pipeline flow (candidate):
+1. Intake: validate provenance, run XCI extraction, emit module/manifest.
+2. Lift: decode and emit lifted module and segments.
+3. Build: run `recomp-cli run`, build emitted project, package bundle.
+4. Validate: capture and align video, run `recomp-validation`, emit report.
+5. Report: upload artifacts, summarize pass/fail and drift windows.
+
+Dependencies to document:
+- Rust toolchain, `cargo`, `nix` (optional dev shell).
+- `hactool` or `hactoolnet` for XCI extraction.
+- `ffmpeg` for capture and alignment steps.
+- Storage and logging backends for automation outputs.
+
+## Future Work Notes: Automation/Docs Backlog
+- XciExtractor helper (wrap tool discovery, key validation, and deterministic output layout).
+- Validation artifacts index (single JSON that points to all capture, alignment, and report files).
+- Playback comparison tooling (side-by-side player with timecode overlays and drift markers).
