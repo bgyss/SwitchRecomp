@@ -85,10 +85,10 @@ Outcome
 - Runtime memory layout is configurable via `title.toml` while preserving a safe default.
 
 Work items
-- [ ] Extend `title.toml` schema to include `runtime.memory_layout` regions.
-- [ ] Validate region overlap, zero sizes, and overflow errors.
-- [ ] Emit configured memory layout in `manifest.json` and generated runtime init.
-- [ ] Add tests for default layout and custom layout parsing.
+- [x] Extend `title.toml` schema to include `runtime.memory_layout` regions.
+- [x] Validate region overlap, zero sizes, and overflow errors.
+- [x] Emit configured memory layout in `manifest.json` and generated runtime init.
+- [x] Add tests for default layout and custom layout parsing.
 
 Exit criteria (from SPEC-046)
 - Custom memory layout in `title.toml` is parsed and emitted in `manifest.json`.
@@ -100,10 +100,10 @@ Outcome
 - Runtime memory is initialized from module segment metadata (code/rodata/data/bss).
 
 Work items
-- [ ] Define segment descriptor schema and carry it through pipeline output metadata.
-- [ ] Populate runtime memory regions with initial segment bytes and zeroed bss.
-- [ ] Validate init sizes and bounds during initialization.
-- [ ] Add tests covering initialized load/store behavior and error paths.
+- [x] Define segment descriptor schema and carry it through pipeline output metadata.
+- [x] Populate runtime memory regions with initial segment bytes and zeroed bss.
+- [x] Validate init sizes and bounds during initialization.
+- [x] Add tests covering initialized load/store behavior and error paths.
 
 Exit criteria (from SPEC-047)
 - A sample module with init bytes executes a load/store path against initialized memory.
@@ -280,11 +280,11 @@ Outcome
 - Intake XCI inputs with user-supplied keys and extract code/assets deterministically.
 
 Work items
-- [ ] Define the XCI intake CLI path and config schema extensions.
-- [ ] Integrate keyset validation and explicit Program NCA selection.
-- [ ] Extract ExeFS/NSO into deterministic segment blobs with hashes recorded.
-- [ ] Emit RomFS assets to a separate asset output root and record in manifest.
-- [ ] Add non-proprietary tests for intake validation and asset separation rules.
+- [x] Define the XCI intake CLI path and config schema extensions.
+- [x] Integrate keyset validation and explicit Program NCA selection.
+- [x] Extract ExeFS/NSO into deterministic segment blobs with hashes recorded.
+- [x] Emit RomFS assets to a separate asset output root and record in manifest.
+- [x] Add non-proprietary tests for intake validation and asset separation rules.
 
 Exit criteria (from SPEC-180)
 - XCI intake emits deterministic ExeFS/NSO outputs and a manifest with hashes.
@@ -296,11 +296,11 @@ Outcome
 - Validate the recompiled output against a reference gameplay video without emulator traces.
 
 Work items
-- [ ] Define a reference timeline for the first level and store it in `reference_video.toml`.
-- [ ] Implement a capture workflow for macOS/aarch64 runtime output.
-- [ ] Add a comparison step that computes video and audio similarity metrics.
-- [ ] Generate a `validation-report.json` with pass/fail and drift summaries.
-- [ ] Document manual review steps for mismatches.
+- [x] Define a reference timeline for the first level and store it in `reference_video.toml`.
+- [x] Implement a capture workflow for macOS/aarch64 runtime output.
+- [x] Add a comparison step that computes video and audio similarity metrics.
+- [x] Generate a `validation-report.json` with pass/fail and drift summaries.
+- [x] Document manual review steps for mismatches.
 
 Exit criteria (from SPEC-190)
 - A single run produces a validation report for the first level.
@@ -312,11 +312,11 @@ Outcome
 - Produce a macOS/aarch64 static recompilation of DKCR HD that reaches and plays the first level.
 
 Work items
-- [ ] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
-- [ ] Identify required OS services and implement or stub them in the runtime.
-- [ ] Implement the minimal GPU translation path needed for the first level.
-- [ ] Create a per-title config and patch set for DKCR HD.
-- [ ] Run video-based validation against the first level (SPEC-190).
+- [x] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
+- [x] Identify required OS services and implement or stub them in the runtime.
+- [x] Implement the minimal GPU translation path needed for the first level.
+- [x] Create a per-title config and patch set for DKCR HD.
+- [x] Run video-based validation against the first level (SPEC-190).
 
 Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.
