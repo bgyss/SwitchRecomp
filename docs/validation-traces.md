@@ -23,3 +23,16 @@ Manual steps:
 - Save observed timecodes in an `event_observations.json` file (outside the repo) and
   re-run validation to compute drift metrics.
 - Flag any event drift or audio/video mismatches that exceed thresholds for follow-up.
+
+## Capture Workflow (macOS)
+Use an external capture path and keep outputs outside the repo.
+
+Suggested workflow:
+- Launch the recompiled runtime and reach the target segment.
+- Capture the primary display (or a specific window) with `ffmpeg`:
+```
+ffmpeg -f avfoundation -framerate 60 -i \"1:0\" -t 360 -pix_fmt yuv420p \
+  /Volumes/External/Captures/dkcr-hd-first-level.mp4
+```
+- Replace the device index (`1:0`) with the correct screen/audio device for your setup.
+- Record the capture path and hashes in provenance metadata.
