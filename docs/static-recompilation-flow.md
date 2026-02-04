@@ -35,6 +35,25 @@ repo provides scaffolding versus where future tooling is required.
 - For XCI inputs, use external tooling (for example `hactool`) with user-provided keys to
   extract ExeFS/RomFS into separated output roots.
 
+Real XCI intake (external tooling):
+- Provide `prod.keys` (and optional `title.keys`) out of band.
+- Specify either `--program-title-id` or `--program-name`.
+- Point `--xci-tool` at `hactool` or `hactoolnet` (or rely on PATH), and set `--xci-tool-kind`
+  when you want to force a specific tool.
+
+Example:
+```
+cargo run -p recomp-cli -- xci-intake \
+  --xci /Volumes/Inputs/title.xci \
+  --keys /Volumes/Keys/prod.keys \
+  --title-keys /Volumes/Keys/title.keys \
+  --provenance /Volumes/Inputs/provenance.toml \
+  --out-dir /Volumes/Outputs/title-intake \
+  --program-title-id 0100DEADBE000000 \
+  --xci-tool /usr/local/bin/hactool \
+  --xci-tool-kind hactool
+```
+
 3. Segment extraction and labeling.
 - Extract executable segments (text, rodata, data, bss) and record:
   - Base address, size, permissions.
