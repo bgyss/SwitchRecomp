@@ -307,6 +307,12 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "recomp-pipeline",
+ "recomp-validation",
+ "serde",
+ "serde_json",
+ "sha2",
+ "tempfile",
+ "toml",
 ]
 
 [[package]]
@@ -348,6 +354,7 @@ dependencies = [
  "serde",
  "serde_json",
  "thiserror",
+ "toml",
 ]
 
 [[package]]

@@ -14,7 +14,7 @@ assets into the repo.
 7. Emit `run-manifest.json` and `validation-report.json`.
 
 ## Core Inputs
-- `automation.toml` (planned config schema).
+- `automation.toml` (config schema implemented in `recomp automate`).
 - `reference_video.toml` and `capture_video.toml`.
 - `input_script.toml` for deterministic input replay.
 
@@ -28,7 +28,21 @@ assets into the repo.
 All assets (RomFS, reference video, capture output) remain outside the repo. Only hashes and
 metadata should be committed.
 
+## Automation Config
+`automation.toml` defines inputs, outputs, capture paths, and commands. Start from
+`samples/automation.toml` and update the paths for your environment. Key sections:
+- `schema_version`
+- `[inputs]` mode (`homebrew`, `xci`, `lifted`), provenance, title config, and inputs.
+- `[outputs]` work root and optional overrides for intake/lift/build dirs.
+- `[reference]` reference/capture video config paths (plus optional validation config).
+- `[capture]` capture video path and extracted frames/audio locations.
+- `[commands]` build/run/capture/extract commands (plus optional lift command for XCI).
+- `[run]` resume and lift settings (optional).
+
+Invoke the loop with:
+```bash
+recomp automate --config automation.toml
+```
+
 ## Next Steps
-- Implement the automation orchestrator (SPEC-210).
-- Add input replay (SPEC-220).
-- Normalize reference media (SPEC-230).
+- Iterate on capture automation and tighten determinism for external tools.

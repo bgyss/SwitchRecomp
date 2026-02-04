@@ -1,7 +1,12 @@
 # SPEC-210: Automated Recompilation Loop
 
 ## Status
-Draft v0.1
+Draft v0.2
+
+## Rationale
+- Added an automation.toml schema and validator for end-to-end runs.
+- Added a CLI orchestrator that drives intake, lift, build, capture, hash, and validation steps.
+- Added deterministic run-manifest emission with artifact hashes and step summaries.
 
 ## Purpose
 Define an automated loop that drives intake, recompilation, execution, capture, and validation in a repeatable pipeline.

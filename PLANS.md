@@ -338,11 +338,11 @@ Outcome
 - Provide a one-command automation loop for intake, build, capture, and validation.
 
 Work items
-- [ ] Define `automation.toml` schema and validator.
-- [ ] Implement an orchestrator CLI that runs intake -> lift -> build -> run -> capture -> validate.
-- [ ] Emit a deterministic `run-manifest.json` with step timings and artifact hashes.
-- [ ] Add resume/caching logic keyed by input hashes.
-- [ ] Add integration tests using non-proprietary fixtures.
+- [x] Define `automation.toml` schema and validator.
+- [x] Implement an orchestrator CLI that runs intake -> lift -> build -> run -> capture -> validate.
+- [x] Emit a deterministic `run-manifest.json` with step timings and artifact hashes.
+- [x] Add resume/caching logic keyed by input hashes.
+- [x] Add integration tests using non-proprietary fixtures.
 
 Exit criteria (from SPEC-210)
 - One command runs the full loop and produces a run manifest and validation report.
@@ -354,10 +354,10 @@ Outcome
 - Deterministic input playback aligned to reference timelines.
 
 Work items
-- [ ] Define `input_script.toml` schema with events and markers.
-- [ ] Implement input script loader and runtime playback module.
-- [ ] Add tools/tests for deterministic playback and alignment.
-- [ ] Document authoring and replay workflows.
+- [x] Define `input_script.toml` schema with events and markers.
+- [x] Implement input script loader and runtime playback module.
+- [x] Add tools/tests for deterministic playback and alignment.
+- [x] Document authoring and replay workflows.
 
 Exit criteria (from SPEC-220)
 - Input scripts replay deterministically across two runs.
@@ -369,10 +369,10 @@ Outcome
 - Normalize reference video/audio into a canonical, comparable format.
 
 Work items
-- [ ] Define canonical reference profile (resolution, fps, audio).
-- [ ] Implement normalization workflow and metadata capture.
-- [ ] Update `reference_video.toml` schema to record normalization details.
-- [ ] Add hash generation tests for normalized outputs.
+- [x] Define canonical reference profile (resolution, fps, audio).
+- [x] Implement normalization workflow and metadata capture.
+- [x] Update `reference_video.toml` schema to record normalization details.
+- [x] Add hash generation tests for normalized outputs.
 
 Exit criteria (from SPEC-230)
 - Reference media can be normalized deterministically.
@@ -383,10 +383,10 @@ Outcome
 - Automated validation with structured reports and triage summaries.
 
 Work items
-- [ ] Define `validation-config.toml` and report schema extensions.
-- [ ] Implement triage summary generation (drift, likely causes).
-- [ ] Integrate validation orchestration into the automation loop.
-- [ ] Add tests for report determinism and failure summaries.
+- [x] Define `validation-config.toml` and report schema extensions.
+- [x] Implement triage summary generation (drift, likely causes).
+- [x] Integrate validation orchestration into the automation loop.
+- [x] Add tests for report determinism and failure summaries.
 
 Exit criteria (from SPEC-240)
 - Validation runs emit deterministic reports and triage summaries.

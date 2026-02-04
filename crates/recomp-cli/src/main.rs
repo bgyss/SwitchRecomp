@@ -1,4 +1,6 @@
 use clap::{Parser, Subcommand, ValueEnum};
+mod automation;
+use automation::run_automation;
 use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
@@ -21,6 +23,7 @@ enum Command {
     HomebrewIntake(HomebrewIntakeArgs),
     HomebrewLift(HomebrewLiftArgs),
     XciIntake(XciIntakeArgs),
+    Automate(AutomateArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -91,6 +94,12 @@ struct XciIntakeArgs {
     xci_tool: XciToolMode,
     #[arg(long)]
     xci_tool_path: Option<PathBuf>,
+}
+
+#[derive(Parser, Debug)]
+struct AutomateArgs {
+    #[arg(long)]
+    config: PathBuf,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -263,5 +272,14 @@ fn main() {
                 }
             }
         }
+        Command::Automate(automate) => match run_automation(&automate.config) {
+            Ok(manifest) => {
+                println!("Automation complete ({} steps).", manifest.steps.len());
+            }
+            Err(err) => {
+                eprintln!("Automation error: {err}");
+                std::process::exit(1);
+            }
+        },
     }
 }
