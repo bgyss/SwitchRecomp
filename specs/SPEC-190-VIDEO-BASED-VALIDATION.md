@@ -51,7 +51,8 @@ Define a validation workflow that compares recompiled output against a reference
   - match ratios, drift summaries, triage categories, and pass/fail summary
 
 ## Deliverables
-- A capture script that records the recompiled runtime output.
+- A capture helper that records the recompiled runtime output and emits hashes (see
+  `scripts/capture-validation.sh`).
 - A comparison flow that generates a validation report from reference and capture hash lists.
 - A validation CLI flow that compares hash lists and emits a report.
 - Documentation describing the expected workflow and thresholds.

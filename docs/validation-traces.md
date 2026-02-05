@@ -25,13 +25,13 @@ Manual steps:
 Use an external capture path and keep outputs outside the repo.
 
 Suggested workflow:
-- Use the helper script to capture a fixed-duration run (preferred):
+- Use the helper script to capture and hash a fixed-duration run (preferred):
 ```
-DURATION_SECONDS=360 FPS=60 VIDEO_DEVICE=1 AUDIO_DEVICE=0 VIDEO_SIZE=1920x1080 \
-  scripts/capture-video-macos.sh /Volumes/External/Captures/dkcr-hd-first-level
+scripts/capture-validation.sh --out-dir /Volumes/External/Captures/dkcr-hd-first-level \
+  --duration 360 --fps 60 --video-device 1 --audio-device 0 --resolution 1920x1080
 ```
 - Use `ffmpeg -f avfoundation -list_devices true -i \"\"` to list available device indices.
-- Optional: use `scripts/capture_video.sh` if you want a flag-driven capture helper.
+- Optional: use `scripts/capture_video.sh` if you want a capture-only helper.
 - Launch the recompiled runtime and reach the target segment.
 - Capture the primary display (or a specific window) with `ffmpeg`:
 ```

@@ -72,5 +72,7 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 
 ## References
 - `docs/dkcr-hd-first-level.md`
+- `docs/xci-intake.md`
 - `docs/validation-artifacts.md`
 - `docs/validation-traces.md`
+- `docs/validation-video.md`

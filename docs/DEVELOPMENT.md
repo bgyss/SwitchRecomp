@@ -46,6 +46,7 @@ Configured hooks:
 - Always run the full test suite (`cargo test`) after changes.
 - PRs must include a Testing section that lists the command and outcome.
 - Do not mark tests as "Not run" unless you have explicit approval to skip them.
+- Include the test outcome in status updates so reviews never default to "Not run".
 
 ## Workspace Commands
 - Run all tests:

@@ -25,6 +25,7 @@ Helper scripts:
 - `scripts/validation_artifacts_init.sh` writes a template artifact index.
 - `scripts/validate_artifacts.sh` runs `recomp-validation artifacts` with the index.
 - `scripts/xci_validate.sh` checks the XCI intake manifest and referenced files.
+- `scripts/capture-validation.sh` captures and hashes video/audio for validation.
 - `scripts/capture-video-macos.sh` records macOS captures for validation.
 - `scripts/capture_video.sh` provides a more configurable capture helper.
 

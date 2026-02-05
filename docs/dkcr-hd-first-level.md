@@ -53,7 +53,7 @@ The current stub map in `samples/dkcr-hd/title.toml` is:
 - Use the `validation` section in `title.toml` to define the external reference video segment.
 - Expect frame pacing variance; allow modest timing drift in the first-level comparison window.
 - Continue running the baseline validation suite via `recomp-validation` for regressions unrelated to DKCR.
-- Capture with `scripts/capture-video-macos.sh` (or `scripts/capture_video.sh`) and store outputs outside the repo.
+- Capture with `scripts/capture-validation.sh` (or `scripts/capture-video-macos.sh`) and store outputs outside the repo.
 - Track validation artifacts with `docs/validation-artifacts.md` and an artifact index JSON.
 - Capture device settings (resolution, fps, audio rate) alongside each report.
 - Run artifact-index validation with `scripts/validate_artifacts.sh`.

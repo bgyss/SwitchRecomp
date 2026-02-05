@@ -60,7 +60,8 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 - The current intake accepts an unencrypted `XCI0` fixture layout (magic `XCI0`) for
   deterministic tests and uses external tooling (for example `hactool`) for real
   XCI extraction. citeturn2view0
-- See `docs/static-recompilation-flow.md` for the Real XCI intake how-to and helper scripts.
+- See `docs/xci-intake.md` for the Real XCI intake how-to and helper scripts.
+- See `docs/static-recompilation-flow.md` for the end-to-end intake + pipeline flow.
 
 ## Open Questions
 - How should update and DLC NCAs be layered or merged?

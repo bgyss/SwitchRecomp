@@ -42,20 +42,24 @@ If you already have precomputed hashes, point `hashes.frames` or `hashes.audio` 
 files directly.
 
 ## Capture (macOS)
-Use `scripts/capture-video-macos.sh` to record a run. Set the device indices to match your capture
-setup (use `ffmpeg -f avfoundation -list_devices true -i \"\"` to enumerate devices).
-This helper script is intended to feed the `recomp-validation` video workflow below, so keep the
-capture output directory stable for hashing and `capture_video.toml`.
+Use `scripts/capture-validation.sh` to record a run and emit frame/audio hashes in one step.
+Set the device indices to match your capture setup (use `scripts/capture-validation.sh --list-devices`
+or `ffmpeg -f avfoundation -list_devices true -i \"\"` to enumerate devices).
+
+```bash
+scripts/capture-validation.sh --out-dir artifacts/capture --duration 360 --fps 60 \
+  --video-device 1 --audio-device 0 --resolution 1920x1080
+```
+
+If you prefer to capture the MP4 separately, use `scripts/capture-video-macos.sh` (or
+`scripts/capture_video.sh`) and extract frames/audio manually before hashing:
 
 ```bash
 scripts/capture-video-macos.sh artifacts/capture
-```
-
-Extract frames and audio from the capture before hashing:
-
-```bash
 ffmpeg -i artifacts/capture/capture.mp4 artifacts/capture/frames/%08d.png
 ffmpeg -i artifacts/capture/capture.mp4 -vn -acodec pcm_s16le artifacts/capture/audio.wav
+recomp-validation hash-frames --frames-dir artifacts/capture/frames --out artifacts/capture/frames.hashes
+recomp-validation hash-audio --audio-file artifacts/capture/audio.wav --out artifacts/capture/audio.hashes
 ```
 
 ## Comparison

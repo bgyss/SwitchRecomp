@@ -31,6 +31,7 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 - Use `cargo test` for Rust workspace tests.
 - Test files live under `crates/*/tests/` or inline in modules.
 - Always run the full suite after changes.
+- Record the full-suite command and outcome in the PR Testing section and in status updates.
 - Do not skip tests unless the user explicitly approves; record the approval and reason in the PR.
 
 ## Back Pressure Hooks
