@@ -325,17 +325,33 @@ Exit criteria (from SPEC-200)
 
 ## Future Work Notes: DKCR HD Video Validation (SPEC-190/200)
 Requirements to finalize:
-- Define the capture spec (resolution, fps, audio sample rate/bit depth, constant frame rate).
-- Document acceptable drift thresholds for both audio and video and the minimum match window.
-- Capture runtime configuration (performance mode, GPU backend) alongside the validation report.
-- Record the hash of the XCI intake outputs and the recompiled build commit hash.
+- Define the capture spec (resolution, fps, constant frame rate, audio rate/bit depth/channels, container/codec).
+- Define alignment parameters (search window, pre-roll, min match window, segment length).
+- Document drift thresholds for video metrics and audio correlation with pass/warn/fail tiers.
+- Capture runtime configuration (performance mode, GPU backend, resolution scale, frame pacing, input map).
+- Record hashes for XCI intake outputs, module.json, manifest.json, and bundle manifest.
+- Record tool versions (recomp-cli, ffmpeg, capture tooling) per validation run.
 - Track each run with a validation artifact index and store reports under a dated output root.
+- Record host metadata (hardware model, OS version, GPU driver/toolchain versions).
+
+Required per-run metadata (external):
+- Run id, start/end timestamps, duration, and title/config identifiers.
+- Git commit hash, build manifest hash, bundle manifest hash, and intake output hash.
+- Runtime config snapshot and capture config snapshot with absolute paths.
+- Alignment parameters and similarity thresholds used for the run.
+
+Validation artifact index fields (external):
+- Paths and sha256 hashes for reference capture, recompiled capture, and alignment outputs.
+- Paths and sha256 hashes for reports, summary json, and run logs.
+- Pointers to the run metadata record and per-stage timing summary.
 
 Artifact paths and naming (external only):
 - Reference captures: `/Volumes/External/validation/dkcr-hd/reference/YYYY-MM-DD/`.
 - Recompiled captures: `/Volumes/External/validation/dkcr-hd/recompiled/YYYY-MM-DD/`.
 - Alignment outputs: `/Volumes/External/validation/dkcr-hd/alignment/YYYY-MM-DD/`.
 - Reports: `/Volumes/External/validation/dkcr-hd/reports/YYYY-MM-DD/validation-report.json`.
+- Run metadata: `/Volumes/External/validation/dkcr-hd/runs/YYYY-MM-DD/run.json`.
+- Artifact index: `/Volumes/External/validation/dkcr-hd/index/YYYY-MM-DD/run-index.json`.
 - Provenance entries should include the external paths and file hashes.
 
 Timeline checklist (per validation run):
@@ -351,12 +367,17 @@ Local automation ideas:
   with consistent logging and a summary JSON.
 - Cache build artifacts under `out/` with per-run timestamps and a manifest index.
 - Emit a single `run.log` plus `summary.json` so automation can surface failures quickly.
+- Add a `run.json` manifest with input hashes, config paths, tool versions, and stage timings.
+- Support `--resume` to reuse intake/lift outputs and `--clean` to purge temp outputs.
+- Create per-run working directories named `runs/YYYYMMDD-HHMMSS-shortsha/`.
 
 Cloud automation ideas:
 - Containerize the pipeline (Rust toolchain + hactool/hactoolnet + ffmpeg).
 - Use object storage for XCI intake outputs, validation artifacts, and reports.
 - Inject key material via a secrets manager; never write keys to persistent storage.
 - Run jobs on ephemeral workers with a per-run working directory and explicit cleanup.
+- Record container image digests and worker hardware profiles in run metadata.
+- Add artifact retention rules and a nightly prune job for stale runs.
 
 Agent-driven pipeline flow (candidate):
 1. Intake: validate provenance, run XCI extraction, emit module/manifest.
@@ -364,14 +385,23 @@ Agent-driven pipeline flow (candidate):
 3. Build: run `recomp-cli run`, build emitted project, package bundle.
 4. Validate: capture and align video, run `recomp-validation`, emit report.
 5. Report: upload artifacts, summarize pass/fail and drift windows.
+6. Archive: write run metadata and validation artifact index entries.
 
 Dependencies to document:
 - Rust toolchain, `cargo`, `nix` (optional dev shell).
 - `hactool` or `hactoolnet` for XCI extraction.
 - `ffmpeg` for capture and alignment steps.
 - Storage and logging backends for automation outputs.
+- Capture tooling and codec requirements for the validation pipeline.
 
 ## Future Work Notes: Automation/Docs Backlog
-- XciExtractor helper (wrap tool discovery, key validation, and deterministic output layout).
-- Validation artifacts index (single JSON that points to all capture, alignment, and report files).
-- Playback comparison tooling (side-by-side player with timecode overlays and drift markers).
+Automation requests:
+- XciExtractor helper that wraps tool discovery, key validation, Program NCA selection, and deterministic output layout.
+- Validation artifacts index generator that emits a single JSON with paths, hashes, and run metadata pointers.
+- Playback comparison tooling that produces side-by-side video with timecode overlays and drift markers.
+- Run registry that aggregates per-run summary.json files into a searchable index.
+
+Documentation requests:
+- XciExtractor usage and key-handling guidance with expected output layout.
+- Validation artifact index schema and example run metadata record.
+- Playback comparison workflow with expected inputs and review checklist.
