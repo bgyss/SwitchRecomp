@@ -1,7 +1,7 @@
 use clap::{Args, Parser, Subcommand};
 use recomp_validation::{
-    hash_audio_file, hash_frames_dir, run_baseline, run_video_suite, write_hash_list, write_report,
-    BaselinePaths,
+    hash_audio_file, hash_frames_dir, load_artifact_index, run_artifact_validation, run_baseline,
+    run_video_suite, write_hash_list, write_report, ArtifactIndex, BaselinePaths,
 };
 use std::path::PathBuf;
 
@@ -24,6 +24,7 @@ enum Command {
     Video(VideoArgs),
     HashFrames(HashFramesArgs),
     HashAudio(HashAudioArgs),
+    Artifacts(ArtifactsArgs),
 }
 
 #[derive(Args, Debug)]
@@ -54,34 +55,12 @@ struct HashAudioArgs {
     out: PathBuf,
 }
 
-#[derive(Subcommand, Debug)]
-enum Command {
-    Baseline {
-        #[arg(long)]
-        out_dir: PathBuf,
-        #[arg(long)]
-        repo_root: Option<PathBuf>,
-    },
-    Video {
-        #[arg(long)]
-        out_dir: PathBuf,
-        #[arg(long)]
-        reference_config: PathBuf,
-        #[arg(long)]
-        test_video: Option<PathBuf>,
-        #[arg(long)]
-        summary: Option<PathBuf>,
-        #[arg(long)]
-        scripts_dir: Option<PathBuf>,
-        #[arg(long)]
-        thresholds: Option<PathBuf>,
-        #[arg(long)]
-        event_observations: Option<PathBuf>,
-        #[arg(long, default_value_t = false)]
-        strict: bool,
-        #[arg(long)]
-        python: Option<PathBuf>,
-    },
+#[derive(Args, Debug)]
+struct ArtifactsArgs {
+    #[arg(long)]
+    artifact_index: PathBuf,
+    #[arg(long)]
+    out_dir: Option<PathBuf>,
 }
 
 fn main() {
@@ -105,6 +84,27 @@ fn main() {
                 "validation passed: {} cases, report written to {}",
                 report.total,
                 cmd.out_dir.display()
+            );
+        }
+        Some(Command::Artifacts(cmd)) => {
+            let index = load_artifact_index(&cmd.artifact_index).unwrap_or_else(|err| {
+                eprintln!("artifact index error: {err}");
+                std::process::exit(2);
+            });
+            let out_dir = resolve_artifact_out_dir(&index, cmd.out_dir);
+            let report = run_artifact_validation(&index, out_dir.clone());
+            if let Err(err) = write_report(&out_dir, &report) {
+                eprintln!("failed to write validation report: {err}");
+                std::process::exit(1);
+            }
+            if report.failed > 0 {
+                eprintln!("validation failed: {} cases failed", report.failed);
+                std::process::exit(1);
+            }
+            println!(
+                "validation passed: {} cases, report written to {}",
+                report.total,
+                out_dir.display()
             );
         }
         Some(Command::HashFrames(cmd)) => {
@@ -171,4 +171,15 @@ fn default_repo_root() -> PathBuf {
         .and_then(|path| path.parent())
         .unwrap_or(&manifest_dir)
         .to_path_buf()
+}
+
+fn resolve_artifact_out_dir(index: &ArtifactIndex, override_dir: Option<PathBuf>) -> PathBuf {
+    if let Some(out_dir) = override_dir {
+        return out_dir;
+    }
+    if let Some(out_dir) = &index.out_dir {
+        return out_dir.clone();
+    }
+    eprintln!("--out-dir is required when artifact index has no out_dir");
+    std::process::exit(2);
 }

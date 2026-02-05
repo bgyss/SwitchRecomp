@@ -1,6 +1,6 @@
 use crate::output::{GeneratedFile, InputSummary};
 use crate::provenance::{InputFormat, ProvenanceManifest, ProvenanceValidation};
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::ffi::OsStr;
 use std::fs;
@@ -58,6 +58,78 @@ pub struct IntakeReport {
     pub module_json_path: PathBuf,
     pub manifest_path: PathBuf,
     pub files_written: Vec<PathBuf>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IntakeManifestSummary {
+    pub schema_version: String,
+    pub program: IntakeProgramSummary,
+    #[serde(default)]
+    pub assets: Vec<IntakeAssetSummary>,
+    #[serde(default)]
+    pub generated_files: Vec<IntakeGeneratedFile>,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IntakeProgramSummary {
+    pub name: String,
+    pub title_id: String,
+    pub version: u32,
+    pub content_type: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IntakeAssetSummary {
+    pub path: String,
+    pub sha256: String,
+    pub size: u64,
+    pub kind: String,
+}
+
+#[derive(Debug, Deserialize)]
+pub struct IntakeGeneratedFile {
+    pub path: String,
+    pub sha256: String,
+    pub size: u64,
+}
+
+#[derive(Debug)]
+pub struct IntakeManifestCheck {
+    pub manifest: IntakeManifestSummary,
+    pub missing_files: Vec<String>,
+}
+
+pub fn read_intake_manifest(path: &Path) -> Result<IntakeManifestSummary, String> {
+    let text = fs::read_to_string(path)
+        .map_err(|err| format!("read intake manifest {}: {err}", path.display()))?;
+    serde_json::from_str(&text).map_err(|err| format!("parse intake manifest json: {err}"))
+}
+
+pub fn check_intake_manifest(path: &Path) -> Result<IntakeManifestCheck, String> {
+    let manifest = read_intake_manifest(path)?;
+    if manifest.schema_version != INTAKE_SCHEMA_VERSION {
+        return Err(format!(
+            "unsupported intake manifest schema version: {}",
+            manifest.schema_version
+        ));
+    }
+    if manifest.program.title_id.trim().is_empty() {
+        return Err("intake manifest missing program title_id".to_string());
+    }
+
+    let base_dir = path.parent().unwrap_or_else(|| Path::new("."));
+    let mut missing = Vec::new();
+    for entry in &manifest.generated_files {
+        let resolved = base_dir.join(&entry.path);
+        if !resolved.exists() {
+            missing.push(entry.path.clone());
+        }
+    }
+
+    Ok(IntakeManifestCheck {
+        manifest,
+        missing_files: missing,
+    })
 }
 
 #[derive(Debug, Serialize)]

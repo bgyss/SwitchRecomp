@@ -24,10 +24,11 @@ Define a validation workflow that compares recompiled output against a reference
 ## Requirements
 - A reference timeline must define the first-level start and completion timecodes.
 - Validation must capture native macOS output at a stable resolution and frame rate.
-- A comparison step must compute frame similarity (perceptual hash or SSIM) and audio similarity.
+- A comparison step must compute frame and audio similarity using deterministic hash lists.
 - The report must highlight drift, dropped frames, or audio desync beyond thresholds.
 - Validation artifacts must remain outside the repo and be referenced via provenance metadata.
-- Validation must accept precomputed `summary.json` outputs or invoke the comparison scripts directly.
+- Validation runs should be tracked with an external artifact index that records intake manifests,
+  capture paths, and report outputs.
 
 ## Operator Inputs
 - External reference and capture artifacts are required to run DKCR validation.
@@ -37,24 +38,24 @@ Define a validation workflow that compares recompiled output against a reference
 - Provenance metadata should record the reference capture as an input:
   - `format = "video_mp4"` for MP4 reference videos.
 - `reference_video.toml` with:
-  - `schema_version = "v1"`
-  - `label`
-  - `reference_video` path (absolute or relative)
-  - `[expected]` video settings (width, height, fps, audio_rate)
-  - `[comparison]` settings (offset_seconds, trim_start_seconds, duration_seconds, no_vmaf)
-  - `[thresholds]` overrides (ssim_min, psnr_min, vmaf_min, audio_lufs_delta_max, audio_peak_delta_max, event_drift_max_seconds)
-  - `[[events]]` with id, label, and timecode
-- `event_observations.json` (optional) with observed timecodes for drift calculations.
+  - `schema_version` (optional)
+  - `[video]` metadata (width, height, fps)
+  - `[timeline]` start/end timecodes
+  - `[hashes]` frame/audio hash sources
+  - optional `[validation]` thresholds and requirements
+- `capture_video.toml` with:
+  - `[video]` metadata
+  - `[hashes]` sources for the captured run
+- `validation_config.toml` (optional) for per-run overrides.
 - `validation-report.json` with:
-  - similarity metric checks and thresholds
-  - timecode drift summaries (per-event + aggregates)
-  - pass/fail summary
+  - match ratios, drift summaries, triage categories, and pass/fail summary
 
 ## Deliverables
 - A capture script that records the recompiled runtime output.
-- A comparison script that generates a validation report from reference and capture.
-- A validation CLI flow that runs the comparison scripts or parses a precomputed summary.
+- A comparison flow that generates a validation report from reference and capture hash lists.
+- A validation CLI flow that compares hash lists and emits a report.
 - Documentation describing the expected workflow and thresholds.
+- An artifact index template and helper scripts for external validation runs.
 
 ## Open Questions
 - What similarity thresholds best indicate a playable first level?
@@ -72,4 +73,6 @@ Define a validation workflow that compares recompiled output against a reference
 - Audio compression or capture devices may skew similarity metrics.
 
 ## References
-- TBD
+- `docs/validation-artifacts.md`
+- `docs/validation-traces.md`
+- `docs/validation-video.md`

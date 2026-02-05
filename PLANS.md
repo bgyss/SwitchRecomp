@@ -23,10 +23,6 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-180 XCI Title Intake
 - SPEC-190 Video-Based Validation
 - SPEC-200 DKCR HD First-Level Milestone (macOS/aarch64)
-- SPEC-210 Automated Recompilation Loop
-- SPEC-220 Input Replay and Interaction Scripts
-- SPEC-230 Reference Media Normalization
-- SPEC-240 Validation Orchestration and Triage
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -299,19 +295,12 @@ Exit criteria (from SPEC-180)
 Outcome
 - Validate the recompiled output against a reference gameplay video without emulator traces.
 
-Note
-- DKCR validation is paused until the automation loop, input replay, and normalization specs land (SPEC-210/220/230/240).
-
 Work items
 - [x] Define a reference timeline for the first level and store it in `reference_video.toml`.
 - [x] Implement a capture workflow for macOS/aarch64 runtime output.
 - [x] Add a comparison step that computes video and audio similarity metrics.
 - [x] Generate a `validation-report.json` with pass/fail and drift summaries.
 - [x] Document manual review steps for mismatches.
-
-External prerequisites (see `docs/dkcr-validation-prereqs.md`)
-- Absolute paths to reference and capture artifacts (video or hashes).
-- Confirmed first-level start and end timecodes.
 
 Exit criteria (from SPEC-190)
 - A single run produces a validation report for the first level.
@@ -322,9 +311,6 @@ Exit criteria (from SPEC-190)
 Outcome
 - Produce a macOS/aarch64 static recompilation of DKCR HD that reaches and plays the first level.
 
-Note
-- DKCR validation is paused until SPEC-210/220/230/240 are implemented.
-
 Work items
 - [x] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
 - [x] Identify required OS services and implement or stub them in the runtime.
@@ -332,70 +318,60 @@ Work items
 - [x] Create a per-title config and patch set for DKCR HD.
 - [x] Run video-based validation against the first level (SPEC-190).
 
-External prerequisites (see `docs/dkcr-validation-prereqs.md`)
-- Absolute paths to DKCR reference and capture artifacts.
-- Confirmed first-level start and end timecodes.
-
 Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.
 - First-level gameplay matches the reference video within defined tolerances.
 - No proprietary assets or keys are stored in the repo or build outputs.
 
-## SPEC-210: Automated Recompilation Loop
-Outcome
-- Provide a one-command automation loop for intake, build, capture, and validation.
+## Future Work Notes: DKCR HD Video Validation (SPEC-190/200)
+Requirements to finalize:
+- Define the capture spec (resolution, fps, audio sample rate/bit depth, constant frame rate).
+- Document acceptable drift thresholds for both audio and video and the minimum match window.
+- Capture runtime configuration (performance mode, GPU backend) alongside the validation report.
+- Record the hash of the XCI intake outputs and the recompiled build commit hash.
+- Track each run with a validation artifact index and store reports under a dated output root.
 
-Work items
-- [x] Define `automation.toml` schema and validator.
-- [x] Implement an orchestrator CLI that runs intake -> lift -> build -> run -> capture -> validate.
-- [x] Emit a deterministic `run-manifest.json` with step timings and artifact hashes.
-- [x] Add resume/caching logic keyed by input hashes.
-- [x] Add integration tests using non-proprietary fixtures.
+Artifact paths and naming (external only):
+- Reference captures: `/Volumes/External/validation/dkcr-hd/reference/YYYY-MM-DD/`.
+- Recompiled captures: `/Volumes/External/validation/dkcr-hd/recompiled/YYYY-MM-DD/`.
+- Alignment outputs: `/Volumes/External/validation/dkcr-hd/alignment/YYYY-MM-DD/`.
+- Reports: `/Volumes/External/validation/dkcr-hd/reports/YYYY-MM-DD/validation-report.json`.
+- Provenance entries should include the external paths and file hashes.
 
-Exit criteria (from SPEC-210)
-- One command runs the full loop and produces a run manifest and validation report.
-- Re-running with identical inputs yields identical artifacts.
-- Proprietary assets remain external.
+Timeline checklist (per validation run):
+- Day 0: capture reference footage and compute hashes.
+- Day 1: capture recompiled footage under matching settings.
+- Day 1-2: run alignment + metric generation, record drift windows.
+- Day 2: manual review of flagged windows and finalize report.
+- Day 3: summarize deltas and file follow-up issues.
 
-## SPEC-220: Input Replay and Interaction Scripts
-Outcome
-- Deterministic input playback aligned to reference timelines.
+## Future Work Notes: Automation Ideas (Local + Cloud)
+Local automation ideas:
+- A `scripts/run_recomp_pipeline.sh` wrapper that runs intake, lift, pipeline, build, and validation
+  with consistent logging and a summary JSON.
+- Cache build artifacts under `out/` with per-run timestamps and a manifest index.
+- Emit a single `run.log` plus `summary.json` so automation can surface failures quickly.
 
-Work items
-- [x] Define `input_script.toml` schema with events and markers.
-- [x] Implement input script loader and runtime playback module.
-- [x] Add tools/tests for deterministic playback and alignment.
-- [x] Document authoring and replay workflows.
+Cloud automation ideas:
+- Containerize the pipeline (Rust toolchain + hactool/hactoolnet + ffmpeg).
+- Use object storage for XCI intake outputs, validation artifacts, and reports.
+- Inject key material via a secrets manager; never write keys to persistent storage.
+- Run jobs on ephemeral workers with a per-run working directory and explicit cleanup.
 
-Exit criteria (from SPEC-220)
-- Input scripts replay deterministically across two runs.
-- Playback order is stable for simultaneous events.
-- Markers align to reference timecodes.
+Agent-driven pipeline flow (candidate):
+1. Intake: validate provenance, run XCI extraction, emit module/manifest.
+2. Lift: decode and emit lifted module and segments.
+3. Build: run `recomp-cli run`, build emitted project, package bundle.
+4. Validate: capture and align video, run `recomp-validation`, emit report.
+5. Report: upload artifacts, summarize pass/fail and drift windows.
 
-## SPEC-230: Reference Media Normalization
-Outcome
-- Normalize reference video/audio into a canonical, comparable format.
+Dependencies to document:
+- Rust toolchain, `cargo`, `nix` (optional dev shell).
+- `hactool` or `hactoolnet` for XCI extraction.
+- `ffmpeg` for capture and alignment steps.
+- Storage and logging backends for automation outputs.
 
-Work items
-- [x] Define canonical reference profile (resolution, fps, audio).
-- [x] Implement normalization workflow and metadata capture.
-- [x] Update `reference_video.toml` schema to record normalization details.
-- [x] Add hash generation tests for normalized outputs.
-
-Exit criteria (from SPEC-230)
-- Reference media can be normalized deterministically.
-- Hashes for normalized outputs are stable across runs.
-
-## SPEC-240: Validation Orchestration and Triage
-Outcome
-- Automated validation with structured reports and triage summaries.
-
-Work items
-- [x] Define `validation-config.toml` and report schema extensions.
-- [x] Implement triage summary generation (drift, likely causes).
-- [x] Integrate validation orchestration into the automation loop.
-- [x] Add tests for report determinism and failure summaries.
-
-Exit criteria (from SPEC-240)
-- Validation runs emit deterministic reports and triage summaries.
-- Failures include actionable context and artifact references.
+## Future Work Notes: Automation/Docs Backlog
+- XciExtractor helper (wrap tool discovery, key validation, and deterministic output layout).
+- Validation artifacts index (single JSON that points to all capture, alignment, and report files).
+- Playback comparison tooling (side-by-side player with timecode overlays and drift markers).

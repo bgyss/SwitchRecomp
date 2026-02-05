@@ -54,11 +54,13 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 - CLI intake command that accepts an XCI plus keyset and emits deterministic extraction outputs.
 - A validator that enforces asset separation and provenance requirements for XCI inputs.
 - Documentation describing the intake flow and supported keyset formats.
+- Helper tooling to verify intake manifests and referenced output paths.
 
 ## Implementation Notes
 - The current intake accepts an unencrypted `XCI0` fixture layout (magic `XCI0`) for
   deterministic tests and uses external tooling (for example `hactool`) for real
   XCI extraction. citeturn2view0
+- See `docs/static-recompilation-flow.md` for the Real XCI intake how-to and helper scripts.
 
 ## Open Questions
 - How should update and DLC NCAs be layered or merged?

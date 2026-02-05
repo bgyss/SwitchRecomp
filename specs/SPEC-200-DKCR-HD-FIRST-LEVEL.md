@@ -30,6 +30,7 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 - Runtime must implement enough OS services, GPU translation, audio, and input to reach the first level.
 - RomFS assets must be loaded from an external, user-managed path.
 - Validation must compare the first level segment against the reference video and record results.
+- Validation artifacts must be tracked externally (artifact index + report output paths).
 
 ## Operator Inputs
 - DKCR validation depends on external reference and capture artifacts.
@@ -39,12 +40,14 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 - `title.toml` for DKCR HD configuration (stubbed services, patches, asset paths).
 - `provenance.toml` for XCI and reference video inputs.
 - `validation-report.json` for the first-level comparison results.
+- `artifacts.json` (external) for linking intake manifests, captures, and reports.
 - `docs/dkcr-hd-first-level.md` for the scaffolding walkthrough.
 
 ## Deliverables
 - Title-specific configuration and patch set placeholders to reach the first playable level.
 - A reproducible build and run command for macOS/aarch64.
 - A validation report demonstrating the first-level gate.
+- A capture workflow and artifact index template for DKCR-specific runs.
 
 ## Scaffolding
 - `samples/dkcr-hd/title.toml` with external asset and key paths.
@@ -68,4 +71,6 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 - Validation thresholds may need tuning for frame pacing variance.
 
 ## References
-- TBD
+- `docs/dkcr-hd-first-level.md`
+- `docs/validation-artifacts.md`
+- `docs/validation-traces.md`

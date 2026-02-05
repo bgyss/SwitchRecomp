@@ -4,7 +4,10 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
+mod artifacts;
 pub mod video;
+
+pub use artifacts::{load_artifact_index, run_artifact_validation, ArtifactIndex};
 pub use video::{
     hash_audio_file, hash_frames_dir, run_video_validation, run_video_validation_with_config,
     write_hash_list, CaptureVideoConfig, HashFormat, HashSource, HashSources, ReferenceVideoConfig,
@@ -102,7 +105,7 @@ pub fn run_baseline(paths: BaselinePaths) -> ValidationReport {
     }
 }
 
-fn run_case<F>(name: &str, runner: F) -> ValidationCase
+pub(crate) fn run_case<F>(name: &str, runner: F) -> ValidationCase
 where
     F: FnOnce() -> Result<(), String>,
 {
@@ -125,7 +128,7 @@ where
     }
 }
 
-fn chrono_stamp() -> String {
+pub(crate) fn chrono_stamp() -> String {
     let now = std::time::SystemTime::now();
     let secs = now
         .duration_since(std::time::UNIX_EPOCH)

@@ -6,7 +6,8 @@ use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
 use recomp_pipeline::xci::{
-    intake_xci, IntakeOptions as XciIntakeOptions, ProgramSelection, ToolKind,
+    check_intake_manifest, intake_xci, IntakeOptions as XciIntakeOptions, ProgramSelection,
+    ToolKind,
 };
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
@@ -25,6 +26,7 @@ enum Command {
     HomebrewIntake(HomebrewIntakeArgs),
     HomebrewLift(HomebrewLiftArgs),
     XciIntake(XciIntakeArgs),
+    XciValidate(XciValidateArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -97,6 +99,12 @@ struct XciIntakeArgs {
     program_title_id: Option<String>,
     #[arg(long)]
     program_name: Option<String>,
+}
+
+#[derive(Parser, Debug)]
+struct XciValidateArgs {
+    #[arg(long)]
+    manifest: PathBuf,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -275,5 +283,30 @@ fn main() {
                 }
             }
         }
+        Command::XciValidate(validate) => match check_intake_manifest(&validate.manifest) {
+            Ok(check) => {
+                if !check.missing_files.is_empty() {
+                    eprintln!("XCI intake manifest has missing files:");
+                    for missing in &check.missing_files {
+                        eprintln!("- {missing}");
+                    }
+                    std::process::exit(1);
+                }
+                let program = &check.manifest.program;
+                println!(
+                    "XCI intake manifest ok: title_id={} name={} version={}",
+                    program.title_id, program.name, program.version
+                );
+                println!(
+                    "assets: {} generated_files: {}",
+                    check.manifest.assets.len(),
+                    check.manifest.generated_files.len()
+                );
+            }
+            Err(err) => {
+                eprintln!("XCI intake manifest error: {err}");
+                std::process::exit(1);
+            }
+        },
     }
 }

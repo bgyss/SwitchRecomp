@@ -17,23 +17,21 @@ When using video-based validation, record timing observations separately from th
 captures.
 
 Manual steps:
-- Run the capture and comparison pipeline to produce `summary.json`.
-- Review the aligned captures and note the observed timecodes for each reference event
-  in `reference_video.toml`.
-- Save observed timecodes in an `event_observations.json` file (outside the repo) and
-  re-run validation to compute drift metrics.
-- Flag any event drift or audio/video mismatches that exceed thresholds for follow-up.
+- Run the hash-based validation pipeline to produce `validation-report.json`.
+- Review the drift summary and triage categories in the report.
+- Note any expected mismatches in provenance metadata for follow-up.
 
 ## Capture Workflow (macOS)
 Use an external capture path and keep outputs outside the repo.
 
 Suggested workflow:
-- Use the helper script to capture a fixed-duration run:
+- Use the helper script to capture a fixed-duration run (preferred):
 ```
-scripts/capture_video.sh --out /Volumes/External/Captures/dkcr-hd-first-level.mp4 \
-  --duration 360 --fps 60 --video-device 1 --audio-device 0 --resolution 1920x1080
+DURATION_SECONDS=360 FPS=60 VIDEO_DEVICE=1 AUDIO_DEVICE=0 VIDEO_SIZE=1920x1080 \
+  scripts/capture-video-macos.sh /Volumes/External/Captures/dkcr-hd-first-level
 ```
-- Use `scripts/capture_video.sh --list-devices` to list available device indices.
+- Use `ffmpeg -f avfoundation -list_devices true -i \"\"` to list available device indices.
+- Optional: use `scripts/capture_video.sh` if you want a flag-driven capture helper.
 - Launch the recompiled runtime and reach the target segment.
 - Capture the primary display (or a specific window) with `ffmpeg`:
 ```
@@ -42,3 +40,14 @@ ffmpeg -f avfoundation -framerate 60 -i \"1:0\" -t 360 -pix_fmt yuv420p \
 ```
 - Replace the device index (`1:0`) with the correct screen/audio device for your setup.
 - Record the capture path and hashes in provenance metadata.
+- Create or update a validation artifact index:
+```
+scripts/validation_artifacts_init.sh --out /Volumes/External/validation/artifacts.json
+```
+- Run validation using the artifact index:
+```
+scripts/validate_artifacts.sh --artifact-index /Volumes/External/validation/artifacts.json
+```
+
+For artifact layouts and dependency notes, see `docs/validation-artifacts.md`.
+For hash-based comparison steps, see `docs/validation-video.md`.

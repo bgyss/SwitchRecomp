@@ -1,4 +1,6 @@
-use recomp_pipeline::xci::{intake_xci, IntakeOptions, ProgramSelection, ToolKind};
+use recomp_pipeline::xci::{
+    check_intake_manifest, intake_xci, IntakeOptions, ProgramSelection, ToolKind,
+};
 use sha2::{Digest, Sha256};
 use std::fs;
 #[cfg(unix)]
@@ -47,6 +49,38 @@ fn xci_intake_emits_outputs() {
     assert!(generated.iter().any(|entry| {
         entry.get("path").and_then(|value| value.as_str()) == Some("assets/romfs.bin")
     }));
+}
+
+#[test]
+fn xci_intake_manifest_check_reports_no_missing_files() {
+    let temp = tempfile::tempdir().expect("tempdir");
+    let xci_path = temp.path().join("sample.xci");
+    let keys_path = temp.path().join("prod.keys");
+    let provenance_path = temp.path().join("provenance.toml");
+    let out_dir = temp.path().join("out");
+
+    let title_id = 0x0100000000000000u64;
+    let xci_bytes = build_xci(vec![build_program_entry("program.nca", title_id, 1)]);
+    fs::write(&xci_path, &xci_bytes).expect("write xci");
+    fs::write(&keys_path, "header_key = 0123456789abcdef0123456789abcdef").expect("write keys");
+
+    write_provenance(&provenance_path, &xci_path, &keys_path);
+
+    intake_xci(IntakeOptions {
+        xci_path,
+        keys_path,
+        provenance_path,
+        out_dir: out_dir.clone(),
+        program: ProgramSelection::TitleId(format!("{title_id:x}")),
+        tool_path: None,
+        tool_kind: ToolKind::Auto,
+        title_keys_path: None,
+    })
+    .expect("intake");
+
+    let manifest_path = out_dir.join("manifest.json");
+    let check = check_intake_manifest(&manifest_path).expect("check manifest");
+    assert!(check.missing_files.is_empty());
 }
 
 #[test]

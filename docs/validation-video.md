@@ -94,3 +94,7 @@ When validation fails:
 - Compare audio hashes around the reported chunk offset.
 - If a mismatch is expected (e.g., cutscene timing), record a note in the provenance metadata.
 - Track follow-ups in the triage notes and update `validation.notes` if needed.
+
+## Related Docs
+- `docs/validation-artifacts.md`
+- `docs/validation-traces.md`

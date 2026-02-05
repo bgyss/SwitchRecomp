@@ -40,6 +40,7 @@ Real XCI intake (external tooling):
 - Specify either `--program-title-id` or `--program-name`.
 - Point `--xci-tool` at `hactool` or `hactoolnet` (or rely on PATH), and set `--xci-tool-kind`
   when you want to force a specific tool.
+- Validate the intake manifest with `recomp-cli xci-validate` or `scripts/xci_validate.sh`.
 
 Example:
 ```
@@ -53,6 +54,10 @@ cargo run -p recomp-cli -- xci-intake \
   --xci-tool /usr/local/bin/hactool \
   --xci-tool-kind hactool
 ```
+
+Validation artifacts:
+- Use `docs/validation-artifacts.md` to define external artifact paths and dependencies.
+- Use `scripts/validation_artifacts_init.sh` to scaffold an artifact index.
 
 3. Segment extraction and labeling.
 - Extract executable segments (text, rodata, data, bss) and record:
