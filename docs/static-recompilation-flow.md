@@ -36,10 +36,11 @@ repo provides scaffolding versus where future tooling is required.
   extract ExeFS/RomFS into separated output roots.
 
 Real XCI intake (external tooling):
+- See [Real XCI intake how-to](xci-intake.md#real-xci-intake-how-to) for the full checklist and example commands.
 - Provide `prod.keys` (and optional `title.keys`) out of band.
-- Specify either `--program-title-id` or `--program-name`.
-- Point `--xci-tool` at `hactool` or `hactoolnet` (or rely on PATH), and set `--xci-tool-kind`
-  when you want to force a specific tool.
+- Set `--xci-tool` to `auto`, `hactool`, or `hactoolnet`, and use `--xci-tool-path` to override
+  the resolved tool path.
+- Intake selects a single Program NCA automatically; multiple programs will raise an error.
 - Validate the intake manifest with `recomp-cli xci-validate` or `scripts/xci_validate.sh`.
 
 Example:
@@ -47,12 +48,11 @@ Example:
 cargo run -p recomp-cli -- xci-intake \
   --xci /Volumes/Inputs/title.xci \
   --keys /Volumes/Keys/prod.keys \
-  --title-keys /Volumes/Keys/title.keys \
   --provenance /Volumes/Inputs/provenance.toml \
   --out-dir /Volumes/Outputs/title-intake \
-  --program-title-id 0100DEADBE000000 \
-  --xci-tool /usr/local/bin/hactool \
-  --xci-tool-kind hactool
+  --assets-dir /Volumes/Outputs/title-assets \
+  --xci-tool hactool \
+  --xci-tool-path /usr/local/bin/hactool
 ```
 
 Validation artifacts:

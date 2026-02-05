@@ -75,16 +75,17 @@ nix develop --impure
 - Replace `samples/dkcr-hd/module.json` with lifted output when available.
 
 2a. (Optional) Extract ExeFS and RomFS from a real XCI using external tooling:
-See `docs/static-recompilation-flow.md` (Real XCI intake) for a short how-to and CLI notes.
+See [Real XCI intake how-to](xci-intake.md#real-xci-intake-how-to) for the detailed steps and CLI notes.
 Use `recomp-cli xci-validate` or `scripts/xci_validate.sh` to confirm the intake manifest.
 ```
 cargo run -p recomp-cli -- xci-intake \
   --xci /Volumes/External/DKCR_HD/game.xci \
   --keys /Volumes/External/SwitchKeys/prod.keys \
-  --program-title-id 0100000000000000 \
   --provenance samples/dkcr-hd/provenance.toml \
   --out-dir out/dkcr-hd-intake \
-  --xci-tool /usr/local/bin/hactool
+  --assets-dir out/dkcr-hd-assets \
+  --xci-tool hactool \
+  --xci-tool-path /usr/local/bin/hactool
 ```
 
 3. Run the pipeline:

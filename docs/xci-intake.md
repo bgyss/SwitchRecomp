@@ -48,6 +48,35 @@ The XCI intake config recognizes these optional fields at the top level:
 - `program_version`
 - `program_content_type` (defaults to `program`)
 
+## Real XCI Intake How-To
+Use this flow when you have lawful access to a retail XCI and keyset. Keep inputs and
+extracted assets outside the repo, and copy only non-proprietary metadata into tracked
+files.
+
+1. Prepare a private workspace with separate roots for inputs, intake metadata, and assets.
+2. Place the `.xci` and keyset in the inputs root.
+3. Hash the inputs and update your provenance file with `path`, `sha256`, and `size`.
+4. Ensure `hactool` or `hactoolnet` is installed and set `--xci-tool` (plus
+   `--xci-tool-path` if needed).
+5. Run intake with absolute paths and separate output roots.
+6. Validate the intake manifest before using the outputs downstream.
+7. Copy only `module.json` and `manifest.json` into the repo (keep `assets_dir` external).
+8. Record tool versions and command lines in provenance notes.
+
+Example (external workspace):
+```bash
+cargo run -p recomp-cli -- xci-intake \
+  --xci /Volumes/Inputs/title.xci \
+  --keys /Volumes/Keys/prod.keys \
+  --provenance /Volumes/Inputs/provenance.toml \
+  --out-dir /Volumes/Outputs/title-intake \
+  --assets-dir /Volumes/Outputs/title-assets \
+  --xci-tool hactool \
+  --xci-tool-path /usr/local/bin/hactool
+
+recomp-cli xci-validate --manifest /Volumes/Outputs/title-intake/manifest.json
+```
+
 ## Provenance Requirements
 The provenance file must list the XCI and keyset as inputs, for example:
 ```toml

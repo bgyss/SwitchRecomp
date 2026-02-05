@@ -44,6 +44,8 @@ files directly.
 ## Capture (macOS)
 Use `scripts/capture-video-macos.sh` to record a run. Set the device indices to match your capture
 setup (use `ffmpeg -f avfoundation -list_devices true -i \"\"` to enumerate devices).
+This helper script is intended to feed the `recomp-validation` video workflow below, so keep the
+capture output directory stable for hashing and `capture_video.toml`.
 
 ```bash
 scripts/capture-video-macos.sh artifacts/capture
