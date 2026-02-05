@@ -34,10 +34,16 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 - ExeFS and NSO segments must be extracted deterministically and hashed.
 - RomFS assets must be emitted to a separate asset output root, never mixed with code outputs.
 - The intake manifest must record tool versions, hashes, and extracted file sizes.
+- Use external tooling for decryption and container extraction (for example `hactool`), driven by
+  a keyset in `key_name = HEX` format and passing the XCI/NCA extraction flags needed to emit
+  ExeFS and RomFS outputs. citeturn2view0
 
 ## Interfaces and Data
 - Inputs
-  - `input.xci_path` and `input.keys_path` in provenance metadata.
+  - `[[inputs]]` entries in provenance metadata with:
+    - `format = "xci"` for the XCI file.
+    - `format = "keyset"` for the keyset file (`*.keys`).
+  - Keyset files are expected to use `name = hex` lines (32 or 64 hex chars).
   - Optional `title.toml` overrides for main program selection.
 - Outputs
   - `intake/` directory with NCA metadata, ExeFS, and NSO segment blobs.
@@ -48,6 +54,14 @@ Define how the pipeline ingests a user-supplied XCI and extracts code and assets
 - CLI intake command that accepts an XCI plus keyset and emits deterministic extraction outputs.
 - A validator that enforces asset separation and provenance requirements for XCI inputs.
 - Documentation describing the intake flow and supported keyset formats.
+- Helper tooling to verify intake manifests and referenced output paths.
+
+## Implementation Notes
+- The current intake accepts an unencrypted `XCI0` fixture layout (magic `XCI0`) for
+  deterministic tests and uses external tooling (for example `hactool`) for real
+  XCI extraction. citeturn2view0
+- See `docs/xci-intake.md` for the Real XCI intake how-to and helper scripts.
+- See `docs/static-recompilation-flow.md` for the end-to-end intake + pipeline flow.
 
 ## Open Questions
 - How should update and DLC NCAs be layered or merged?

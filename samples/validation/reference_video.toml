@@ -1,0 +1,38 @@
+schema_version = "v1"
+label = "sample-first-level"
+reference_video = "/path/to/reference.mp4"
+
+[expected]
+width = 1920
+height = 1080
+fps = 60.0
+audio_rate = 48000
+
+[comparison]
+offset_seconds = 0.25
+trim_start_seconds = 5.0
+duration_seconds = 30.0
+no_vmaf = false
+
+[thresholds]
+ssim_min = 0.95
+psnr_min = 35.0
+vmaf_min = 90.0
+audio_lufs_delta_max = 2.0
+audio_peak_delta_max = 2.0
+event_drift_max_seconds = 0.5
+
+[[events]]
+id = "boot-logo"
+label = "boot logo visible"
+timecode = "00:00:02.500"
+
+[[events]]
+id = "level-start"
+label = "level start control"
+timecode = "00:00:05.000"
+
+[[events]]
+id = "checkpoint-1"
+label = "checkpoint reached"
+timecode = "00:00:20.000"

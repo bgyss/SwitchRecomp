@@ -28,4 +28,5 @@ existing timeline in `samples/reference_video.toml` is correct, explicitly confi
 - Update `samples/reference_video.toml` with the absolute reference video path and timeline.
 - Update `samples/capture_video.toml` with the absolute capture video path.
 - Run the validation command described in `docs/validation-video.md`.
+- Create an artifact index JSON to record manifests and report outputs (see `docs/validation-artifacts.md`).
 - Review `validation-report.json` and capture any triage notes.

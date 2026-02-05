@@ -32,8 +32,12 @@ Legal and provenance policy:
 
 ## Samples and Flow Docs
 - `samples/memory-image/` shows the memory image initialization flow (segment blob + lifted module).
-- `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline.
-- `docs/validation-matrix-template.md`, `docs/title-run-sheet-template.md`, `docs/thresholds/default.json`, `docs/batch-manifest-schema.md`, `docs/batch-manifest-schema.json`, and `docs/batch-pipeline-layout.md` are reusable validation templates.
+- `samples/validation/` contains non-proprietary validation artifact index templates.
+- `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline (see the Real XCI intake section for external-tool usage).
+- `docs/xci-intake.md` documents the XCI intake workflow and mock extractor format.
+- `docs/validation-artifacts.md` defines validation artifact indexing, workflows, and dependencies.
+- `docs/validation-video.md` describes the hash-based video validation workflow.
+- `scripts/capture-validation.sh`, `scripts/capture-video-macos.sh`, `scripts/capture_video.sh`, and `scripts/validate_artifacts.sh` provide capture and validation helpers.
 
 ## Back Pressure Hooks
 These hooks add fast, consistent feedback to keep the repo autonomous and reduce review churn. Hooks are defined in `.pre-commit-config.yaml` and can be run with `prek` (preferred) or `pre-commit`.

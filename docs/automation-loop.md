@@ -23,6 +23,7 @@ assets into the repo.
 - Capture artifacts under `artifacts/<title>/capture/`.
 - Validation artifacts under `artifacts/<title>/validation/`.
 - `run-manifest.json` for per-step timing, hashes, and provenance.
+- `artifacts.json` to link intake manifests, capture configs, and validation reports.
 
 ## Asset Separation
 All assets (RomFS, reference video, capture output) remain outside the repo. Only hashes and

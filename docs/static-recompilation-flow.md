@@ -32,6 +32,32 @@ repo provides scaffolding versus where future tooling is required.
 - Use the intake tooling to detect and validate formats (NCA, NSO, NRO, NPDM).
 - Store extracted data under a clean, deterministic directory layout.
 - Reject inputs that fail hash or format validation.
+- For XCI inputs, use external tooling (for example `hactool`) with user-provided keys to
+  extract ExeFS/RomFS into separated output roots.
+
+Real XCI intake (external tooling):
+- See [Real XCI intake how-to](xci-intake.md#real-xci-intake-how-to) for the full checklist and example commands.
+- Provide `prod.keys` (and optional `title.keys`) out of band.
+- Set `--xci-tool` to `auto`, `hactool`, or `hactoolnet`, and use `--xci-tool-path` to override
+  the resolved tool path.
+- Intake selects a single Program NCA automatically; multiple programs will raise an error.
+- Validate the intake manifest with `recomp-cli xci-validate` or `scripts/xci_validate.sh`.
+
+Example:
+```
+cargo run -p recomp-cli -- xci-intake \
+  --xci /Volumes/Inputs/title.xci \
+  --keys /Volumes/Keys/prod.keys \
+  --provenance /Volumes/Inputs/provenance.toml \
+  --out-dir /Volumes/Outputs/title-intake \
+  --assets-dir /Volumes/Outputs/title-assets \
+  --xci-tool hactool \
+  --xci-tool-path /usr/local/bin/hactool
+```
+
+Validation artifacts:
+- Use `docs/validation-artifacts.md` to define external artifact paths and dependencies.
+- Use `scripts/validation_artifacts_init.sh` to scaffold an artifact index.
 
 3. Segment extraction and labeling.
 - Extract executable segments (text, rodata, data, bss) and record:

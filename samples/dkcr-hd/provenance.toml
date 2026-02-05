@@ -1,65 +1,48 @@
 schema_version = "1"
 
 [title]
-name = "DKCR HD Sample"
-title_id = "0100000000000000"
-version = "0.1.0"
+name = "DKCR HD First-Level"
+title_id = "TBD"
+version = "TBD"
 region = "US"
 
 [collection]
-device = "demo"
-collected_at = "2026-02-03"
-notes = "Scaffold provenance with placeholder inputs; proprietary assets remain external."
+device = "macos-aarch64"
+collected_at = "2026-02-04"
+notes = "Scaffolding metadata. Update with real capture details for DKCR HD inputs."
 
 [collection.tool]
 name = "manual"
-version = "1.0"
+version = "0.1"
+
+[collection.decryption_tool]
+name = "placeholder"
+version = "0.0"
 
 [[inputs]]
 path = "module.json"
 format = "lifted_json"
-sha256 = "0927f44712c04c3eb9b3c75e8678138c7253374862abf23e4346495a7e360f35"
-size = 489
-role = "lifted_module"
+sha256 = "e38352960726df12d5784205e7a0bcd482806de976376ade5ef23ebc43b2e470"
+size = 368
+role = "placeholder_module"
 
 [[inputs]]
-path = "inputs/dkcr-hd.xci"
+path = "/Volumes/External/DKCR_HD/game.xci"
 format = "xci"
-sha256 = "c68ddc13f5d1f0ed4cd866cd8c8fcba80ab974fe3e4edae55da586377ff4f47d"
-size = 9
-role = "retail_image"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size = 0
+role = "xci"
 
 [[inputs]]
-path = "inputs/title.keys"
+path = "/Volumes/External/SwitchKeys/prod.keys"
 format = "keyset"
-sha256 = "f17a692cd78aafa541c98e73d62f18199512ea39b0900339384842c1457bf9a9"
-size = 10
-role = "decryption_keys"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size = 0
+role = "keyset"
 
 [[inputs]]
-path = "inputs/program.nca"
-format = "nca"
-sha256 = "13b3ee74e75cd5ace4bd578c92ae3f4ee7ae37fc8ffe6101970617d4077045df"
-size = 5
-role = "program_nca"
-
-[[inputs]]
-path = "inputs/exefs.pfs0"
-format = "exefs"
-sha256 = "1cffc3ff1e9b8a5d9cfa30e10f644cb07addc491e278d55207797663763acd3f"
-size = 5
-role = "exefs"
-
-[[inputs]]
-path = "inputs/main.nso"
-format = "nso0"
-sha256 = "b06873320cf57661c5781d7d923f262761145ccbaee6fb11f556c12c0293165c"
-size = 5
-role = "main_executable"
-
-[[inputs]]
-path = "inputs/main.npdm"
-format = "npdm"
-sha256 = "de0f02829e8eef270e4f2346083e01abea971920535fff90b253da1924b07c35"
-size = 5
-role = "process_metadata"
+path = "/Volumes/External/DKCR_HD/reference/first-level.mp4"
+format = "video_mp4"
+sha256 = "0000000000000000000000000000000000000000000000000000000000000000"
+size = 0
+role = "reference_video"

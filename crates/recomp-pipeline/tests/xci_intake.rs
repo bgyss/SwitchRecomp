@@ -1,6 +1,8 @@
 use base64::engine::general_purpose::STANDARD;
 use base64::Engine as _;
-use recomp_pipeline::xci::{intake_xci, XciIntakeOptions, XciToolPreference};
+use recomp_pipeline::xci::{
+    check_intake_manifest, intake_xci, XciIntakeOptions, XciToolPreference,
+};
 use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -301,6 +303,9 @@ fn intake_xci_emits_manifest_and_assets() {
         .and_then(|value| value.as_str())
         .expect("assets_root string");
     assert!(assets_root.contains("assets"));
+
+    let check = check_intake_manifest(&out_dir.join("manifest.json")).expect("check manifest");
+    assert!(check.missing_files.is_empty());
 }
 
 #[test]

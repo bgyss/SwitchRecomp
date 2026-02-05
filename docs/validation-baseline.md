@@ -7,7 +7,12 @@ This document defines the baseline validation suite and thresholds for correctne
 - `pipeline_minimal_sample`: Minimal sample pipeline emits expected artifacts and detects inputs.
 
 ## Video Validation
-Video-based validation is a separate workflow that compares reference and capture hashes. See `docs/validation-video.md` for configuration, hashing, and report details.
+Video-based validation is invoked separately via `recomp-validation video` and adds a `video`
+summary to `validation-report.json`. The video summary includes hash match ratios, drift
+statistics, and triage notes.
+
+For runs that stitch together intake outputs, pipeline outputs, and captures, use the
+`artifacts` command with an artifact index JSON (see `docs/validation-artifacts.md`).
 
 ## Thresholds
 - All baseline cases must pass (0 failures).

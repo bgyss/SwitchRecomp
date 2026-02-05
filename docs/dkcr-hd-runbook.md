@@ -54,6 +54,10 @@ recomp-validation video \
   --reference samples/reference_video.toml \
   --capture artifacts/dkcr-hd/capture.toml \
   --out-dir artifacts/dkcr-hd/validation
+
+scripts/validation_artifacts_init.sh --out artifacts/dkcr-hd/artifacts.json
+# Edit artifacts/dkcr-hd/artifacts.json to point at intake/pipeline manifests.
+scripts/validate_artifacts.sh --artifact-index artifacts/dkcr-hd/artifacts.json
 ```
 
 Note: The automated validation loop is paused until SPEC-210/220/230/240 are implemented.

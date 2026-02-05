@@ -1,0 +1,17 @@
+schema_version = "1"
+title = "DKCR HD First-Level"
+notes = "Placeholder patch set for first-level bring-up."
+
+[[patches]]
+id = "skip_intro_cutscene"
+kind = "branch_patch"
+target = "main"
+offset = "0x00000000"
+comment = "Placeholder offset. Replace with the real branch address once located."
+
+[[patches]]
+id = "force_debug_logging"
+kind = "config_override"
+target = "runtime.logging"
+value = "verbose"
+comment = "Placeholder override for early bring-up visibility."

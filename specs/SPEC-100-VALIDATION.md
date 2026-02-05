@@ -35,6 +35,7 @@ Define validation, testing, and acceptance criteria for the project.
 
 ## Trace Guidance
 - `docs/validation-traces.md` documents how to add new golden traces without distributing proprietary data.
+- `docs/validation-artifacts.md` defines the external artifact index and validation workflow.
 
 ## Deliverables
 - A test harness and baseline test suite.

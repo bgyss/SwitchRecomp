@@ -1,0 +1,17 @@
+{
+  "schema_version": "v1",
+  "observations": [
+    {
+      "id": "boot-logo",
+      "observed_timecode": "00:00:02.600"
+    },
+    {
+      "id": "level-start",
+      "observed_timecode": "00:00:05.450"
+    },
+    {
+      "id": "checkpoint-1",
+      "observed_timecode": "00:00:20.300"
+    }
+  ]
+}

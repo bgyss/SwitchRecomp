@@ -42,6 +42,12 @@ Configured hooks:
 - Pre-commit: `trailing-whitespace`, `end-of-file-fixer`, `check-merge-conflict`, `check-yaml`, `check-toml`, `check-json`, `check-added-large-files`, `detect-private-key`, `check-executables-have-shebangs`, `check-symlinks`, `check-case-conflict`, `cargo fmt --check`.
 - Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
 
+## Testing Expectations
+- Always run the full test suite (`cargo test`) after changes.
+- PRs must include a Testing section that lists the command and outcome.
+- Do not mark tests as "Not run" unless you have explicit approval to skip them.
+- Include the test outcome in status updates so reviews never default to "Not run".
+
 ## Workspace Commands
 - Run all tests:
 
@@ -53,6 +59,12 @@ cargo test
 
 ```
 cargo run -p recomp-validation -- --out-dir artifacts/validation
+```
+
+- Run validation from an artifact index (XCI intake + pipeline + captures):
+
+```
+cargo run -p recomp-validation -- artifacts --artifact-index /Volumes/External/validation/artifacts.json
 ```
 
 - ISA unit tests live in `crates/recomp-isa` and validate arithmetic, shifts, load/store alignment, and flag updates.

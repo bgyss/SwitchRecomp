@@ -1,0 +1,50 @@
+{
+  "label": "sample-first-level",
+  "inputs": {
+    "reference": "/path/to/reference.mp4",
+    "test": "/path/to/recompiled.mp4"
+  },
+  "settings": {
+    "width": 1920,
+    "height": 1080,
+    "fps": 60.0,
+    "audio_rate": 48000,
+    "offset": 0.25,
+    "trim_start": 5.0,
+    "duration": 30.0,
+    "vmaf": true
+  },
+  "video": {
+    "ssim": {
+      "samples": 120,
+      "average": 0.9
+    },
+    "psnr": {
+      "samples": 120,
+      "average": 32.0
+    },
+    "vmaf": {
+      "samples": 120,
+      "average": 82.0,
+      "min": 75.0,
+      "max": 88.0
+    }
+  },
+  "audio": {
+    "reference": {
+      "integrated_lufs": -16.0,
+      "true_peak_dbtp": -1.2
+    },
+    "test": {
+      "integrated_lufs": -21.5,
+      "true_peak_dbtp": 2.5
+    }
+  },
+  "artifacts": {
+    "ssim_log": "out/metrics/ssim.log",
+    "psnr_log": "out/metrics/psnr.log",
+    "vmaf_log": "out/metrics/vmaf.json",
+    "ref_ebur128_log": "out/metrics/ref_ebur128.log",
+    "test_ebur128_log": "out/metrics/test_ebur128.log"
+  }
+}

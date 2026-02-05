@@ -53,6 +53,9 @@ pub struct InputRecord {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum InputFormatHint {
+    Xci,
+    Keyset,
+    VideoMp4,
     Nca,
     Exefs,
     Nso0,
@@ -60,12 +63,13 @@ pub enum InputFormatHint {
     Nrr0,
     Npdm,
     LiftedJson,
-    Xci,
-    Keyset,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum InputFormat {
+    Xci,
+    Keyset,
+    VideoMp4,
     Nca,
     Exefs,
     Nso0,
@@ -73,13 +77,14 @@ pub enum InputFormat {
     Nrr0,
     Npdm,
     LiftedJson,
-    Xci,
-    Keyset,
 }
 
 impl InputFormat {
     pub fn as_str(self) -> &'static str {
         match self {
+            InputFormat::Xci => "xci",
+            InputFormat::Keyset => "keyset",
+            InputFormat::VideoMp4 => "video_mp4",
             InputFormat::Nca => "nca",
             InputFormat::Exefs => "exefs",
             InputFormat::Nso0 => "nso0",
@@ -87,8 +92,6 @@ impl InputFormat {
             InputFormat::Nrr0 => "nrr0",
             InputFormat::Npdm => "npdm",
             InputFormat::LiftedJson => "lifted_json",
-            InputFormat::Xci => "xci",
-            InputFormat::Keyset => "keyset",
         }
     }
 }
@@ -184,6 +187,9 @@ impl ProvenanceManifest {
             let detected = detect_format(&resolved)?;
             if let Some(hint) = record.format {
                 let expected = match hint {
+                    InputFormatHint::Xci => InputFormat::Xci,
+                    InputFormatHint::Keyset => InputFormat::Keyset,
+                    InputFormatHint::VideoMp4 => InputFormat::VideoMp4,
                     InputFormatHint::Nca => InputFormat::Nca,
                     InputFormatHint::Exefs => InputFormat::Exefs,
                     InputFormatHint::Nso0 => InputFormat::Nso0,
@@ -191,8 +197,6 @@ impl ProvenanceManifest {
                     InputFormatHint::Nrr0 => InputFormat::Nrr0,
                     InputFormatHint::Npdm => InputFormat::Npdm,
                     InputFormatHint::LiftedJson => InputFormat::LiftedJson,
-                    InputFormatHint::Xci => InputFormat::Xci,
-                    InputFormatHint::Keyset => InputFormat::Keyset,
                 };
                 if expected != detected {
                     return Err(format!(
@@ -253,8 +257,11 @@ pub fn detect_format(path: &Path) -> Result<InputFormat, String> {
         if ext.eq_ignore_ascii_case("xci") {
             return Ok(InputFormat::Xci);
         }
-        if ext.eq_ignore_ascii_case("keys") || ext.eq_ignore_ascii_case("keyset") {
+        if ext.eq_ignore_ascii_case("keys") || ext.eq_ignore_ascii_case("key") {
             return Ok(InputFormat::Keyset);
+        }
+        if ext.eq_ignore_ascii_case("mp4") {
+            return Ok(InputFormat::VideoMp4);
         }
     }
 
@@ -268,7 +275,12 @@ pub fn detect_format(path: &Path) -> Result<InputFormat, String> {
         ));
     }
     let magic = &bytes[0..4];
+    if bytes.len() >= 8 && &bytes[4..8] == b"ftyp" {
+        return Ok(InputFormat::VideoMp4);
+    }
+
     match magic {
+        b"XCI0" => Ok(InputFormat::Xci),
         b"NCA3" | b"NCA2" => Ok(InputFormat::Nca),
         b"PFS0" => Ok(InputFormat::Exefs),
         b"NSO0" => Ok(InputFormat::Nso0),

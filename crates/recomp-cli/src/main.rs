@@ -1,11 +1,12 @@
 use clap::{Parser, Subcommand, ValueEnum};
 mod automation;
-use automation::run_automation;
 use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
-use recomp_pipeline::xci::{intake_xci, XciIntakeOptions, XciToolPreference};
+use recomp_pipeline::xci::{
+    check_intake_manifest, intake_xci, XciIntakeOptions, XciToolPreference,
+};
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
 
@@ -23,7 +24,7 @@ enum Command {
     HomebrewIntake(HomebrewIntakeArgs),
     HomebrewLift(HomebrewLiftArgs),
     XciIntake(XciIntakeArgs),
-    Automate(AutomateArgs),
+    XciValidate(XciValidateArgs),
 }
 
 #[derive(Parser, Debug)]
@@ -83,42 +84,31 @@ struct XciIntakeArgs {
     #[arg(long)]
     keys: PathBuf,
     #[arg(long)]
+    config: Option<PathBuf>,
+    #[arg(long)]
     provenance: PathBuf,
     #[arg(long)]
     out_dir: PathBuf,
     #[arg(long)]
-    assets_dir: PathBuf,
-    #[arg(long)]
-    config: Option<PathBuf>,
+    assets_dir: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "auto")]
-    xci_tool: XciToolMode,
+    xci_tool: XciToolPreferenceArg,
     #[arg(long)]
     xci_tool_path: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]
-struct AutomateArgs {
+struct XciValidateArgs {
     #[arg(long)]
-    config: PathBuf,
+    manifest: PathBuf,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
-enum XciToolMode {
+enum XciToolPreferenceArg {
     Auto,
     Hactool,
     Hactoolnet,
     Mock,
-}
-
-impl From<XciToolMode> for XciToolPreference {
-    fn from(value: XciToolMode) -> Self {
-        match value {
-            XciToolMode::Auto => XciToolPreference::Auto,
-            XciToolMode::Hactool => XciToolPreference::Hactool,
-            XciToolMode::Hactoolnet => XciToolPreference::Hactoolnet,
-            XciToolMode::Mock => XciToolPreference::Mock,
-        }
-    }
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -132,6 +122,17 @@ impl From<HomebrewLiftMode> for LiftMode {
         match value {
             HomebrewLiftMode::Stub => LiftMode::Stub,
             HomebrewLiftMode::Decode => LiftMode::Decode,
+        }
+    }
+}
+
+impl From<XciToolPreferenceArg> for XciToolPreference {
+    fn from(value: XciToolPreferenceArg) -> Self {
+        match value {
+            XciToolPreferenceArg::Auto => XciToolPreference::Auto,
+            XciToolPreferenceArg::Hactool => XciToolPreference::Hactool,
+            XciToolPreferenceArg::Hactoolnet => XciToolPreference::Hactoolnet,
+            XciToolPreferenceArg::Mock => XciToolPreference::Mock,
         }
     }
 }
@@ -245,13 +246,16 @@ fn main() {
             }
         }
         Command::XciIntake(intake) => {
+            let assets_dir = intake
+                .assets_dir
+                .unwrap_or_else(|| intake.out_dir.join("assets"));
             let options = XciIntakeOptions {
                 xci_path: intake.xci,
                 keys_path: intake.keys,
                 config_path: intake.config,
                 provenance_path: intake.provenance,
                 out_dir: intake.out_dir,
-                assets_dir: intake.assets_dir,
+                assets_dir,
                 tool_preference: intake.xci_tool.into(),
                 tool_path: intake.xci_tool_path,
             };
@@ -264,7 +268,6 @@ fn main() {
                     );
                     println!("module.json: {}", report.module_json_path.display());
                     println!("manifest.json: {}", report.manifest_path.display());
-                    println!("assets root: {}", report.assets_dir.display());
                 }
                 Err(err) => {
                     eprintln!("XCI intake error: {err}");
@@ -272,12 +275,30 @@ fn main() {
                 }
             }
         }
-        Command::Automate(automate) => match run_automation(&automate.config) {
-            Ok(manifest) => {
-                println!("Automation complete ({} steps).", manifest.steps.len());
+        Command::XciValidate(validate) => match check_intake_manifest(&validate.manifest) {
+            Ok(check) => {
+                if !check.missing_files.is_empty() {
+                    eprintln!("XCI intake manifest has missing files:");
+                    for missing in &check.missing_files {
+                        eprintln!("- {missing}");
+                    }
+                    std::process::exit(1);
+                }
+                let program = &check.manifest.program;
+                println!(
+                    "XCI intake manifest ok: title_id={} name={} version={}",
+                    program.title_id,
+                    program.name.as_deref().unwrap_or("unknown"),
+                    program.version
+                );
+                println!(
+                    "assets: {} generated_files: {}",
+                    check.manifest.assets.len(),
+                    check.manifest.generated_files.len()
+                );
             }
             Err(err) => {
-                eprintln!("Automation error: {err}");
+                eprintln!("XCI intake manifest error: {err}");
                 std::process::exit(1);
             }
         },

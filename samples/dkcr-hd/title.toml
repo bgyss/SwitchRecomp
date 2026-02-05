@@ -1,51 +1,49 @@
-title = "DKCR HD Sample"
+title = "DKCR HD First-Level"
 entry = "entry"
 abi_version = "0.1.0"
 
+[stubs]
+svc_log = "log"
+svc_sleep = "noop"
+"sm:" = "log"
+"sm:m" = "log"
+"fs" = "log"
+"fs:ldr" = "log"
+"fs:pr" = "log"
+"hid" = "log"
+"irs" = "log"
+"audout" = "log"
+"audren" = "log"
+"appletOE" = "log"
+"acc:u0" = "log"
+"ns:am2" = "log"
+"nifm:u" = "noop"
+
 [runtime]
-performance_mode = "handheld"
-
-[runtime.memory_layout]
-[[runtime.memory_layout.regions]]
-name = "code"
-base = 0x1000_0000
-size = 0x0008_0000
-permissions = { read = true, write = false, execute = true }
-
-[[runtime.memory_layout.regions]]
-name = "rodata"
-base = 0x1008_0000
-size = 0x0004_0000
-permissions = { read = true, write = false, execute = false }
-
-[[runtime.memory_layout.regions]]
-name = "data"
-base = 0x100c_0000
-size = 0x0008_0000
-permissions = { read = true, write = true, execute = false }
-
-[[runtime.memory_layout.regions]]
-name = "heap"
-base = 0x2000_0000
-size = 0x0040_0000
-permissions = { read = true, write = true, execute = false }
-
-[[runtime.memory_layout.regions]]
-name = "stack"
-base = 0x3000_0000
-size = 0x0010_0000
-permissions = { read = true, write = true, execute = false }
+performance_mode = "docked"
 
 [assets]
-romfs_root = "game-data/dkcr-hd/romfs"
+romfs_path = "/Volumes/External/DKCR_HD/romfs"
+shader_cache_path = "/Volumes/External/DKCR_HD/shader-cache"
+save_data_dir = "/Volumes/External/DKCR_HD/save-data"
+
+[keys]
+prod_keys_path = "/Volumes/External/SwitchKeys/prod.keys"
+title_keys_path = "/Volumes/External/SwitchKeys/title.keys"
+
+[inputs]
+xci_path = "/Volumes/External/DKCR_HD/game.xci"
+program_nca_path = "/Volumes/External/DKCR_HD/program.nca"
+exefs_dir = "/Volumes/External/DKCR_HD/exefs"
 
 [patches]
-patch_set = "patches/first-level.toml"
+patch_set = "patches/patches.toml"
 
-[stubs]
-svc_boot = "log"
-svc_sm = "log"
-svc_fs = "log"
-svc_vi = "log"
-svc_hid = "log"
-svc_audout = "log"
+[validation]
+reference_video_path = "/Volumes/External/DKCR_HD/reference/first-level.mp4"
+segment_start = "00:00:00"
+segment_end = "00:06:00"
+
+[gpu]
+backend = "metal"
+notes = "Placeholder for Maxwell-to-Metal mapping during first-level validation."

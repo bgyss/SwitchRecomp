@@ -4,12 +4,10 @@
     {
       "name": "entry",
       "ops": [
-        { "op": "syscall", "name": "svc_boot", "args": [] },
-        { "op": "syscall", "name": "svc_sm", "args": [] },
-        { "op": "syscall", "name": "svc_fs", "args": [] },
-        { "op": "syscall", "name": "svc_vi", "args": [] },
-        { "op": "syscall", "name": "svc_hid", "args": [] },
-        { "op": "syscall", "name": "svc_audout", "args": [] },
+        { "op": "const_i64", "dst": "x0", "imm": 1 },
+        { "op": "const_i64", "dst": "x1", "imm": 2 },
+        { "op": "add_i64", "dst": "x2", "lhs": "x0", "rhs": "x1" },
+        { "op": "syscall", "name": "svc_log", "args": ["x2"] },
         { "op": "ret" }
       ]
     }

@@ -111,7 +111,11 @@ impl TitleConfig {
         let performance_mode = PerformanceMode::from_str(&runtime_mode)?;
         let memory_layout = match runtime.memory_layout {
             Some(layout) => parse_memory_layout(layout)?,
-            None => MemoryLayoutDescriptor::minimal_default(),
+            None => {
+                let layout = MemoryLayoutDescriptor::minimal_default();
+                layout.validate()?;
+                layout
+            }
         };
         Ok(TitleConfig {
             title: raw.title,

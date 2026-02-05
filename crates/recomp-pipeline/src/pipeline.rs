@@ -174,6 +174,8 @@ fn build_memory_image(
         return Ok((None, Vec::new()));
     }
 
+    validate_module_segments(&module.segments)?;
+
     let base_dir = module_path.parent().unwrap_or_else(|| Path::new("."));
     let mut descriptor = MemoryImageDescriptor::empty();
     let mut sources = Vec::new();
@@ -234,6 +236,30 @@ fn build_memory_image(
     }
 
     Ok((Some(descriptor), sources))
+}
+
+fn validate_module_segments(segments: &[crate::input::ModuleSegment]) -> Result<(), PipelineError> {
+    let mut ranges = Vec::with_capacity(segments.len());
+    for segment in segments {
+        let end = segment.base.checked_add(segment.size).ok_or_else(|| {
+            PipelineError::Module(format!("segment {} overflows address space", segment.name))
+        })?;
+        ranges.push((segment.name.as_str(), segment.base, end));
+    }
+
+    ranges.sort_by(|a, b| a.1.cmp(&b.1));
+    for window in ranges.windows(2) {
+        let left = window[0];
+        let right = window[1];
+        if left.2 > right.1 {
+            return Err(PipelineError::Module(format!(
+                "segments {} and {} overlap",
+                left.0, right.0
+            )));
+        }
+    }
+
+    Ok(())
 }
 
 fn sanitize_segment_name(name: &str, index: usize) -> String {
