@@ -15,8 +15,8 @@ fn artifact_validation_runs_xci_manifest_check() {
         "program": {
             "name": "test",
             "title_id": "0100000000000000",
-            "version": 1,
-            "content_type": "Program"
+            "version": "1.0.0",
+            "content_type": "program"
         },
         "assets": [],
         "generated_files": [
@@ -41,7 +41,7 @@ fn artifact_validation_runs_xci_manifest_check() {
         out_dir: Some(out_dir.clone()),
     };
 
-    let report = run_artifact_validation(&index, out_dir);
+    let report = run_artifact_validation(&index);
     assert_eq!(report.failed, 0);
     assert_eq!(report.passed, 1);
     assert_eq!(report.cases.len(), 1);

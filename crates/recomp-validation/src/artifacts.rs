@@ -28,7 +28,7 @@ pub fn load_artifact_index(path: &Path) -> Result<ArtifactIndex, String> {
     serde_json::from_str(&text).map_err(|err| format!("parse artifact index json: {err}"))
 }
 
-pub fn run_artifact_validation(index: &ArtifactIndex, out_dir: PathBuf) -> ValidationReport {
+pub fn run_artifact_validation(index: &ArtifactIndex) -> ValidationReport {
     let mut cases = Vec::new();
 
     if let Some(path) = &index.xci_intake_manifest {

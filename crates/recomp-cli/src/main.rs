@@ -1,13 +1,11 @@
 use clap::{Parser, Subcommand, ValueEnum};
 mod automation;
-use automation::run_automation;
 use recomp_pipeline::bundle::{package_bundle, PackageOptions};
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
 use recomp_pipeline::xci::{
-    check_intake_manifest, intake_xci, IntakeOptions as XciIntakeOptions, ProgramSelection,
-    ToolKind,
+    check_intake_manifest, intake_xci, XciIntakeOptions, XciToolPreference,
 };
 use recomp_pipeline::{run_pipeline, PipelineOptions};
 use std::path::PathBuf;
@@ -86,19 +84,17 @@ struct XciIntakeArgs {
     #[arg(long)]
     keys: PathBuf,
     #[arg(long)]
-    title_keys: Option<PathBuf>,
+    config: Option<PathBuf>,
     #[arg(long)]
     provenance: PathBuf,
     #[arg(long)]
     out_dir: PathBuf,
     #[arg(long)]
-    xci_tool: Option<PathBuf>,
+    assets_dir: Option<PathBuf>,
     #[arg(long, value_enum, default_value = "auto")]
-    xci_tool_kind: XciToolKind,
-    #[arg(long, conflicts_with = "program_name")]
-    program_title_id: Option<String>,
+    xci_tool: XciToolPreferenceArg,
     #[arg(long)]
-    program_name: Option<String>,
+    xci_tool_path: Option<PathBuf>,
 }
 
 #[derive(Parser, Debug)]
@@ -108,10 +104,11 @@ struct XciValidateArgs {
 }
 
 #[derive(ValueEnum, Debug, Clone)]
-enum XciToolKind {
+enum XciToolPreferenceArg {
     Auto,
     Hactool,
     Hactoolnet,
+    Mock,
 }
 
 #[derive(ValueEnum, Debug, Clone)]
@@ -129,12 +126,13 @@ impl From<HomebrewLiftMode> for LiftMode {
     }
 }
 
-impl From<XciToolKind> for ToolKind {
-    fn from(value: XciToolKind) -> Self {
+impl From<XciToolPreferenceArg> for XciToolPreference {
+    fn from(value: XciToolPreferenceArg) -> Self {
         match value {
-            XciToolKind::Auto => ToolKind::Auto,
-            XciToolKind::Hactool => ToolKind::Hactool,
-            XciToolKind::Hactoolnet => ToolKind::HactoolNet,
+            XciToolPreferenceArg::Auto => XciToolPreference::Auto,
+            XciToolPreferenceArg::Hactool => XciToolPreference::Hactool,
+            XciToolPreferenceArg::Hactoolnet => XciToolPreference::Hactoolnet,
+            XciToolPreferenceArg::Mock => XciToolPreference::Mock,
         }
     }
 }
@@ -248,24 +246,18 @@ fn main() {
             }
         }
         Command::XciIntake(intake) => {
-            let program = if let Some(title_id) = intake.program_title_id {
-                ProgramSelection::TitleId(title_id)
-            } else if let Some(name) = intake.program_name {
-                ProgramSelection::Name(name)
-            } else {
-                eprintln!("XCI intake requires --program-title-id or --program-name");
-                std::process::exit(2);
-            };
-
+            let assets_dir = intake
+                .assets_dir
+                .unwrap_or_else(|| intake.out_dir.join("assets"));
             let options = XciIntakeOptions {
                 xci_path: intake.xci,
                 keys_path: intake.keys,
+                config_path: intake.config,
                 provenance_path: intake.provenance,
                 out_dir: intake.out_dir,
-                program,
-                tool_path: intake.xci_tool,
-                tool_kind: intake.xci_tool_kind.into(),
-                title_keys_path: intake.title_keys,
+                assets_dir,
+                tool_preference: intake.xci_tool.into(),
+                tool_path: intake.xci_tool_path,
             };
             match intake_xci(options) {
                 Ok(report) => {
@@ -295,7 +287,9 @@ fn main() {
                 let program = &check.manifest.program;
                 println!(
                     "XCI intake manifest ok: title_id={} name={} version={}",
-                    program.title_id, program.name, program.version
+                    program.title_id,
+                    program.name.as_deref().unwrap_or("unknown"),
+                    program.version
                 );
                 println!(
                     "assets: {} generated_files: {}",

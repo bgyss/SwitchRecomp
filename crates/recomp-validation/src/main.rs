@@ -92,7 +92,7 @@ fn main() {
                 std::process::exit(2);
             });
             let out_dir = resolve_artifact_out_dir(&index, cmd.out_dir);
-            let report = run_artifact_validation(&index, out_dir.clone());
+            let report = run_artifact_validation(&index);
             if let Err(err) = write_report(&out_dir, &report) {
                 eprintln!("failed to write validation report: {err}");
                 std::process::exit(1);

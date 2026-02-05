@@ -18,10 +18,11 @@ XCI intake (external tooling):
 cargo run -p recomp-cli -- xci-intake \
   --xci /Volumes/External/DKCR_HD/game.xci \
   --keys /Volumes/External/SwitchKeys/prod.keys \
-  --program-title-id 0100000000000000 \
   --provenance samples/dkcr-hd/provenance.toml \
   --out-dir out/dkcr-hd-intake \
-  --xci-tool /usr/local/bin/hactool
+  --assets-dir out/dkcr-hd-assets \
+  --xci-tool hactool \
+  --xci-tool-path /usr/local/bin/hactool
 ```
 
 Usage (from repo root):
