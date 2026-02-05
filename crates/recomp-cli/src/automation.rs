@@ -1,3 +1,6 @@
+#![allow(dead_code)]
+// Automation scaffolding is intentionally compiled but not yet wired into the CLI.
+
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
