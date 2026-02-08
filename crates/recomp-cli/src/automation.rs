@@ -23,11 +23,19 @@ const RUN_SUMMARY_SCHEMA_VERSION: &str = "1";
 const STRATEGY_CATALOG_SCHEMA_VERSION: &str = "1";
 const CLOUD_RUN_REQUEST_SCHEMA_VERSION: &str = "1";
 const CLOUD_STATUS_EVENT_SCHEMA_VERSION: &str = "1";
+const CLOUD_SUBMISSION_RECEIPT_SCHEMA_VERSION: &str = "1";
 const AGENT_AUDIT_SCHEMA_VERSION: &str = "1";
+const AGENT_GATEWAY_REQUEST_SCHEMA_VERSION: &str = "1";
+const AGENT_GATEWAY_RESPONSE_SCHEMA_VERSION: &str = "1";
 
 const DEFAULT_MAX_RETRIES: usize = 5;
 const DEFAULT_MAX_RUNTIME_MINUTES: u64 = 120;
 const DEFAULT_AUDIO_RATE: u32 = 48_000;
+const DEFAULT_CLOUD_OBSERVE_POLL_INTERVAL_SECONDS: u64 = 2;
+const DEFAULT_CLOUD_OBSERVE_MAX_POLLS: usize = 3;
+const DEFAULT_AGENT_GATEWAY_REASON_MAX_LEN: usize = 1024;
+const DEFAULT_AGENT_GATEWAY_SCHEMA_PATH: &str =
+    "config/aws/model-gateway/strategy-response.schema.json";
 
 #[derive(Debug, Deserialize, Clone)]
 pub struct AutomationConfig {
@@ -316,6 +324,18 @@ pub struct AgentConfig {
     pub max_cost_usd: Option<f64>,
     #[serde(default)]
     pub approval_mode: Option<String>,
+    #[serde(default)]
+    pub gateway: AgentGatewayConfig,
+}
+
+#[derive(Debug, Deserialize, Clone, Default, Serialize)]
+pub struct AgentGatewayConfig {
+    #[serde(default)]
+    pub command: Option<Vec<String>>,
+    #[serde(default = "default_agent_gateway_reason_max_len")]
+    pub reason_max_len: usize,
+    #[serde(default)]
+    pub schema_path: Option<PathBuf>,
 }
 
 #[derive(Debug, Deserialize, Clone, Serialize)]
@@ -327,7 +347,17 @@ pub struct CloudConfig {
     #[serde(default)]
     pub queue_name: Option<String>,
     #[serde(default)]
+    pub queue_url: Option<String>,
+    #[serde(default)]
     pub state_machine_arn: Option<String>,
+    #[serde(default)]
+    pub aws_cli_path: Option<PathBuf>,
+    #[serde(default = "default_cloud_observe_execution")]
+    pub observe_execution: bool,
+    #[serde(default = "default_cloud_observe_poll_interval_seconds")]
+    pub observe_poll_interval_seconds: u64,
+    #[serde(default = "default_cloud_observe_max_polls")]
+    pub observe_max_polls: usize,
 }
 
 impl Default for CloudConfig {
@@ -336,7 +366,12 @@ impl Default for CloudConfig {
             mode: CloudMode::Local,
             artifact_uri: None,
             queue_name: None,
+            queue_url: None,
             state_machine_arn: None,
+            aws_cli_path: None,
+            observe_execution: default_cloud_observe_execution(),
+            observe_poll_interval_seconds: default_cloud_observe_poll_interval_seconds(),
+            observe_max_polls: default_cloud_observe_max_polls(),
         }
     }
 }
@@ -618,6 +653,7 @@ struct ResolvedPaths {
     cloud_run_request: PathBuf,
     cloud_state_machine_input: PathBuf,
     cloud_status_log: PathBuf,
+    cloud_submission_receipt: PathBuf,
     agent_dir: PathBuf,
     agent_audit_log: PathBuf,
 }
@@ -724,7 +760,7 @@ struct CloudStateMachineInput {
     max_attempts: usize,
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Serialize, Deserialize, Clone)]
 struct CloudStatusEvent {
     schema_version: String,
     run_id: String,
@@ -738,6 +774,19 @@ struct CloudStatusEvent {
     final_status: Option<RunFinalStatus>,
     #[serde(skip_serializing_if = "Option::is_none")]
     detail: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize, Clone)]
+struct CloudSubmissionReceipt {
+    schema_version: String,
+    run_id: String,
+    #[serde(default)]
+    input_fingerprint: Option<String>,
+    queue_url: String,
+    sqs_message_id: String,
+    execution_arn: String,
+    execution_name: String,
+    submitted_unix: u64,
 }
 
 #[derive(Debug, Serialize)]
@@ -767,6 +816,34 @@ struct AgentAuditInput<'a> {
     reason: String,
 }
 
+#[derive(Debug, Serialize)]
+struct AgentGatewayRequest {
+    schema_version: String,
+    run_id: String,
+    attempt: usize,
+    strategy: String,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    previous_categories: Vec<String>,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    previous_findings: Vec<String>,
+}
+
+#[derive(Debug, Deserialize)]
+struct AgentGatewayResponse {
+    schema_version: String,
+    strategy: String,
+    confidence: f64,
+    reason: String,
+    #[serde(default, alias = "cost")]
+    cost_usd: f64,
+}
+
+#[derive(Debug, Clone)]
+struct AgentGatewaySchema {
+    schema_version_const: String,
+    strategy_enum: HashSet<String>,
+}
+
 pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
     let config_path = fs::canonicalize(config_path)
         .map_err(|err| format!("resolve automation config {}: {err}", config_path.display()))?;
@@ -793,7 +870,14 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
 
     let inputs = gather_inputs(&config, &config_path, &paths)?;
     let input_fingerprint = fingerprint_inputs(&inputs);
-    let run_id = format!("run-{}-{}", unix_seconds(), &input_fingerprint[..8]);
+    let mut run_id = format!("run-{}-{}", unix_seconds(), &input_fingerprint[..8]);
+    if config.run.resume && config.cloud.mode == CloudMode::AwsHybrid {
+        if let Some(receipt) = load_cloud_submission_receipt(&paths.cloud_submission_receipt)? {
+            if receipt.input_fingerprint.as_deref() == Some(input_fingerprint.as_str()) {
+                run_id = receipt.run_id;
+            }
+        }
+    }
 
     if config.run.resume && paths.run_manifest.exists() {
         if let Ok(previous) = load_run_manifest(&paths.run_manifest) {
@@ -825,6 +909,17 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
     let mut last_attempt: Option<AttemptExecution> = None;
     let mut current_config = config.clone();
     let mut halted_reason = None;
+    let mut cloud_execution_arn = None;
+    let gateway_schema = if current_config.agent.enabled
+        && current_config.loop_config.enabled
+        && current_config.loop_config.max_retries > 0
+    {
+        Some(load_agent_gateway_schema(
+            &resolve_agent_gateway_schema_path(&current_config, &paths),
+        )?)
+    } else {
+        None
+    };
 
     if current_config.cloud.mode == CloudMode::AwsHybrid {
         let queue_name = current_config
@@ -871,6 +966,21 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
             None,
             Some("run request emitted for aws_hybrid mode".to_string()),
         )?;
+
+        let receipt = submit_aws_hybrid(
+            &current_config.cloud,
+            &paths,
+            &run_id,
+            &run_request,
+            &state_input,
+        )?;
+        cloud_execution_arn = Some(receipt.execution_arn.clone());
+        observe_aws_execution(
+            &current_config.cloud,
+            &paths.cloud_status_log,
+            &run_id,
+            &receipt.execution_arn,
+        )?;
     }
 
     if current_config.agent.enabled {
@@ -915,7 +1025,25 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
                 break;
             };
 
-            let (allowed, reason) = evaluate_agent_strategy_policy(&current_config.agent);
+            let (gateway_allowed, gateway_reason) = evaluate_agent_gateway_strategy(
+                &current_config,
+                &paths,
+                &run_id,
+                attempt,
+                strategy_kind,
+                last_attempt.as_ref(),
+                gateway_schema.as_ref(),
+            )?;
+            let (policy_allowed, policy_reason) =
+                evaluate_agent_strategy_policy(&current_config.agent);
+            let allowed = gateway_allowed && policy_allowed;
+            let reason = if !gateway_allowed {
+                gateway_reason
+            } else if !policy_allowed {
+                policy_reason
+            } else {
+                format!("{gateway_reason}; {policy_reason}")
+            };
             if current_config.agent.enabled {
                 append_agent_audit(
                     &paths.agent_audit_log,
@@ -1055,6 +1183,14 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
         .map(|attempt| attempt.attempt);
 
     if current_config.cloud.mode == CloudMode::AwsHybrid {
+        if let Some(execution_arn) = &cloud_execution_arn {
+            observe_aws_execution(
+                &current_config.cloud,
+                &paths.cloud_status_log,
+                &run_id,
+                execution_arn,
+            )?;
+        }
         append_cloud_status(
             &paths.cloud_status_log,
             &run_id,
@@ -1526,7 +1662,11 @@ fn run_single_attempt(
         .parent()
         .unwrap_or_else(|| Path::new("."));
     let capture_video_path = resolve_path(capture_config_dir, &capture_config.video.path);
-    if capture_video_path != config.capture.video_path {
+    let capture_video_path_canon =
+        fs::canonicalize(&capture_video_path).unwrap_or_else(|_| capture_video_path.clone());
+    let config_capture_video_canon = fs::canonicalize(&config.capture.video_path)
+        .unwrap_or_else(|_| config.capture.video_path.clone());
+    if capture_video_path_canon != config_capture_video_canon {
         return Err(format!(
             "capture video path mismatch: config {}, capture_video.toml {}",
             config.capture.video_path.display(),
@@ -2384,7 +2524,10 @@ fn select_next_strategy(
 ) -> Option<StrategyKind> {
     if let Some(last) = last_attempt {
         if let Some(next) = last.triage.next_strategy {
-            if !used_strategies.contains(&next) && strategy_applicable(next, config) {
+            if order.contains(&next)
+                && !used_strategies.contains(&next)
+                && strategy_applicable(next, config)
+            {
                 return Some(next);
             }
         }
@@ -2802,6 +2945,12 @@ impl AutomationConfig {
         if let Some(path) = &self.loop_config.strategy_catalog_toml {
             self.loop_config.strategy_catalog_toml = Some(resolve_path(base_dir, path));
         }
+        if let Some(path) = &self.cloud.aws_cli_path {
+            self.cloud.aws_cli_path = Some(resolve_path(base_dir, path));
+        }
+        if let Some(path) = &self.agent.gateway.schema_path {
+            self.agent.gateway.schema_path = Some(resolve_path(base_dir, path));
+        }
     }
 
     fn validate(&self) -> Result<(), String> {
@@ -2925,6 +3074,20 @@ impl AutomationConfig {
             if self.cloud.queue_name.is_none() {
                 return Err("cloud.queue_name is required when mode=aws_hybrid".to_string());
             }
+            if self.cloud.state_machine_arn.is_none() {
+                return Err("cloud.state_machine_arn is required when mode=aws_hybrid".to_string());
+            }
+            if self.cloud.observe_max_polls == 0 {
+                return Err("cloud.observe_max_polls must be >= 1".to_string());
+            }
+            if self.cloud.observe_poll_interval_seconds == 0 {
+                return Err("cloud.observe_poll_interval_seconds must be >= 1".to_string());
+            }
+            if let Some(path) = &self.cloud.aws_cli_path {
+                if !path.exists() {
+                    return Err(format!("cloud.aws_cli_path not found: {}", path.display()));
+                }
+            }
 
             // Avoid writing sensitive cloud-run outputs into the repository worktree.
             let repo = repo_root();
@@ -2956,6 +3119,26 @@ impl AutomationConfig {
                 return Err(format!(
                     "agent.model ({model}) is not present in agent.model_allowlist"
                 ));
+            }
+            if self.agent.gateway.reason_max_len == 0 {
+                return Err("agent.gateway.reason_max_len must be >= 1".to_string());
+            }
+            if self.loop_config.enabled && self.loop_config.max_retries > 0 {
+                match &self.agent.gateway.command {
+                    Some(argv) if !argv.is_empty() => {}
+                    _ => {
+                        return Err(
+                            "agent.gateway.command is required when agent.enabled=true and loop retries are enabled".to_string(),
+                        )
+                    }
+                }
+                let schema_path = resolve_agent_gateway_schema_path_from_config(self);
+                if !schema_path.exists() {
+                    return Err(format!(
+                        "agent gateway schema not found: {}",
+                        schema_path.display()
+                    ));
+                }
             }
         }
         for scene in &self.scenes {
@@ -3017,6 +3200,7 @@ impl ResolvedPaths {
         let cloud_run_request = cloud_dir.join("run-request.json");
         let cloud_state_machine_input = cloud_dir.join("state-machine-input.json");
         let cloud_status_log = cloud_dir.join("status-events.jsonl");
+        let cloud_submission_receipt = cloud_dir.join("submission-receipt.json");
         let agent_dir = work_root.join("agent");
         let agent_audit_log = agent_dir.join("audit-events.jsonl");
 
@@ -3038,6 +3222,7 @@ impl ResolvedPaths {
             cloud_run_request,
             cloud_state_machine_input,
             cloud_status_log,
+            cloud_submission_receipt,
             agent_dir,
             agent_audit_log,
         })
@@ -3068,6 +3253,7 @@ impl ResolvedPaths {
             cloud_run_request: self.cloud_run_request.clone(),
             cloud_state_machine_input: self.cloud_state_machine_input.clone(),
             cloud_status_log: self.cloud_status_log.clone(),
+            cloud_submission_receipt: self.cloud_submission_receipt.clone(),
             agent_dir: self.agent_dir.clone(),
             agent_audit_log: self.agent_audit_log.clone(),
         }
@@ -3287,10 +3473,26 @@ fn command_env(paths: &ResolvedPaths, config: &AutomationConfig) -> BTreeMap<Str
     if let Some(queue_name) = &config.cloud.queue_name {
         env.insert("RECOMP_CLOUD_QUEUE_NAME".to_string(), queue_name.clone());
     }
+    if let Some(queue_url) = &config.cloud.queue_url {
+        env.insert("RECOMP_CLOUD_QUEUE_URL".to_string(), queue_url.clone());
+    }
     if let Some(state_machine) = &config.cloud.state_machine_arn {
         env.insert(
             "RECOMP_CLOUD_STATE_MACHINE_ARN".to_string(),
             state_machine.clone(),
+        );
+    }
+    if let Some(aws_cli_path) = &config.cloud.aws_cli_path {
+        env.insert(
+            "RECOMP_CLOUD_AWS_CLI_PATH".to_string(),
+            aws_cli_path.display().to_string(),
+        );
+    }
+    if config.agent.enabled && config.loop_config.enabled && config.loop_config.max_retries > 0 {
+        let schema_path = resolve_agent_gateway_schema_path(config, paths);
+        env.insert(
+            "RECOMP_AGENT_GATEWAY_SCHEMA_PATH".to_string(),
+            schema_path.display().to_string(),
         );
     }
     env
@@ -3438,6 +3640,12 @@ fn gather_inputs_from_config(
     if let Some(path) = &config.loop_config.strategy_catalog_toml {
         inputs.push(run_input("strategy_catalog", path)?);
     }
+    if config.agent.enabled && config.loop_config.enabled && config.loop_config.max_retries > 0 {
+        let schema_path = resolve_agent_gateway_schema_path(config, paths);
+        if schema_path.exists() {
+            inputs.push(run_input("agent_gateway_schema", &schema_path)?);
+        }
+    }
     inputs.sort_by(|a, b| a.name.cmp(&b.name));
     Ok(inputs)
 }
@@ -3545,7 +3753,408 @@ fn append_cloud_status(
         final_status,
         detail,
     };
-    append_jsonl(path, &event)
+    append_cloud_status_event(path, &event)
+}
+
+fn append_cloud_status_event(path: &Path, event: &CloudStatusEvent) -> Result<(), String> {
+    if cloud_status_event_exists(path, event)? {
+        return Ok(());
+    }
+    append_jsonl(path, event)
+}
+
+fn cloud_status_event_exists(path: &Path, candidate: &CloudStatusEvent) -> Result<bool, String> {
+    if !path.exists() {
+        return Ok(false);
+    }
+    let src = fs::read_to_string(path)
+        .map_err(|err| format!("read cloud status log {}: {err}", path.display()))?;
+    for line in src.lines() {
+        if line.trim().is_empty() {
+            continue;
+        }
+        let existing: CloudStatusEvent = serde_json::from_str(line)
+            .map_err(|err| format!("invalid cloud status event {}: {err}", path.display()))?;
+        if existing.schema_version == candidate.schema_version
+            && existing.run_id == candidate.run_id
+            && existing.event == candidate.event
+            && existing.attempt == candidate.attempt
+            && existing.status == candidate.status
+            && existing.final_status == candidate.final_status
+            && existing.detail == candidate.detail
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn submit_aws_hybrid(
+    cloud: &CloudConfig,
+    paths: &ResolvedPaths,
+    run_id: &str,
+    run_request: &CloudRunRequest,
+    state_input: &CloudStateMachineInput,
+) -> Result<CloudSubmissionReceipt, String> {
+    if let Some(existing) = load_cloud_submission_receipt(&paths.cloud_submission_receipt)? {
+        if existing.run_id == run_id {
+            append_cloud_status(
+                &paths.cloud_status_log,
+                run_id,
+                "submission_reused",
+                None,
+                None,
+                None,
+                Some(format!(
+                    "existing execution reused: {}",
+                    existing.execution_arn
+                )),
+            )?;
+            return Ok(existing);
+        }
+    }
+
+    let state_machine_arn = cloud
+        .state_machine_arn
+        .as_ref()
+        .ok_or_else(|| "cloud.state_machine_arn is required when mode=aws_hybrid".to_string())?;
+    let queue_name = cloud
+        .queue_name
+        .as_ref()
+        .ok_or_else(|| "cloud.queue_name is required when mode=aws_hybrid".to_string())?;
+
+    let aws_cli = cloud
+        .aws_cli_path
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("aws"));
+    ensure_command_works(&aws_cli, &["--version".to_string()], "aws CLI availability")?;
+
+    append_cloud_status(
+        &paths.cloud_status_log,
+        run_id,
+        "submit_started",
+        None,
+        None,
+        None,
+        Some("submitting aws_hybrid run request".to_string()),
+    )?;
+
+    let queue_url = if let Some(url) = &cloud.queue_url {
+        url.clone()
+    } else {
+        let output = run_command_capture(
+            &aws_cli,
+            &[
+                "sqs".to_string(),
+                "get-queue-url".to_string(),
+                "--queue-name".to_string(),
+                queue_name.clone(),
+                "--output".to_string(),
+                "json".to_string(),
+            ],
+            "aws sqs get-queue-url",
+        )?;
+        let value: serde_json::Value = serde_json::from_str(&output)
+            .map_err(|err| format!("parse aws sqs get-queue-url output as json: {err}"))?;
+        json_required_string(&value, "QueueUrl", "aws sqs get-queue-url")?
+    };
+
+    let message_body = serde_json::to_string(run_request)
+        .map_err(|err| format!("serialize run request: {err}"))?;
+    let output = run_command_capture(
+        &aws_cli,
+        &[
+            "sqs".to_string(),
+            "send-message".to_string(),
+            "--queue-url".to_string(),
+            queue_url.clone(),
+            "--message-body".to_string(),
+            message_body,
+            "--output".to_string(),
+            "json".to_string(),
+        ],
+        "aws sqs send-message",
+    )?;
+    let sqs_result: serde_json::Value = serde_json::from_str(&output)
+        .map_err(|err| format!("parse aws sqs send-message output as json: {err}"))?;
+    let sqs_message_id = json_required_string(&sqs_result, "MessageId", "aws sqs send-message")?;
+    append_cloud_status(
+        &paths.cloud_status_log,
+        run_id,
+        "sqs_message_submitted",
+        None,
+        None,
+        None,
+        Some(format!("queue_url={queue_url};message_id={sqs_message_id}")),
+    )?;
+
+    let execution_input = serde_json::to_string(state_input)
+        .map_err(|err| format!("serialize state input: {err}"))?;
+    let output = run_command_capture(
+        &aws_cli,
+        &[
+            "stepfunctions".to_string(),
+            "start-execution".to_string(),
+            "--state-machine-arn".to_string(),
+            state_machine_arn.clone(),
+            "--name".to_string(),
+            run_id.to_string(),
+            "--input".to_string(),
+            execution_input,
+            "--output".to_string(),
+            "json".to_string(),
+        ],
+        "aws stepfunctions start-execution",
+    )?;
+    let execution_result: serde_json::Value = serde_json::from_str(&output)
+        .map_err(|err| format!("parse aws stepfunctions start-execution output as json: {err}"))?;
+    let execution_arn = json_required_string(
+        &execution_result,
+        "executionArn",
+        "aws stepfunctions start-execution",
+    )?;
+
+    let receipt = CloudSubmissionReceipt {
+        schema_version: CLOUD_SUBMISSION_RECEIPT_SCHEMA_VERSION.to_string(),
+        run_id: run_id.to_string(),
+        input_fingerprint: Some(run_request.input_fingerprint.clone()),
+        queue_url,
+        sqs_message_id,
+        execution_arn: execution_arn.clone(),
+        execution_name: run_id.to_string(),
+        submitted_unix: unix_seconds(),
+    };
+    write_json(&paths.cloud_submission_receipt, &receipt)?;
+    append_cloud_status(
+        &paths.cloud_status_log,
+        run_id,
+        "worker_execution_started",
+        None,
+        None,
+        None,
+        Some(execution_arn),
+    )?;
+
+    Ok(receipt)
+}
+
+fn observe_aws_execution(
+    cloud: &CloudConfig,
+    cloud_status_log: &Path,
+    run_id: &str,
+    execution_arn: &str,
+) -> Result<(), String> {
+    if !cloud.observe_execution {
+        return Ok(());
+    }
+
+    let aws_cli = cloud
+        .aws_cli_path
+        .clone()
+        .unwrap_or_else(|| PathBuf::from("aws"));
+    ensure_command_works(&aws_cli, &["--version".to_string()], "aws CLI availability")?;
+
+    for poll in 0..cloud.observe_max_polls {
+        let output = run_command_capture(
+            &aws_cli,
+            &[
+                "stepfunctions".to_string(),
+                "describe-execution".to_string(),
+                "--execution-arn".to_string(),
+                execution_arn.to_string(),
+                "--output".to_string(),
+                "json".to_string(),
+            ],
+            "aws stepfunctions describe-execution",
+        )?;
+        let value: serde_json::Value = serde_json::from_str(&output).map_err(|err| {
+            format!("parse aws stepfunctions describe-execution output as json: {err}")
+        })?;
+        let status =
+            json_required_string(&value, "status", "aws stepfunctions describe-execution")?;
+        append_cloud_status(
+            cloud_status_log,
+            run_id,
+            "worker_execution_observed",
+            None,
+            None,
+            None,
+            Some(format!("execution_arn={execution_arn};status={status}")),
+        )?;
+
+        if is_terminal_execution_status(&status) {
+            append_cloud_status(
+                cloud_status_log,
+                run_id,
+                "worker_execution_terminal",
+                None,
+                None,
+                None,
+                Some(format!("execution_arn={execution_arn};status={status}")),
+            )?;
+            return Ok(());
+        }
+
+        if poll + 1 < cloud.observe_max_polls {
+            std::thread::sleep(Duration::from_secs(cloud.observe_poll_interval_seconds));
+        }
+    }
+
+    append_cloud_status(
+        cloud_status_log,
+        run_id,
+        "worker_execution_observe_timeout",
+        None,
+        None,
+        None,
+        Some(format!(
+            "execution_arn={execution_arn};polls={}",
+            cloud.observe_max_polls
+        )),
+    )?;
+    Ok(())
+}
+
+fn load_cloud_submission_receipt(path: &Path) -> Result<Option<CloudSubmissionReceipt>, String> {
+    if !path.exists() {
+        return Ok(None);
+    }
+    let src = fs::read_to_string(path)
+        .map_err(|err| format!("read cloud submission receipt {}: {err}", path.display()))?;
+    let receipt: CloudSubmissionReceipt = serde_json::from_str(&src)
+        .map_err(|err| format!("parse cloud submission receipt {}: {err}", path.display()))?;
+    if receipt.schema_version != CLOUD_SUBMISSION_RECEIPT_SCHEMA_VERSION {
+        return Err(format!(
+            "unsupported cloud submission receipt schema version: {}",
+            receipt.schema_version
+        ));
+    }
+    Ok(Some(receipt))
+}
+
+fn run_command_capture(program: &Path, args: &[String], label: &str) -> Result<String, String> {
+    let output = Command::new(program)
+        .args(args)
+        .output()
+        .map_err(|err| format!("{label} failed to execute ({}): {err}", program.display()))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).to_string();
+    if output.status.success() {
+        return Ok(stdout);
+    }
+
+    let detail = if stderr.trim().is_empty() {
+        stdout.trim().to_string()
+    } else {
+        stderr.trim().to_string()
+    };
+    Err(format!(
+        "{label} failed (exit={}): {}",
+        output.status.code().unwrap_or(-1),
+        detail
+    ))
+}
+
+fn ensure_command_works(program: &Path, args: &[String], label: &str) -> Result<(), String> {
+    let output = Command::new(program)
+        .args(args)
+        .output()
+        .map_err(|err| format!("{label}: missing executable {} ({err})", program.display()))?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        Err(format!(
+            "{label}: executable {} returned exit={} ({})",
+            program.display(),
+            output.status.code().unwrap_or(-1),
+            stderr
+        ))
+    }
+}
+
+fn json_required_string(
+    value: &serde_json::Value,
+    key: &str,
+    context: &str,
+) -> Result<String, String> {
+    value
+        .get(key)
+        .and_then(|value| value.as_str())
+        .map(|value| value.to_string())
+        .ok_or_else(|| format!("{context} missing string field `{key}`"))
+}
+
+fn is_terminal_execution_status(status: &str) -> bool {
+    matches!(status, "SUCCEEDED" | "FAILED" | "TIMED_OUT" | "ABORTED")
+}
+
+fn resolve_agent_gateway_schema_path_from_config(config: &AutomationConfig) -> PathBuf {
+    config
+        .agent
+        .gateway
+        .schema_path
+        .clone()
+        .unwrap_or_else(|| repo_root().join(DEFAULT_AGENT_GATEWAY_SCHEMA_PATH))
+}
+
+fn resolve_agent_gateway_schema_path(config: &AutomationConfig, paths: &ResolvedPaths) -> PathBuf {
+    config
+        .agent
+        .gateway
+        .schema_path
+        .clone()
+        .unwrap_or_else(|| paths.repo_root.join(DEFAULT_AGENT_GATEWAY_SCHEMA_PATH))
+}
+
+fn load_agent_gateway_schema(path: &Path) -> Result<AgentGatewaySchema, String> {
+    let src = fs::read_to_string(path)
+        .map_err(|err| format!("read agent gateway schema {}: {err}", path.display()))?;
+    let value: serde_json::Value = serde_json::from_str(&src)
+        .map_err(|err| format!("parse agent gateway schema {}: {err}", path.display()))?;
+
+    let schema_version_const = value
+        .pointer("/properties/schema_version/const")
+        .and_then(|value| value.as_str())
+        .ok_or_else(|| {
+            format!(
+                "agent gateway schema {} missing /properties/schema_version/const",
+                path.display()
+            )
+        })?
+        .to_string();
+
+    let enum_values = value
+        .pointer("/properties/strategy/enum")
+        .and_then(|value| value.as_array())
+        .ok_or_else(|| {
+            format!(
+                "agent gateway schema {} missing /properties/strategy/enum",
+                path.display()
+            )
+        })?;
+    let mut strategy_enum = HashSet::new();
+    for entry in enum_values {
+        let Some(id) = entry.as_str() else {
+            return Err(format!(
+                "agent gateway schema {} has non-string strategy enum value",
+                path.display()
+            ));
+        };
+        strategy_enum.insert(id.to_string());
+    }
+    if strategy_enum.is_empty() {
+        return Err(format!(
+            "agent gateway schema {} has empty strategy enum",
+            path.display()
+        ));
+    }
+
+    Ok(AgentGatewaySchema {
+        schema_version_const,
+        strategy_enum,
+    })
 }
 
 fn append_agent_audit(
@@ -3583,6 +4192,149 @@ fn evaluate_agent_strategy_policy(agent: &AgentConfig) -> (bool, String) {
         "disabled" => (false, "agent approval mode disabled mutations".to_string()),
         _ => (true, "approved by policy".to_string()),
     }
+}
+
+fn evaluate_agent_gateway_strategy(
+    config: &AutomationConfig,
+    paths: &ResolvedPaths,
+    run_id: &str,
+    attempt: usize,
+    strategy: StrategyKind,
+    last_attempt: Option<&AttemptExecution>,
+    schema: Option<&AgentGatewaySchema>,
+) -> Result<(bool, String), String> {
+    if !config.agent.enabled {
+        return Ok((true, "agent disabled".to_string()));
+    }
+
+    let Some(command) = &config.agent.gateway.command else {
+        return Ok((
+            false,
+            "agent.gateway.command is required for strategy decisions".to_string(),
+        ));
+    };
+    let (program, args) = command.split_first().ok_or_else(|| {
+        "agent.gateway.command must be non-empty when gateway command is configured".to_string()
+    })?;
+
+    let request = AgentGatewayRequest {
+        schema_version: AGENT_GATEWAY_REQUEST_SCHEMA_VERSION.to_string(),
+        run_id: run_id.to_string(),
+        attempt,
+        strategy: strategy.id().to_string(),
+        previous_categories: last_attempt
+            .map(|last| last.triage.categories.clone())
+            .unwrap_or_default(),
+        previous_findings: last_attempt
+            .map(|last| last.triage.findings.clone())
+            .unwrap_or_default(),
+    };
+    let request_json = serde_json::to_string(&request)
+        .map_err(|err| format!("serialize agent gateway request: {err}"))?;
+
+    let mut cmd = Command::new(program);
+    cmd.args(args);
+    cmd.current_dir(&paths.repo_root);
+    for (key, value) in command_env(paths, config) {
+        cmd.env(key, value);
+    }
+    cmd.env("RECOMP_AGENT_GATEWAY_REQUEST", request_json);
+    let output = cmd
+        .output()
+        .map_err(|err| format!("run agent gateway command failed: {err}"))?;
+
+    let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+    let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+    if !output.status.success() {
+        return Err(format!(
+            "agent gateway command failed (exit={}): {}",
+            output.status.code().unwrap_or(-1),
+            stderr
+        ));
+    }
+    if stdout.is_empty() {
+        return Ok((false, "agent gateway returned empty response".to_string()));
+    }
+
+    let response: AgentGatewayResponse = serde_json::from_str(&stdout)
+        .map_err(|err| format!("invalid agent gateway response JSON: {err}"))?;
+    let schema = schema.ok_or_else(|| "agent gateway schema context is missing".to_string())?;
+    match validate_agent_gateway_response(
+        &response,
+        strategy,
+        config.agent.gateway.reason_max_len,
+        schema,
+    ) {
+        Ok(()) => Ok((
+            true,
+            format!(
+                "gateway approved strategy={} confidence={:.3} cost_usd={:.6}",
+                response.strategy, response.confidence, response.cost_usd
+            ),
+        )),
+        Err(reason) => Ok((false, format!("gateway rejected strategy: {reason}"))),
+    }
+}
+
+fn validate_agent_gateway_response(
+    response: &AgentGatewayResponse,
+    selected_strategy: StrategyKind,
+    max_reason_len: usize,
+    schema: &AgentGatewaySchema,
+) -> Result<(), String> {
+    if response.schema_version != AGENT_GATEWAY_RESPONSE_SCHEMA_VERSION {
+        return Err(format!(
+            "schema_version={} is unsupported",
+            response.schema_version
+        ));
+    }
+    if response.schema_version != schema.schema_version_const {
+        return Err(format!(
+            "schema_version={} does not match schema const {}",
+            response.schema_version, schema.schema_version_const
+        ));
+    }
+    if !schema.strategy_enum.contains(&response.strategy) {
+        return Err(format!(
+            "strategy `{}` not permitted by schema enum",
+            response.strategy
+        ));
+    }
+
+    let gateway_strategy = StrategyKind::from_id(&response.strategy)
+        .ok_or_else(|| format!("unknown strategy `{}`", response.strategy))?;
+    if gateway_strategy != selected_strategy {
+        return Err(format!(
+            "strategy mismatch (gateway={}, selected={})",
+            gateway_strategy.id(),
+            selected_strategy.id()
+        ));
+    }
+
+    if !response.confidence.is_finite() || !(0.0..=1.0).contains(&response.confidence) {
+        return Err(format!(
+            "confidence {} is outside [0, 1]",
+            response.confidence
+        ));
+    }
+    if response.reason.trim().is_empty() {
+        return Err("reason must be non-empty".to_string());
+    }
+    if response.reason.len() > max_reason_len {
+        return Err(format!(
+            "reason length {} exceeds max {}",
+            response.reason.len(),
+            max_reason_len
+        ));
+    }
+    if !response.cost_usd.is_finite() || response.cost_usd < 0.0 {
+        return Err(format!(
+            "cost_usd {} must be nonnegative",
+            response.cost_usd
+        ));
+    }
+
+    Ok(())
 }
 
 fn agent_approval_mode(agent: &AgentConfig) -> String {
@@ -3675,10 +4427,53 @@ fn default_strategy_enabled() -> bool {
     true
 }
 
+fn default_cloud_observe_execution() -> bool {
+    true
+}
+
+fn default_cloud_observe_poll_interval_seconds() -> u64 {
+    DEFAULT_CLOUD_OBSERVE_POLL_INTERVAL_SECONDS
+}
+
+fn default_cloud_observe_max_polls() -> usize {
+    DEFAULT_CLOUD_OBSERVE_MAX_POLLS
+}
+
+fn default_agent_gateway_reason_max_len() -> usize {
+    DEFAULT_AGENT_GATEWAY_REASON_MAX_LEN
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
     use tempfile::tempdir;
+
+    fn test_paths(base: &Path) -> ResolvedPaths {
+        let work_root = base.join("work");
+        let cloud_dir = work_root.join("cloud");
+        ResolvedPaths {
+            repo_root: base.to_path_buf(),
+            config_dir: base.to_path_buf(),
+            work_root: work_root.clone(),
+            intake_dir: work_root.join("intake"),
+            lift_dir: work_root.join("lift"),
+            build_dir: work_root.join("build"),
+            assets_dir: work_root.join("assets"),
+            validation_dir: work_root.join("validation"),
+            log_dir: work_root.join("logs"),
+            run_manifest: work_root.join("run-manifest.json"),
+            lifted_module_json: work_root.join("lift/module.json"),
+            attempts_root: work_root.join("attempts"),
+            run_summary: work_root.join("run-summary.json"),
+            cloud_dir: cloud_dir.clone(),
+            cloud_run_request: cloud_dir.join("run-request.json"),
+            cloud_state_machine_input: cloud_dir.join("state-machine-input.json"),
+            cloud_status_log: cloud_dir.join("status-events.jsonl"),
+            cloud_submission_receipt: cloud_dir.join("submission-receipt.json"),
+            agent_dir: work_root.join("agent"),
+            agent_audit_log: work_root.join("agent/audit-events.jsonl"),
+        }
+    }
 
     #[test]
     fn automation_runs_with_lifted_module_schema_v1() {
@@ -4021,5 +4816,105 @@ approval_mode = "config_patch_only"
             .validate()
             .expect_err("expected allowlist validation failure");
         assert!(err.contains("model_allowlist"));
+    }
+
+    #[test]
+    fn cloud_status_event_append_is_idempotent() {
+        let temp = tempdir().expect("tempdir");
+        let log_path = temp.path().join("status-events.jsonl");
+
+        append_cloud_status(
+            &log_path,
+            "run-1",
+            "worker_execution_started",
+            None,
+            None,
+            None,
+            Some("execution_arn=arn:aws:states:us-east-1:123:execution:test:run-1".to_string()),
+        )
+        .expect("append first cloud status");
+        append_cloud_status(
+            &log_path,
+            "run-1",
+            "worker_execution_started",
+            None,
+            None,
+            None,
+            Some("execution_arn=arn:aws:states:us-east-1:123:execution:test:run-1".to_string()),
+        )
+        .expect("append duplicate cloud status");
+
+        let src = fs::read_to_string(&log_path).expect("read status events");
+        let lines: Vec<&str> = src.lines().collect();
+        assert_eq!(lines.len(), 1);
+
+        let event: CloudStatusEvent =
+            serde_json::from_str(lines[0]).expect("parse cloud status event line");
+        assert_eq!(event.run_id, "run-1");
+        assert_eq!(event.event, "worker_execution_started");
+    }
+
+    #[test]
+    fn submit_aws_hybrid_reuses_existing_execution_receipt() {
+        let temp = tempdir().expect("tempdir");
+        let paths = test_paths(temp.path());
+        fs::create_dir_all(&paths.cloud_dir).expect("create cloud dir");
+
+        let receipt = CloudSubmissionReceipt {
+            schema_version: CLOUD_SUBMISSION_RECEIPT_SCHEMA_VERSION.to_string(),
+            run_id: "run-reused".to_string(),
+            input_fingerprint: Some("abc123".to_string()),
+            queue_url: "https://sqs.us-east-1.amazonaws.com/123/recomp".to_string(),
+            sqs_message_id: "msg-1".to_string(),
+            execution_arn: "arn:aws:states:us-east-1:123:execution:machine:run-reused".to_string(),
+            execution_name: "run-reused".to_string(),
+            submitted_unix: 1,
+        };
+        write_json(&paths.cloud_submission_receipt, &receipt).expect("write existing receipt");
+
+        let cloud = CloudConfig {
+            mode: CloudMode::AwsHybrid,
+            artifact_uri: Some("s3://bucket/artifacts".to_string()),
+            queue_name: Some("recomp-queue".to_string()),
+            queue_url: None,
+            state_machine_arn: Some("arn:aws:states:us-east-1:123:stateMachine:test".to_string()),
+            aws_cli_path: Some(PathBuf::from("/path/that/does/not/exist/aws")),
+            observe_execution: true,
+            observe_poll_interval_seconds: 1,
+            observe_max_polls: 1,
+        };
+        let run_request = CloudRunRequest {
+            schema_version: CLOUD_RUN_REQUEST_SCHEMA_VERSION.to_string(),
+            run_id: "run-reused".to_string(),
+            queue_name: "recomp-queue".to_string(),
+            artifact_uri: "s3://bucket/artifacts".to_string(),
+            state_machine_arn: cloud.state_machine_arn.clone(),
+            input_fingerprint: "abc123".to_string(),
+            max_attempts: 2,
+            max_runtime_minutes: 60,
+            submitted_unix: 1,
+        };
+        let state_input = CloudStateMachineInput {
+            schema_version: CLOUD_RUN_REQUEST_SCHEMA_VERSION.to_string(),
+            run_id: "run-reused".to_string(),
+            run_request_path: "cloud/run-request.json".to_string(),
+            input_fingerprint: "abc123".to_string(),
+            max_attempts: 2,
+        };
+
+        let first = submit_aws_hybrid(&cloud, &paths, "run-reused", &run_request, &state_input)
+            .expect("reuse existing execution");
+        let second = submit_aws_hybrid(&cloud, &paths, "run-reused", &run_request, &state_input)
+            .expect("reuse existing execution twice");
+
+        assert_eq!(first.execution_arn, receipt.execution_arn);
+        assert_eq!(second.execution_arn, receipt.execution_arn);
+
+        let src = fs::read_to_string(&paths.cloud_status_log).expect("read cloud status log");
+        let lines: Vec<&str> = src.lines().collect();
+        assert_eq!(lines.len(), 1);
+        let event: CloudStatusEvent =
+            serde_json::from_str(lines[0]).expect("parse cloud status log event");
+        assert_eq!(event.event, "submission_reused");
     }
 }

@@ -1,0 +1,28 @@
+schema_version = "1"
+
+[metadata]
+title = "Local Retry Trial"
+controller = "pro_controller"
+timing_mode = "frames"
+recorded_at = "2026-02-08T00:00:00Z"
+notes = "Automation mutates this file on retry attempts."
+
+[[events]]
+frame = 0
+control = 100
+value = 1
+note = "Start button down"
+
+[[events]]
+frame = 2
+control = 100
+value = 0
+note = "Start button up"
+
+[[markers]]
+name = "boot"
+frame = 0
+
+[[markers]]
+name = "menu"
+frame = 2

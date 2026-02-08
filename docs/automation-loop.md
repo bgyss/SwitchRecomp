@@ -53,7 +53,10 @@ metadata should be committed.
 - `[gates.perceptual]` perceptual thresholds (SSIM/PSNR/VMAF/LUFS/peak).
 - `[agent]` model policy metadata (for governance and future gateway integration).
   - `model_allowlist` gates which model IDs are accepted when agent mode is enabled.
+  - `[agent.gateway]` command + schema settings for pre-strategy model decisions.
 - `[cloud]` local vs aws_hybrid mode metadata.
+  - `queue_name` (or `queue_url`), `state_machine_arn`, optional `aws_cli_path`.
+  - bounded observe settings: `observe_execution`, `observe_poll_interval_seconds`, `observe_max_polls`.
 - `[[scenes]]` weighted scene windows for perceptual validation.
 
 Invoke the loop with:
@@ -66,6 +69,11 @@ Dev invocation:
 cargo run -p recomp-cli -- automate --config samples/automation.toml
 ```
 
+For a deterministic local dry run (no proprietary assets), use:
+- `samples/automation.local-roundtrip.toml`
+- `docs/local-roundtrip-trial.md`
+- `scripts/local_roundtrip_trial.sh`
+
 ## title-a24b9e807b456252 Validation Inputs
 The title-a24b9e807b456252 validation run requires external reference and capture artifacts. Track the required
 paths and timecodes in `docs/title-a24b9e807b456252-validation-prereqs.md` before wiring a title-a24b9e807b456252-specific
@@ -75,7 +83,7 @@ paths and timecodes in `docs/title-a24b9e807b456252-validation-prereqs.md` befor
 - Ghidra headless evidence export is optional via `[tools.ghidra]`.
 - Perceptual validation requires `python3` and `ffmpeg` (see skill scripts under
   `skills/static-recomp-av-compare/scripts/`).
-- AWS hybrid scaffolding assets:
+- AWS hybrid integration assets:
   - `config/aws/step-functions/round-trip-automation.asl.json`
   - `config/aws/model-gateway/strategy-response.schema.json`
   - `scripts/aws/worker-entrypoint.sh`
