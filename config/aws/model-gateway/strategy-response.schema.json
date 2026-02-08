@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://switchrecomp.local/schemas/model-gateway/strategy-response.schema.json",
+  "title": "Model Gateway Strategy Response",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "strategy", "confidence", "reason"],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "strategy": {
+      "type": "string",
+      "enum": [
+        "capture_alignment_profile",
+        "input_timing_variant",
+        "service_stub_profile_switch",
+        "patch_set_variant",
+        "lift_mode_variant",
+        "runtime_mode_variant"
+      ]
+    },
+    "confidence": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0
+    },
+    "reason": {
+      "type": "string",
+      "minLength": 1,
+      "maxLength": 2000
+    },
+    "estimated_cost_usd": {
+      "type": "number",
+      "minimum": 0
+    }
+  }
+}
