@@ -69,6 +69,7 @@ offset_seconds = 0.0
 [agent]
 enabled = false
 model = "gpt-5.2-codex"
+model_allowlist = ["gpt-5.2-codex"]
 reasoning_effort = "medium"
 max_cost_usd = 50.0
 approval_mode = "config_patch_only"

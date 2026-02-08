@@ -21,6 +21,9 @@ const RUN_MANIFEST_SCHEMA_VERSION: &str = "2";
 const ATTEMPT_MANIFEST_SCHEMA_VERSION: &str = "1";
 const RUN_SUMMARY_SCHEMA_VERSION: &str = "1";
 const STRATEGY_CATALOG_SCHEMA_VERSION: &str = "1";
+const CLOUD_RUN_REQUEST_SCHEMA_VERSION: &str = "1";
+const CLOUD_STATUS_EVENT_SCHEMA_VERSION: &str = "1";
+const AGENT_AUDIT_SCHEMA_VERSION: &str = "1";
 
 const DEFAULT_MAX_RETRIES: usize = 5;
 const DEFAULT_MAX_RUNTIME_MINUTES: u64 = 120;
@@ -306,6 +309,8 @@ pub struct AgentConfig {
     #[serde(default)]
     pub model: Option<String>,
     #[serde(default)]
+    pub model_allowlist: Vec<String>,
+    #[serde(default)]
     pub reasoning_effort: Option<String>,
     #[serde(default)]
     pub max_cost_usd: Option<f64>,
@@ -550,6 +555,7 @@ pub struct TriageReport {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RunSummary {
     pub schema_version: String,
+    pub run_id: String,
     pub input_fingerprint: String,
     pub status: RunFinalStatus,
     pub attempts: usize,
@@ -558,6 +564,14 @@ pub struct RunSummary {
     pub duration_ms: u128,
     pub cloud: CloudConfig,
     pub agent: AgentConfig,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub halted_reason: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cloud_run_request: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub cloud_status_log: Option<String>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_audit_log: Option<String>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, Copy, PartialEq, Eq)]
@@ -600,6 +614,12 @@ struct ResolvedPaths {
     lifted_module_json: PathBuf,
     attempts_root: PathBuf,
     run_summary: PathBuf,
+    cloud_dir: PathBuf,
+    cloud_run_request: PathBuf,
+    cloud_state_machine_input: PathBuf,
+    cloud_status_log: PathBuf,
+    agent_dir: PathBuf,
+    agent_audit_log: PathBuf,
 }
 
 #[derive(Debug)]
@@ -681,6 +701,72 @@ struct MutationState {
     perceptual_offset_seconds: f64,
 }
 
+#[derive(Debug, Serialize)]
+struct CloudRunRequest {
+    schema_version: String,
+    run_id: String,
+    queue_name: String,
+    artifact_uri: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    state_machine_arn: Option<String>,
+    input_fingerprint: String,
+    max_attempts: usize,
+    max_runtime_minutes: u64,
+    submitted_unix: u64,
+}
+
+#[derive(Debug, Serialize)]
+struct CloudStateMachineInput {
+    schema_version: String,
+    run_id: String,
+    run_request_path: String,
+    input_fingerprint: String,
+    max_attempts: usize,
+}
+
+#[derive(Debug, Serialize)]
+struct CloudStatusEvent {
+    schema_version: String,
+    run_id: String,
+    event: String,
+    unix: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attempt: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    status: Option<AttemptStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    final_status: Option<RunFinalStatus>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    detail: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct AgentAuditEvent {
+    schema_version: String,
+    run_id: String,
+    event: String,
+    unix: u64,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    attempt: Option<usize>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    strategy: Option<StrategyKind>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    model: Option<String>,
+    approval_mode: String,
+    allowed: bool,
+    reason: String,
+    redacted: bool,
+}
+
+struct AgentAuditInput<'a> {
+    run_id: &'a str,
+    event: &'a str,
+    attempt: Option<usize>,
+    strategy: Option<StrategyKind>,
+    allowed: bool,
+    reason: String,
+}
+
 pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
     let config_path = fs::canonicalize(config_path)
         .map_err(|err| format!("resolve automation config {}: {err}", config_path.display()))?;
@@ -707,6 +793,7 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
 
     let inputs = gather_inputs(&config, &config_path, &paths)?;
     let input_fingerprint = fingerprint_inputs(&inputs);
+    let run_id = format!("run-{}-{}", unix_seconds(), &input_fingerprint[..8]);
 
     if config.run.resume && paths.run_manifest.exists() {
         if let Ok(previous) = load_run_manifest(&paths.run_manifest) {
@@ -737,11 +824,77 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
     let mut previous_attempt_manifest: Option<RunManifest> = None;
     let mut last_attempt: Option<AttemptExecution> = None;
     let mut current_config = config.clone();
+    let mut halted_reason = None;
+
+    if current_config.cloud.mode == CloudMode::AwsHybrid {
+        let queue_name = current_config
+            .cloud
+            .queue_name
+            .clone()
+            .ok_or_else(|| "cloud.queue_name is required when mode=aws_hybrid".to_string())?;
+        let artifact_uri = current_config
+            .cloud
+            .artifact_uri
+            .clone()
+            .ok_or_else(|| "cloud.artifact_uri is required when mode=aws_hybrid".to_string())?;
+        fs::create_dir_all(&paths.cloud_dir)
+            .map_err(|err| format!("create cloud dir {}: {err}", paths.cloud_dir.display()))?;
+
+        let run_request = CloudRunRequest {
+            schema_version: CLOUD_RUN_REQUEST_SCHEMA_VERSION.to_string(),
+            run_id: run_id.clone(),
+            queue_name,
+            artifact_uri,
+            state_machine_arn: current_config.cloud.state_machine_arn.clone(),
+            input_fingerprint: input_fingerprint.clone(),
+            max_attempts,
+            max_runtime_minutes: current_config.loop_config.max_runtime_minutes,
+            submitted_unix: unix_seconds(),
+        };
+        write_json(&paths.cloud_run_request, &run_request)?;
+
+        let state_input = CloudStateMachineInput {
+            schema_version: CLOUD_RUN_REQUEST_SCHEMA_VERSION.to_string(),
+            run_id: run_id.clone(),
+            run_request_path: format_path(&paths, &paths.cloud_run_request),
+            input_fingerprint: input_fingerprint.clone(),
+            max_attempts,
+        };
+        write_json(&paths.cloud_state_machine_input, &state_input)?;
+
+        append_cloud_status(
+            &paths.cloud_status_log,
+            &run_id,
+            "queued",
+            None,
+            None,
+            None,
+            Some("run request emitted for aws_hybrid mode".to_string()),
+        )?;
+    }
+
+    if current_config.agent.enabled {
+        fs::create_dir_all(&paths.agent_dir)
+            .map_err(|err| format!("create agent dir {}: {err}", paths.agent_dir.display()))?;
+        append_agent_audit(
+            &paths.agent_audit_log,
+            AgentAuditInput {
+                run_id: &run_id,
+                event: "policy_initialized",
+                attempt: None,
+                strategy: None,
+                allowed: true,
+                reason: "agent policy initialized".to_string(),
+            },
+            &current_config.agent,
+        )?;
+    }
 
     for attempt in 0..max_attempts {
         if config.loop_config.enabled
             && started.elapsed() > Duration::from_secs(config.loop_config.max_runtime_minutes * 60)
         {
+            halted_reason = Some("max_runtime_exceeded".to_string());
             break;
         }
 
@@ -758,8 +911,41 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
 
         if attempt > 0 {
             let Some(strategy_kind) = strategy else {
+                halted_reason = Some("strategy_exhausted".to_string());
                 break;
             };
+
+            let (allowed, reason) = evaluate_agent_strategy_policy(&current_config.agent);
+            if current_config.agent.enabled {
+                append_agent_audit(
+                    &paths.agent_audit_log,
+                    AgentAuditInput {
+                        run_id: &run_id,
+                        event: "strategy_decision",
+                        attempt: Some(attempt),
+                        strategy: Some(strategy_kind),
+                        allowed,
+                        reason: reason.clone(),
+                    },
+                    &current_config.agent,
+                )?;
+            }
+            if !allowed {
+                halted_reason = Some(reason);
+                if current_config.cloud.mode == CloudMode::AwsHybrid {
+                    append_cloud_status(
+                        &paths.cloud_status_log,
+                        &run_id,
+                        "attempt_blocked",
+                        Some(attempt),
+                        None,
+                        None,
+                        halted_reason.clone(),
+                    )?;
+                }
+                break;
+            }
+
             apply_strategy(
                 strategy_kind,
                 &mut current_config,
@@ -769,6 +955,18 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
                 last_attempt.as_ref(),
             )?;
             used_strategies.insert(strategy_kind);
+        }
+
+        if current_config.cloud.mode == CloudMode::AwsHybrid {
+            append_cloud_status(
+                &paths.cloud_status_log,
+                &run_id,
+                "attempt_started",
+                Some(attempt),
+                None,
+                None,
+                strategy.map(|kind| kind.id().to_string()),
+            )?;
         }
 
         let attempt_exec = run_single_attempt(
@@ -794,6 +992,32 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
         let attempt_status = attempt_exec.status;
         last_attempt = Some(attempt_exec);
 
+        if current_config.agent.enabled {
+            append_agent_audit(
+                &paths.agent_audit_log,
+                AgentAuditInput {
+                    run_id: &run_id,
+                    event: "attempt_completed",
+                    attempt: Some(attempt),
+                    strategy,
+                    allowed: true,
+                    reason: format!("attempt status={attempt_status:?}"),
+                },
+                &current_config.agent,
+            )?;
+        }
+        if current_config.cloud.mode == CloudMode::AwsHybrid {
+            append_cloud_status(
+                &paths.cloud_status_log,
+                &run_id,
+                "attempt_completed",
+                Some(attempt),
+                Some(attempt_status),
+                None,
+                None,
+            )?;
+        }
+
         if attempt_status == AttemptStatus::Passed && config.loop_config.stop_on_first_pass {
             break;
         }
@@ -808,6 +1032,8 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
         .any(|attempt| attempt.status == AttemptStatus::Passed)
     {
         RunFinalStatus::Passed
+    } else if halted_reason.is_some() {
+        RunFinalStatus::NeedsReview
     } else if attempts
         .iter()
         .any(|attempt| attempt.status == AttemptStatus::NeedsReview)
@@ -828,8 +1054,35 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
         .find(|attempt| attempt.status == AttemptStatus::Passed)
         .map(|attempt| attempt.attempt);
 
+    if current_config.cloud.mode == CloudMode::AwsHybrid {
+        append_cloud_status(
+            &paths.cloud_status_log,
+            &run_id,
+            "run_completed",
+            None,
+            None,
+            Some(final_status),
+            halted_reason.clone(),
+        )?;
+    }
+    if current_config.agent.enabled {
+        append_agent_audit(
+            &paths.agent_audit_log,
+            AgentAuditInput {
+                run_id: &run_id,
+                event: "run_completed",
+                attempt: None,
+                strategy: None,
+                allowed: true,
+                reason: format!("final_status={final_status:?}"),
+            },
+            &current_config.agent,
+        )?;
+    }
+
     let run_summary = RunSummary {
         schema_version: RUN_SUMMARY_SCHEMA_VERSION.to_string(),
+        run_id: run_id.clone(),
         input_fingerprint: input_fingerprint.clone(),
         status: final_status,
         attempts: attempts.len(),
@@ -837,6 +1090,22 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
         duration_ms: started.elapsed().as_millis(),
         cloud: current_config.cloud.clone(),
         agent: current_config.agent.clone(),
+        halted_reason: halted_reason.clone(),
+        cloud_run_request: if current_config.cloud.mode == CloudMode::AwsHybrid {
+            Some(format_path(&paths, &paths.cloud_run_request))
+        } else {
+            None
+        },
+        cloud_status_log: if current_config.cloud.mode == CloudMode::AwsHybrid {
+            Some(format_path(&paths, &paths.cloud_status_log))
+        } else {
+            None
+        },
+        agent_audit_log: if current_config.agent.enabled {
+            Some(format_path(&paths, &paths.agent_audit_log))
+        } else {
+            None
+        },
     };
     write_json(&paths.run_summary, &run_summary)?;
 
@@ -2643,6 +2912,52 @@ impl AutomationConfig {
                 return Err(format!("strategy catalog not found: {}", path.display()));
             }
         }
+        if self.cloud.mode == CloudMode::AwsHybrid {
+            let artifact_uri =
+                self.cloud.artifact_uri.as_ref().ok_or_else(|| {
+                    "cloud.artifact_uri is required when mode=aws_hybrid".to_string()
+                })?;
+            if !artifact_uri.starts_with("s3://") {
+                return Err(
+                    "cloud.artifact_uri must use an s3:// URI when mode=aws_hybrid".to_string(),
+                );
+            }
+            if self.cloud.queue_name.is_none() {
+                return Err("cloud.queue_name is required when mode=aws_hybrid".to_string());
+            }
+
+            // Avoid writing sensitive cloud-run outputs into the repository worktree.
+            let repo = repo_root();
+            if self.outputs.work_root.starts_with(&repo) {
+                return Err(
+                    "outputs.work_root must be outside the repository for mode=aws_hybrid"
+                        .to_string(),
+                );
+            }
+        }
+        if self.agent.enabled {
+            let model = self
+                .agent
+                .model
+                .as_ref()
+                .ok_or_else(|| "agent.model is required when agent.enabled=true".to_string())?;
+            if let Some(cap) = self.agent.max_cost_usd {
+                if cap <= 0.0 {
+                    return Err("agent.max_cost_usd must be positive".to_string());
+                }
+            }
+            if !self.agent.model_allowlist.is_empty()
+                && !self
+                    .agent
+                    .model_allowlist
+                    .iter()
+                    .any(|allowed| allowed == model)
+            {
+                return Err(format!(
+                    "agent.model ({model}) is not present in agent.model_allowlist"
+                ));
+            }
+        }
         for scene in &self.scenes {
             if scene.id.trim().is_empty() {
                 return Err("scene id cannot be empty".to_string());
@@ -2698,6 +3013,12 @@ impl ResolvedPaths {
             .unwrap_or_else(|| lift_dir.join("module.json"));
         let attempts_root = work_root.join("attempts");
         let run_summary = work_root.join("run-summary.json");
+        let cloud_dir = work_root.join("cloud");
+        let cloud_run_request = cloud_dir.join("run-request.json");
+        let cloud_state_machine_input = cloud_dir.join("state-machine-input.json");
+        let cloud_status_log = cloud_dir.join("status-events.jsonl");
+        let agent_dir = work_root.join("agent");
+        let agent_audit_log = agent_dir.join("audit-events.jsonl");
 
         Ok(Self {
             repo_root,
@@ -2713,6 +3034,12 @@ impl ResolvedPaths {
             lifted_module_json,
             attempts_root,
             run_summary,
+            cloud_dir,
+            cloud_run_request,
+            cloud_state_machine_input,
+            cloud_status_log,
+            agent_dir,
+            agent_audit_log,
         })
     }
 
@@ -2737,6 +3064,12 @@ impl ResolvedPaths {
             lifted_module_json: self.lifted_module_json.clone(),
             attempts_root: self.attempts_root.clone(),
             run_summary: self.run_summary.clone(),
+            cloud_dir: self.cloud_dir.clone(),
+            cloud_run_request: self.cloud_run_request.clone(),
+            cloud_state_machine_input: self.cloud_state_machine_input.clone(),
+            cloud_status_log: self.cloud_status_log.clone(),
+            agent_dir: self.agent_dir.clone(),
+            agent_audit_log: self.agent_audit_log.clone(),
         }
     }
 }
@@ -2922,6 +3255,10 @@ fn command_env(paths: &ResolvedPaths, config: &AutomationConfig) -> BTreeMap<Str
         paths.run_manifest.display().to_string(),
     );
     env.insert(
+        "RECOMP_RUN_SUMMARY".to_string(),
+        paths.run_summary.display().to_string(),
+    );
+    env.insert(
         "RECOMP_LIFTED_MODULE_JSON".to_string(),
         paths.lifted_module_json.display().to_string(),
     );
@@ -2944,6 +3281,18 @@ fn command_env(paths: &ResolvedPaths, config: &AutomationConfig) -> BTreeMap<Str
             CloudMode::AwsHybrid => "aws_hybrid".to_string(),
         },
     );
+    if let Some(uri) = &config.cloud.artifact_uri {
+        env.insert("RECOMP_CLOUD_ARTIFACT_URI".to_string(), uri.clone());
+    }
+    if let Some(queue_name) = &config.cloud.queue_name {
+        env.insert("RECOMP_CLOUD_QUEUE_NAME".to_string(), queue_name.clone());
+    }
+    if let Some(state_machine) = &config.cloud.state_machine_arn {
+        env.insert(
+            "RECOMP_CLOUD_STATE_MACHINE_ARN".to_string(),
+            state_machine.clone(),
+        );
+    }
     env
 }
 
@@ -3160,6 +3509,89 @@ fn write_json<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
     fs::write(path, encoded).map_err(|err| format!("write json {}: {err}", path.display()))
 }
 
+fn append_jsonl<T: Serialize>(path: &Path, value: &T) -> Result<(), String> {
+    if let Some(parent) = path.parent() {
+        fs::create_dir_all(parent)
+            .map_err(|err| format!("create jsonl dir {}: {err}", parent.display()))?;
+    }
+    let mut line = serde_json::to_string(value).map_err(|err| err.to_string())?;
+    line.push('\n');
+    use std::io::Write;
+    let mut file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(path)
+        .map_err(|err| format!("open jsonl {}: {err}", path.display()))?;
+    file.write_all(line.as_bytes())
+        .map_err(|err| format!("append jsonl {}: {err}", path.display()))
+}
+
+fn append_cloud_status(
+    path: &Path,
+    run_id: &str,
+    event: &str,
+    attempt: Option<usize>,
+    status: Option<AttemptStatus>,
+    final_status: Option<RunFinalStatus>,
+    detail: Option<String>,
+) -> Result<(), String> {
+    let event = CloudStatusEvent {
+        schema_version: CLOUD_STATUS_EVENT_SCHEMA_VERSION.to_string(),
+        run_id: run_id.to_string(),
+        event: event.to_string(),
+        unix: unix_seconds(),
+        attempt,
+        status,
+        final_status,
+        detail,
+    };
+    append_jsonl(path, &event)
+}
+
+fn append_agent_audit(
+    path: &Path,
+    input: AgentAuditInput<'_>,
+    agent: &AgentConfig,
+) -> Result<(), String> {
+    let audit = AgentAuditEvent {
+        schema_version: AGENT_AUDIT_SCHEMA_VERSION.to_string(),
+        run_id: input.run_id.to_string(),
+        event: input.event.to_string(),
+        unix: unix_seconds(),
+        attempt: input.attempt,
+        strategy: input.strategy,
+        model: agent.model.clone(),
+        approval_mode: agent_approval_mode(agent),
+        allowed: input.allowed,
+        reason: input.reason,
+        redacted: true,
+    };
+    append_jsonl(path, &audit)
+}
+
+fn evaluate_agent_strategy_policy(agent: &AgentConfig) -> (bool, String) {
+    if !agent.enabled {
+        return (true, "agent disabled".to_string());
+    }
+    if let Some(cap) = agent.max_cost_usd {
+        if cap <= 0.0 {
+            return (false, "agent max_cost_usd exhausted".to_string());
+        }
+    }
+    match agent_approval_mode(agent).as_str() {
+        "manual" => (false, "manual approval required".to_string()),
+        "disabled" => (false, "agent approval mode disabled mutations".to_string()),
+        _ => (true, "approved by policy".to_string()),
+    }
+}
+
+fn agent_approval_mode(agent: &AgentConfig) -> String {
+    agent
+        .approval_mode
+        .clone()
+        .unwrap_or_else(|| "config_patch_only".to_string())
+}
+
 fn find_role_artifact(manifest: &RunManifest, role: &str) -> Option<String> {
     manifest
         .artifacts
@@ -3175,6 +3607,13 @@ fn chrono_stamp() -> String {
         .unwrap_or_default()
         .as_secs();
     format!("{secs}")
+}
+
+fn unix_seconds() -> u64 {
+    let now = std::time::SystemTime::now();
+    now.duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs()
 }
 
 fn default_resume() -> bool {
@@ -3471,5 +3910,116 @@ frame = 20
             .and_then(|value| value.as_integer())
             .expect("marker frame");
         assert_eq!(marker_frame, 22);
+    }
+
+    #[test]
+    fn aws_hybrid_requires_s3_artifact_uri() {
+        let repo = repo_root();
+        let temp = tempdir().expect("tempdir");
+        let toml = format!(
+            r#"schema_version = "2"
+
+[inputs]
+mode = "lifted"
+module_json = "{}"
+provenance = "{}"
+config = "{}"
+runtime_path = "{}"
+
+[outputs]
+work_root = "{}"
+
+[reference]
+reference_video_toml = "{}"
+capture_video_toml = "{}"
+
+[capture]
+video_path = "{}"
+frames_dir = "{}"
+
+[commands]
+build = ["/usr/bin/true"]
+run = ["/usr/bin/true"]
+capture = ["/usr/bin/true"]
+extract_frames = ["/usr/bin/true"]
+
+[cloud]
+mode = "aws_hybrid"
+artifact_uri = "file:///tmp/local-artifacts"
+queue_name = "recomp-queue"
+"#,
+            repo.join("samples/minimal/module.json").display(),
+            repo.join("samples/minimal/provenance.toml").display(),
+            repo.join("samples/minimal/title.toml").display(),
+            repo.join("crates/recomp-runtime").display(),
+            temp.path().join("work").display(),
+            repo.join("samples/reference_video.toml").display(),
+            repo.join("samples/capture_video.toml").display(),
+            temp.path().join("capture.mp4").display(),
+            temp.path().join("frames").display(),
+        );
+
+        let mut config: AutomationConfig = toml::from_str(&toml).expect("parse automation toml");
+        config.resolve_paths(temp.path());
+        let err = config
+            .validate()
+            .expect_err("expected cloud URI validation failure");
+        assert!(err.contains("s3:// URI"));
+    }
+
+    #[test]
+    fn agent_model_must_be_in_allowlist() {
+        let repo = repo_root();
+        let temp = tempdir().expect("tempdir");
+        let toml = format!(
+            r#"schema_version = "2"
+
+[inputs]
+mode = "lifted"
+module_json = "{}"
+provenance = "{}"
+config = "{}"
+runtime_path = "{}"
+
+[outputs]
+work_root = "{}"
+
+[reference]
+reference_video_toml = "{}"
+capture_video_toml = "{}"
+
+[capture]
+video_path = "{}"
+frames_dir = "{}"
+
+[commands]
+build = ["/usr/bin/true"]
+run = ["/usr/bin/true"]
+capture = ["/usr/bin/true"]
+extract_frames = ["/usr/bin/true"]
+
+[agent]
+enabled = true
+model = "gpt-unknown"
+model_allowlist = ["gpt-5.2-codex"]
+approval_mode = "config_patch_only"
+"#,
+            repo.join("samples/minimal/module.json").display(),
+            repo.join("samples/minimal/provenance.toml").display(),
+            repo.join("samples/minimal/title.toml").display(),
+            repo.join("crates/recomp-runtime").display(),
+            temp.path().join("work").display(),
+            repo.join("samples/reference_video.toml").display(),
+            repo.join("samples/capture_video.toml").display(),
+            temp.path().join("capture.mp4").display(),
+            temp.path().join("frames").display(),
+        );
+
+        let mut config: AutomationConfig = toml::from_str(&toml).expect("parse automation toml");
+        config.resolve_paths(temp.path());
+        let err = config
+            .validate()
+            .expect_err("expected allowlist validation failure");
+        assert!(err.contains("model_allowlist"));
     }
 }

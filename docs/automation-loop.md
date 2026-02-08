@@ -30,6 +30,9 @@ without copying proprietary assets into the repo.
 - `attempts/<NNN>/gate-results.json` hash/perceptual gate results.
 - `attempts/<NNN>/triage.json` retry classification and suggested next strategy.
 - `artifacts.json` to link intake manifests, capture configs, and validation reports.
+- `cloud/run-request.json` and `cloud/state-machine-input.json` when `mode=aws_hybrid`.
+- `cloud/status-events.jsonl` run and attempt state transitions for queue/status sync.
+- `agent/audit-events.jsonl` policy and strategy audit trail (redacted metadata only).
 
 ## Asset Separation
 All assets (RomFS, reference video, capture output) remain outside the repo. Only hashes and
@@ -49,6 +52,7 @@ metadata should be committed.
 - `[gates.hash]` optional hard-gate overrides.
 - `[gates.perceptual]` perceptual thresholds (SSIM/PSNR/VMAF/LUFS/peak).
 - `[agent]` model policy metadata (for governance and future gateway integration).
+  - `model_allowlist` gates which model IDs are accepted when agent mode is enabled.
 - `[cloud]` local vs aws_hybrid mode metadata.
 - `[[scenes]]` weighted scene windows for perceptual validation.
 
@@ -71,3 +75,7 @@ paths and timecodes in `docs/title-a24b9e807b456252-validation-prereqs.md` befor
 - Ghidra headless evidence export is optional via `[tools.ghidra]`.
 - Perceptual validation requires `python3` and `ffmpeg` (see skill scripts under
   `skills/static-recomp-av-compare/scripts/`).
+- AWS hybrid scaffolding assets:
+  - `config/aws/step-functions/round-trip-automation.asl.json`
+  - `config/aws/model-gateway/strategy-response.schema.json`
+  - `scripts/aws/worker-entrypoint.sh`
