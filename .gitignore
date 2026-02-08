@@ -5,6 +5,8 @@
 /.devenv.flake.nix
 /devenv.lock
 /game-data/
+/config/title-hash-registry.toml
+/config/title-hash-tracking.log
 
 # Python cache
 __pycache__/

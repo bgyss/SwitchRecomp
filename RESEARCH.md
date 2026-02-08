@@ -75,7 +75,7 @@ Needed research:
 - Capture tooling behavior and determinism guarantees.
 - Input timing and latency characteristics for Switch titles.
 - Video/audio similarity metrics and drift analysis.
-- Operational checklist for DKCR validation artifacts (see `docs/dkcr-validation-prereqs.md`).
+- Operational checklist for title-a24b9e807b456252 validation artifacts (see `docs/title-a24b9e807b456252-validation-prereqs.md`).
 
 ## Seed Resources (Reviewed)
 - Jamulator write-up on static recompilation pitfalls and concurrency: https://andrewkelley.me/post/jamulator.html

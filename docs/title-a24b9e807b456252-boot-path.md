@@ -1,11 +1,11 @@
-# DKCR HD Boot Path (Scaffold)
+# title-a24b9e807b456252 Boot Path (Scaffold)
 
 This document sketches a first-level boot path using the new runtime stubs. The goal is to
 capture the minimal service, graphics, audio, and input wiring needed to reach the first
 playable level without bundling proprietary assets.
 
 ## Boot Flow Summary
-- Mount external RomFS at `game-data/dkcr-hd/romfs`.
+- Mount external RomFS at `game-data/title-a24b9e807b456252/romfs`.
 - Initialize stub services (SM, FS, VI, HID, audio) for early boot.
 - Submit placeholder graphics commands and present frames.
 - Submit placeholder audio buffers.
@@ -22,8 +22,8 @@ use recomp_runtime::{
 };
 use recomp_runtime::{CommandStream};
 
-let mut boot = BootContext::new("DKCR HD Sample")
-    .with_assets_root("game-data/dkcr-hd/romfs");
+let mut boot = BootContext::new("title-a24b9e807b456252 Sample")
+    .with_assets_root("game-data/title-a24b9e807b456252/romfs");
 
 boot.register_service_stubs(&[
     ServiceStubSpec::new("svc_sm", StubBehavior::Log),
@@ -46,6 +46,6 @@ println!("boot steps: {}", trace.steps().len());
 ```
 
 ## Notes
-- `samples/dkcr-hd/title.toml` contains stub mappings and the RomFS path.
-- `samples/dkcr-hd/patches/first-level.toml` records placeholder patches for the first level.
+- `samples/title-a24b9e807b456252/title.toml` contains stub mappings and the RomFS path.
+- `samples/title-a24b9e807b456252/patches/first-level.toml` records placeholder patches for the first level.
 - Replace stub service calls with real implementations as the pipeline matures.

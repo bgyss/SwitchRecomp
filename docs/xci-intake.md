@@ -77,6 +77,16 @@ cargo run -p recomp-cli -- xci-intake \
 recomp-cli xci-validate --manifest /Volumes/Outputs/title-intake/manifest.json
 ```
 
+## Optional: Hash-Based Title/Data Ingest
+If you want to obscure clear-text title names in local paths before intake, run:
+```bash
+scripts/ingest_hashed_title.sh \
+  --title sample-title \
+  --game-data-root /Users/briangyss/src/SwitchRecomp/game-data
+```
+
+See `docs/title-hash-ingest.md` for full options and decoder-ring behavior.
+
 ## Provenance Requirements
 The provenance file must list the XCI and keyset as inputs, for example:
 ```toml

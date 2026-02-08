@@ -8,7 +8,7 @@ The artifact index ties together intake outputs, recompiled outputs, and validat
 It is consumed by `recomp-validation artifacts`.
 
 Required or common fields:
-- `label`: short name for the run (for example, `dkcr-hd-first-level`).
+- `label`: short name for the run (for example, `title-a24b9e807b456252-first-level`).
 - `xci_intake_manifest`: absolute path to `manifest.json` from XCI intake.
 - `pipeline_manifest`: absolute path to `manifest.json` from the pipeline output.
 - `reference_config`: absolute path to `reference_video.toml`.
@@ -25,6 +25,7 @@ Helper scripts:
 - `scripts/validation_artifacts_init.sh` writes a template artifact index.
 - `scripts/validate_artifacts.sh` runs `recomp-validation artifacts` with the index.
 - `scripts/xci_validate.sh` checks the XCI intake manifest and referenced files.
+- `scripts/ingest_hashed_title.sh` hashes title directory/XCI/video names and updates the local decoder ring.
 - `scripts/capture-validation.sh` captures and hashes video/audio for validation.
 - `scripts/capture-video-macos.sh` records macOS captures for validation.
 - `scripts/capture_video.sh` provides a more configurable capture helper.
@@ -65,4 +66,4 @@ recomp-validation hash-audio --audio-file /path/to/audio.wav --out /path/to/audi
 - `docs/static-recompilation-flow.md` (Real XCI intake section).
 - `docs/validation-traces.md` (capture workflow details).
 - `docs/validation-video.md` (hash-based comparison workflow).
-- `docs/dkcr-hd-first-level.md` (DKCR-specific validation notes).
+- `docs/title-a24b9e807b456252-first-level.md` (title-a24b9e807b456252-specific validation notes).

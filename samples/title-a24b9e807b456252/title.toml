@@ -1,4 +1,4 @@
-title = "DKCR HD First-Level"
+title = "title-a24b9e807b456252 First-Level"
 entry = "entry"
 abi_version = "0.1.0"
 
@@ -23,24 +23,24 @@ svc_sleep = "noop"
 performance_mode = "docked"
 
 [assets]
-romfs_path = "/Volumes/External/DKCR_HD/romfs"
-shader_cache_path = "/Volumes/External/DKCR_HD/shader-cache"
-save_data_dir = "/Volumes/External/DKCR_HD/save-data"
+romfs_path = "/Volumes/External/title-a24b9e807b456252/romfs"
+shader_cache_path = "/Volumes/External/title-a24b9e807b456252/shader-cache"
+save_data_dir = "/Volumes/External/title-a24b9e807b456252/save-data"
 
 [keys]
 prod_keys_path = "/Volumes/External/SwitchKeys/prod.keys"
 title_keys_path = "/Volumes/External/SwitchKeys/title.keys"
 
 [inputs]
-xci_path = "/Volumes/External/DKCR_HD/game.xci"
-program_nca_path = "/Volumes/External/DKCR_HD/program.nca"
-exefs_dir = "/Volumes/External/DKCR_HD/exefs"
+xci_path = "/Volumes/External/title-a24b9e807b456252/xci/0123456789abcdef.xci"
+program_nca_path = "/Volumes/External/title-a24b9e807b456252/program.nca"
+exefs_dir = "/Volumes/External/title-a24b9e807b456252/exefs"
 
 [patches]
 patch_set = "patches/patches.toml"
 
 [validation]
-reference_video_path = "/Volumes/External/DKCR_HD/reference/first-level.mp4"
+reference_video_path = "/Volumes/External/title-a24b9e807b456252/gameplay-video/fedcba9876543210-001.mp4"
 segment_start = "00:00:00"
 segment_end = "00:06:00"
 

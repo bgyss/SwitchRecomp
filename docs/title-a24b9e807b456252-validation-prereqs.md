@@ -1,6 +1,6 @@
-# DKCR Validation Prerequisites
+# title-a24b9e807b456252 Validation Prerequisites
 
-This document captures the external inputs required to run DKCR HD video validation. These
+This document captures the external inputs required to run title-a24b9e807b456252 video validation. These
 artifacts are not stored in the repo and must be supplied locally for each run.
 
 ## Required Inputs

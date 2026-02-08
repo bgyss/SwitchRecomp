@@ -37,7 +37,10 @@ Legal and provenance policy:
 - `docs/xci-intake.md` documents the XCI intake workflow and mock extractor format.
 - `docs/validation-artifacts.md` defines validation artifact indexing, workflows, and dependencies.
 - `docs/validation-video.md` describes the hash-based video validation workflow.
+- `docs/title-hash-ingest.md` documents hash-based title/data ingest and local decoder-ring files.
 - `scripts/capture-validation.sh`, `scripts/capture-video-macos.sh`, `scripts/capture_video.sh`, and `scripts/validate_artifacts.sh` provide capture and validation helpers.
+- `scripts/ingest_hashed_title.sh` hashes title/data paths for private local workspaces.
+- `scripts/rewrite_title_refs_in_history.sh` rewrites commit-message title references to hash ids.
 
 ## Back Pressure Hooks
 These hooks add fast, consistent feedback to keep the repo autonomous and reduce review churn. Hooks are defined in `.pre-commit-config.yaml` and can be run with `prek` (preferred) or `pre-commit`.

@@ -22,7 +22,7 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-170 Function Discovery and Control-Flow Graph
 - SPEC-180 XCI Title Intake
 - SPEC-190 Video-Based Validation
-- SPEC-200 DKCR HD First-Level Milestone (macOS/aarch64)
+- SPEC-200 title-a24b9e807b456252 First-Level Milestone (macOS/aarch64)
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -307,15 +307,15 @@ Exit criteria (from SPEC-190)
 - Similarity metrics are stable across two consecutive runs.
 - Validation artifacts remain external and are referenced via provenance metadata.
 
-## SPEC-200: DKCR HD First-Level Milestone (macOS/aarch64)
+## SPEC-200: title-a24b9e807b456252 First-Level Milestone (macOS/aarch64)
 Outcome
-- Produce a macOS/aarch64 static recompilation of DKCR HD that reaches and plays the first level.
+- Produce a macOS/aarch64 static recompilation of title-a24b9e807b456252 that reaches and plays the first level.
 
 Work items
-- [x] Complete XCI intake for the DKCR HD title (SPEC-180 inputs and outputs).
+- [x] Complete XCI intake for the title-a24b9e807b456252 title (SPEC-180 inputs and outputs).
 - [x] Identify required OS services and implement or stub them in the runtime.
 - [x] Implement the minimal GPU translation path needed for the first level.
-- [x] Create a per-title config and patch set for DKCR HD.
+- [x] Create a per-title config and patch set for title-a24b9e807b456252.
 - [x] Run video-based validation against the first level (SPEC-190).
 
 Exit criteria (from SPEC-200)
@@ -323,7 +323,7 @@ Exit criteria (from SPEC-200)
 - First-level gameplay matches the reference video within defined tolerances.
 - No proprietary assets or keys are stored in the repo or build outputs.
 
-## Future Work Notes: DKCR HD Video Validation (SPEC-190/200)
+## Future Work Notes: title-a24b9e807b456252 Video Validation (SPEC-190/200)
 Requirements to finalize:
 - Define the capture spec (resolution, fps, constant frame rate, audio rate/bit depth/channels, container/codec).
 - Define alignment parameters (search window, pre-roll, min match window, segment length).
@@ -346,12 +346,12 @@ Validation artifact index fields (external):
 - Pointers to the run metadata record and per-stage timing summary.
 
 Artifact paths and naming (external only):
-- Reference captures: `/Volumes/External/validation/dkcr-hd/reference/YYYY-MM-DD/`.
-- Recompiled captures: `/Volumes/External/validation/dkcr-hd/recompiled/YYYY-MM-DD/`.
-- Alignment outputs: `/Volumes/External/validation/dkcr-hd/alignment/YYYY-MM-DD/`.
-- Reports: `/Volumes/External/validation/dkcr-hd/reports/YYYY-MM-DD/validation-report.json`.
-- Run metadata: `/Volumes/External/validation/dkcr-hd/runs/YYYY-MM-DD/run.json`.
-- Artifact index: `/Volumes/External/validation/dkcr-hd/index/YYYY-MM-DD/run-index.json`.
+- Reference captures: `/Volumes/External/validation/title-a24b9e807b456252/reference/YYYY-MM-DD/`.
+- Recompiled captures: `/Volumes/External/validation/title-a24b9e807b456252/recompiled/YYYY-MM-DD/`.
+- Alignment outputs: `/Volumes/External/validation/title-a24b9e807b456252/alignment/YYYY-MM-DD/`.
+- Reports: `/Volumes/External/validation/title-a24b9e807b456252/reports/YYYY-MM-DD/validation-report.json`.
+- Run metadata: `/Volumes/External/validation/title-a24b9e807b456252/runs/YYYY-MM-DD/run.json`.
+- Artifact index: `/Volumes/External/validation/title-a24b9e807b456252/index/YYYY-MM-DD/run-index.json`.
 - Provenance entries should include the external paths and file hashes.
 
 Timeline checklist (per validation run):
