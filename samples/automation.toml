@@ -1,4 +1,4 @@
-schema_version = "1"
+schema_version = "2"
 
 [inputs]
 mode = "lifted"
@@ -14,6 +14,7 @@ work_root = "out/automation-minimal"
 reference_video_toml = "samples/reference_video.toml"
 capture_video_toml = "samples/capture_video.toml"
 validation_config_toml = "samples/validation_config.toml"
+input_script_toml = "samples/input-replay/input_script.toml"
 
 [capture]
 video_path = "artifacts/capture/capture.mp4"
@@ -31,3 +32,66 @@ extract_audio = ["ffmpeg", "-i", "artifacts/capture/capture.mp4", "-vn", "-acode
 resume = true
 lift_entry = "entry"
 lift_mode = "decode"
+
+[loop]
+enabled = true
+max_retries = 5
+max_runtime_minutes = 120
+stop_on_first_pass = true
+strategy_order = [
+  "capture_alignment_profile",
+  "input_timing_variant",
+  "service_stub_profile_switch",
+  "patch_set_variant",
+  "lift_mode_variant",
+  "runtime_mode_variant",
+]
+strategy_catalog_toml = "samples/strategy-catalog.toml"
+
+[gates.hash]
+frame_match_ratio_min = 0.92
+audio_match_ratio_min = 0.90
+max_drift_frames = 3
+max_audio_drift_chunks = 3
+max_dropped_frames = 5
+
+[gates.perceptual]
+enabled = true
+ssim_min = 0.95
+psnr_min = 35.0
+vmaf_min = 90.0
+audio_lufs_delta_max = 2.0
+audio_peak_delta_max = 2.0
+require_vmaf = false
+audio_rate = 48000
+offset_seconds = 0.0
+
+[agent]
+enabled = false
+model = "gpt-5.2-codex"
+reasoning_effort = "medium"
+max_cost_usd = 50.0
+approval_mode = "config_patch_only"
+
+[cloud]
+mode = "local"
+
+[tools.ghidra]
+enabled = false
+headless_path = "ghidra-analyzeHeadless"
+script_path = "scripts/ghidra"
+post_script = "ghidra_export_evidence.py"
+
+[[scenes]]
+id = "boot-window"
+start = "00:00:05.000"
+end = "00:00:15.000"
+input_marker_start = "boot"
+input_marker_end = "mid"
+weight = 0.4
+
+[[scenes]]
+id = "first-level-window"
+start = "00:00:15.000"
+end = "00:00:30.000"
+weight = 0.6
