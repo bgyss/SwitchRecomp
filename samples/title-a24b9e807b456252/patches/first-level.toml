@@ -1,6 +1,6 @@
 schema_version = "1"
 patch_set = "first_level"
-notes = "Placeholder patch set for DKCR HD first-level boot."
+notes = "Placeholder patch set for title-a24b9e807b456252 first-level boot."
 
 [[patches]]
 id = "force-performance-mode"

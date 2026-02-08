@@ -31,8 +31,8 @@ Define a validation workflow that compares recompiled output against a reference
   capture paths, and report outputs.
 
 ## Operator Inputs
-- External reference and capture artifacts are required to run DKCR validation.
-- Absolute paths and timeline confirmations are tracked in `docs/dkcr-validation-prereqs.md`.
+- External reference and capture artifacts are required to run title-a24b9e807b456252 validation.
+- Absolute paths and timeline confirmations are tracked in `docs/title-a24b9e807b456252-validation-prereqs.md`.
 
 ## Interfaces and Data
 - Provenance metadata should record the reference capture as an input:

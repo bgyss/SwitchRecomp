@@ -8,12 +8,12 @@ Usage:
 
 Options:
   --out <path>     Output JSON path (required).
-  --label <label>  Artifact label (default: dkcr-hd-first-level).
+  --label <label>  Artifact label (default: title-a24b9e807b456252-first-level).
 USAGE
 }
 
 OUT=""
-LABEL="dkcr-hd-first-level"
+LABEL="title-a24b9e807b456252-first-level"
 
 while [[ $# -gt 0 ]]; do
   case "$1" in

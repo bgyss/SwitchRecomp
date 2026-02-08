@@ -1,5 +1,5 @@
 schema_version = "1"
-title = "DKCR HD First-Level"
+title = "title-a24b9e807b456252 First-Level"
 notes = "Placeholder patch set for first-level bring-up."
 
 [[patches]]

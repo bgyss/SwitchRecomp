@@ -45,9 +45,9 @@ Invoke the loop with:
 recomp automate --config automation.toml
 ```
 
-## DKCR Validation Inputs
-The DKCR validation run requires external reference and capture artifacts. Track the required
-paths and timecodes in `docs/dkcr-validation-prereqs.md` before wiring a DKCR-specific
+## title-a24b9e807b456252 Validation Inputs
+The title-a24b9e807b456252 validation run requires external reference and capture artifacts. Track the required
+paths and timecodes in `docs/title-a24b9e807b456252-validation-prereqs.md` before wiring a title-a24b9e807b456252-specific
 `automation.toml`.
 
 ## Next Steps

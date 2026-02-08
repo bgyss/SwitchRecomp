@@ -1,4 +1,4 @@
-# DKCR HD First-Level Sample (Scaffolding)
+# title-a24b9e807b456252 First-Level Sample (Scaffolding)
 
 This folder provides non-proprietary scaffolding for SPEC-200. It is not a playable build; it is a configuration and workflow template.
 
@@ -16,11 +16,11 @@ Notes:
 XCI intake (external tooling):
 ```
 cargo run -p recomp-cli -- xci-intake \
-  --xci /Volumes/External/DKCR_HD/game.xci \
+  --xci /Volumes/External/title-a24b9e807b456252/xci/0123456789abcdef.xci \
   --keys /Volumes/External/SwitchKeys/prod.keys \
-  --provenance samples/dkcr-hd/provenance.toml \
-  --out-dir out/dkcr-hd-intake \
-  --assets-dir out/dkcr-hd-assets \
+  --provenance samples/title-a24b9e807b456252/provenance.toml \
+  --out-dir out/title-a24b9e807b456252-intake \
+  --assets-dir out/title-a24b9e807b456252-assets \
   --xci-tool hactool \
   --xci-tool-path /usr/local/bin/hactool
 ```
@@ -28,13 +28,13 @@ cargo run -p recomp-cli -- xci-intake \
 Usage (from repo root):
 ```
 cargo run -p recomp-cli -- run \
-  --module samples/dkcr-hd/module.json \
-  --config samples/dkcr-hd/title.toml \
-  --provenance samples/dkcr-hd/provenance.toml \
-  --out-dir out/dkcr-hd
+  --module samples/title-a24b9e807b456252/module.json \
+  --config samples/title-a24b9e807b456252/title.toml \
+  --provenance samples/title-a24b9e807b456252/provenance.toml \
+  --out-dir out/title-a24b9e807b456252
 ```
 
 Then build the emitted project:
 ```
-cargo build --manifest-path out/dkcr-hd/Cargo.toml
+cargo build --manifest-path out/title-a24b9e807b456252/Cargo.toml
 ```

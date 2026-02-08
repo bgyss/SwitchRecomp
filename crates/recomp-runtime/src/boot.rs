@@ -198,8 +198,8 @@ mod tests {
 
     #[test]
     fn boot_context_runs_plan_and_records() {
-        let mut context =
-            BootContext::new("DKCR HD Sample").with_assets_root("game-data/dkcr-hd/romfs");
+        let mut context = BootContext::new("title-a24b9e807b456252 Sample")
+            .with_assets_root("game-data/title-a24b9e807b456252/romfs");
         context.register_service_stubs(&[
             ServiceStubSpec::new("svc_sm", StubBehavior::Noop),
             ServiceStubSpec::new("svc_fs", StubBehavior::Noop),

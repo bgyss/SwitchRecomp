@@ -1,4 +1,4 @@
-# SPEC-200: DKCR HD First-Level Milestone (macOS/aarch64)
+# SPEC-200: title-a24b9e807b456252 First-Level Milestone (macOS/aarch64)
 
 ## Status
 Draft v0.2
@@ -7,7 +7,7 @@ Draft v0.2
 - Added non-proprietary scaffolding for title config, patch placeholders, and run instructions.
 
 ## Purpose
-Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using video-based validation to confirm the first level is playable.
+Define the first title milestone for the title-a24b9e807b456252 XCI on macOS/aarch64, using video-based validation to confirm the first level is playable.
 
 ## Goals
 - Produce a macOS/aarch64 static recompilation that boots and reaches the first level.
@@ -33,27 +33,27 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 - Validation artifacts must be tracked externally (artifact index + report output paths).
 
 ## Operator Inputs
-- DKCR validation depends on external reference and capture artifacts.
-- Absolute paths and timeline confirmations are tracked in `docs/dkcr-validation-prereqs.md`.
+- title-a24b9e807b456252 validation depends on external reference and capture artifacts.
+- Absolute paths and timeline confirmations are tracked in `docs/title-a24b9e807b456252-validation-prereqs.md`.
 
 ## Interfaces and Data
-- `title.toml` for DKCR HD configuration (stubbed services, patches, asset paths).
+- `title.toml` for title-a24b9e807b456252 configuration (stubbed services, patches, asset paths).
 - `provenance.toml` for XCI and reference video inputs.
 - `validation-report.json` for the first-level comparison results.
 - `artifacts.json` (external) for linking intake manifests, captures, and reports.
-- `docs/dkcr-hd-first-level.md` for the scaffolding walkthrough.
+- `docs/title-a24b9e807b456252-first-level.md` for the scaffolding walkthrough.
 
 ## Deliverables
 - Title-specific configuration and patch set placeholders to reach the first playable level.
 - A reproducible build and run command for macOS/aarch64.
 - A validation report demonstrating the first-level gate.
-- A capture workflow and artifact index template for DKCR-specific runs.
+- A capture workflow and artifact index template for title-a24b9e807b456252-specific runs.
 
 ## Scaffolding
-- `samples/dkcr-hd/title.toml` with external asset and key paths.
-- `samples/dkcr-hd/provenance.toml` with placeholder inputs and metadata.
-- `samples/dkcr-hd/patches/patches.toml` with patch placeholders.
-- `samples/dkcr-hd/module.json` placeholder for lifted output wiring.
+- `samples/title-a24b9e807b456252/title.toml` with external asset and key paths.
+- `samples/title-a24b9e807b456252/provenance.toml` with placeholder inputs and metadata.
+- `samples/title-a24b9e807b456252/patches/patches.toml` with patch placeholders.
+- `samples/title-a24b9e807b456252/module.json` placeholder for lifted output wiring.
 
 ## Open Questions
 - Which services are the minimum set required to reach the first level?
@@ -71,7 +71,7 @@ Define the first title milestone for the DKCR HD XCI on macOS/aarch64, using vid
 - Validation thresholds may need tuning for frame pacing variance.
 
 ## References
-- `docs/dkcr-hd-first-level.md`
+- `docs/title-a24b9e807b456252-first-level.md`
 - `docs/xci-intake.md`
 - `docs/validation-artifacts.md`
 - `docs/validation-traces.md`

@@ -35,4 +35,4 @@ Reference media stays outside the repo. Only hashes and metadata are tracked.
 If the source is variable frame rate, normalize to constant fps before hashing.
 Record the normalization profile and source path in `[normalization]` within
 `reference_video.toml`.
-For DKCR-specific validation inputs, see `docs/dkcr-validation-prereqs.md`.
+For title-a24b9e807b456252-specific validation inputs, see `docs/title-a24b9e807b456252-validation-prereqs.md`.

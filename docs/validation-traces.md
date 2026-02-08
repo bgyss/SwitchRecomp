@@ -27,7 +27,7 @@ Use an external capture path and keep outputs outside the repo.
 Suggested workflow:
 - Use the helper script to capture and hash a fixed-duration run (preferred):
 ```
-scripts/capture-validation.sh --out-dir /Volumes/External/Captures/dkcr-hd-first-level \
+scripts/capture-validation.sh --out-dir /Volumes/External/Captures/title-a24b9e807b456252-first-level \
   --duration 360 --fps 60 --video-device 1 --audio-device 0 --resolution 1920x1080
 ```
 - Use `ffmpeg -f avfoundation -list_devices true -i \"\"` to list available device indices.
@@ -36,7 +36,7 @@ scripts/capture-validation.sh --out-dir /Volumes/External/Captures/dkcr-hd-first
 - Capture the primary display (or a specific window) with `ffmpeg`:
 ```
 ffmpeg -f avfoundation -framerate 60 -i \"1:0\" -t 360 -pix_fmt yuv420p \
-  /Volumes/External/Captures/dkcr-hd-first-level.mp4
+  /Volumes/External/Captures/title-a24b9e807b456252-first-level.mp4
 ```
 - Replace the device index (`1:0`) with the correct screen/audio device for your setup.
 - Record the capture path and hashes in provenance metadata.
