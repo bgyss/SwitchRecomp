@@ -36,9 +36,11 @@ Legal and provenance policy:
 - `docs/static-recompilation-flow.md` outlines a hypothetical macOS static recompilation flow and verification pipeline (see the Real XCI intake section for external-tool usage).
 - `docs/xci-intake.md` documents the XCI intake workflow and mock extractor format.
 - `docs/validation-artifacts.md` defines validation artifact indexing, workflows, and dependencies.
+- `docs/run-manifest-schema.md` and `docs/artifact-index-schema.md` document automation/validation metadata schemas.
 - `docs/validation-video.md` describes the hash-based video validation workflow.
 - `docs/title-hash-ingest.md` documents hash-based title/data ingest and local decoder-ring files.
 - `scripts/capture-validation.sh`, `scripts/capture-video-macos.sh`, `scripts/capture_video.sh`, and `scripts/validate_artifacts.sh` provide capture and validation helpers.
+- `cargo run -p recomp-cli -- automate --config <automation.toml>` runs the local end-to-end automation loop.
 - `scripts/ingest_hashed_title.sh` hashes title/data paths for private local workspaces.
 - `scripts/rewrite_title_refs_in_history.sh` rewrites commit-message title references to hash ids.
 

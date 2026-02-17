@@ -24,9 +24,103 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-190 Video-Based Validation
 - SPEC-200 title-a24b9e807b456252 First-Level Milestone (macOS/aarch64)
 - SPEC-210 Automated Recompilation Loop
+- SPEC-220 Input Replay and Interaction Scripts
+- SPEC-230 Reference Media Normalization
 - SPEC-240 Validation Orchestration and Triage
 - SPEC-250 Automation Services and Data Flow
 - SPEC-260 Agent Pipeline Security and Automation
+- SPEC-270 Comprehensive Automated Static Recompilation Solution
+
+## Reopened Active Work (SPEC-210 to SPEC-270)
+These specs are now active implementation work. Items remain unchecked until merged and verified.
+
+## SPEC-210: Automated Recompilation Loop
+Outcome
+- Expose a single automation command and complete deterministic stage-level cache behavior.
+
+Work items
+- [ ] Expose `recomp automate --config <path>` in CLI and document usage.
+- [ ] Add stage-level cache key behavior based on input fingerprint + stage signature + tool versions.
+- [ ] Extend run-manifest with run-level metadata and per-step cache/attempt details.
+- [ ] Add regression tests for valid config, invalid config, resume, and downstream-only invalidation.
+
+Exit criteria (from SPEC-210)
+- A single command runs intake-through-validation for supported modes.
+- Cache behavior preserves unaffected upstream stages when downstream commands change.
+
+## SPEC-220: Input Replay and Interaction Scripts
+Outcome
+- Keep input replay deterministic and consistently linked to automation + validation outputs.
+
+Work items
+- [ ] Add automation docs for wiring `input_script.toml` into loop runs.
+- [ ] Add replay log linkage into run-manifest/artifact index metadata.
+- [ ] Add replay determinism test coverage for same-script repeated runs.
+
+Exit criteria (from SPEC-220)
+- Input replay is deterministic across repeated runs.
+- Replay alignment markers are represented in validation artifacts.
+
+## SPEC-230: Reference Media Normalization
+Outcome
+- Make normalization profile and outputs first-class run inputs.
+
+Work items
+- [ ] Record normalization metadata in run-manifest and artifact index docs.
+- [ ] Add docs/tests for VFR-to-CFR handling and hash stability.
+- [ ] Ensure automation docs enforce external storage and canonical profile usage.
+
+Exit criteria (from SPEC-230)
+- Normalized reference media and hashes are reproducible and traceable.
+
+## SPEC-240: Validation Orchestration and Triage
+Outcome
+- Standardize report + triage outputs across local automation runs.
+
+Work items
+- [ ] Align `recomp-validation artifacts` docs/schema with extended run-manifest references.
+- [ ] Document triage expectations and follow-up workflow in runbook/docs.
+- [ ] Add deterministic report regression tests for artifact-index workflows.
+
+Exit criteria (from SPEC-240)
+- Validation runs emit deterministic reports and actionable triage details.
+
+## SPEC-250: Automation Services and Data Flow
+Outcome
+- Define local-first run/state/event contracts with cloud-compatible schemas.
+
+Work items
+- [ ] Publish run submission/status schema docs with local/cloud/hybrid execution modes.
+- [ ] Document stage event names and required fields.
+- [ ] Add artifact index schema aligned with run-manifest references.
+
+Exit criteria (from SPEC-250)
+- Local runs and cloud-ready schemas share the same stage/data contracts.
+
+## SPEC-260: Agent Pipeline Security and Automation
+Outcome
+- Provide policy and security envelopes now, enforce in cloud phase.
+
+Work items
+- [ ] Add versioned JSON schemas for model request envelope and automation policy record.
+- [ ] Add local policy metadata fields in automation config and run-manifest documentation.
+- [ ] Add security test coverage that prevents secret/key path leakage in emitted logs.
+
+Exit criteria (from SPEC-260)
+- Security/policy interfaces are schema-defined and auditable without blocking local runs.
+
+## SPEC-270: Comprehensive Automated Static Recompilation Solution
+Outcome
+- Keep all planning/spec/docs/code surfaces aligned under dual-track, local-first strategy.
+
+Work items
+- [ ] Publish integration meta-spec and link dependent specs/docs.
+- [ ] Resolve contradictions between homebrew-first and retail milestone docs.
+- [ ] Update roadmap phaseing for Automation + Security Hardening.
+- [ ] Keep runbook and automation docs in sync with shipped CLI behavior.
+
+Exit criteria (from SPEC-270)
+- Specs, plans, roadmap, and docs are internally consistent and implementation-ready.
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -326,24 +420,6 @@ Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.
 - First-level gameplay matches the reference video within defined tolerances.
 - No proprietary assets or keys are stored in the repo or build outputs.
-
-## Cross-Cutting Intake: LLM-Assisted Long-Tail Decompilation (2026-02-16)
-Outcome
-- Reduce long-tail churn by ranking harder work using similarity and enforcing stronger unattended automation guardrails.
-
-Work items
-- [ ] Add similarity-based candidate ranking for unresolved functions (for example bounded opcode-sequence distance plus optional embedding retrieval) and record top references in run metadata.
-- [ ] Add periodic cleanup/documentation passes for already-matched functions so they remain high-quality exemplars for similarity-guided attempts.
-- [ ] Add specialist task lanes for graphics macro recovery, math-heavy functions, and mechanical cleanup/refactor work.
-- [ ] Add hard guardrails that block integrity-sentinel edits, generated-file edits, and skipped tests in unattended agent loops.
-- [ ] Capture long-tail metrics (`attempt_count`, `p85/p95 attempts`, `stall_reason`) in `run-manifest.json` and validation triage output.
-- [ ] Define escalation rules for outliers (for example very large functions or repeated failures) to prevent unbounded token burn.
-
-Related specs
-- SPEC-170 Function Discovery and Control-Flow Graph
-- SPEC-210 Automated Recompilation Loop
-- SPEC-250 Automation Services and Data Flow
-- SPEC-260 Agent Pipeline Security and Automation
 
 ## Future Work Notes: title-a24b9e807b456252 Video Validation (SPEC-190/200)
 Requirements to finalize:

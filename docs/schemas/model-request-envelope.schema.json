@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://switchrecomp.local/schemas/model-request-envelope.schema.json",
+  "title": "Model Request Envelope (v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "run_id",
+    "stage",
+    "model",
+    "reasoning_effort",
+    "input_artifacts",
+    "redaction_profile",
+    "response_schema"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "stage": {
+      "type": "string",
+      "minLength": 1
+    },
+    "model": {
+      "type": "string",
+      "enum": ["gpt-5.2-codex", "gpt-5.2"]
+    },
+    "reasoning_effort": {
+      "type": "string",
+      "enum": ["low", "medium", "high", "xhigh"]
+    },
+    "input_artifacts": {
+      "type": "array",
+      "items": { "type": "string" }
+    },
+    "redaction_profile": {
+      "type": "string",
+      "minLength": 1
+    },
+    "response_schema": {
+      "type": "string",
+      "minLength": 1
+    }
+  }
+}

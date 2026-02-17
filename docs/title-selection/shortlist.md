@@ -2,6 +2,10 @@
 
 This shortlist prioritizes preservation-safe, open-source homebrew titles with redistributable assets and minimal service dependencies. Each candidate requires license verification before selection.
 
+Retail pilot note:
+- Retail pilot selection is tracked separately as hashed title `title-a24b9e807b456252` under SPEC-200.
+- Retail assets remain external and are not part of this homebrew shortlist.
+
 ## Candidate A: 2048-style Homebrew (e.g., 2048NX)
 Pros:
 - Small codebase and minimal assets.

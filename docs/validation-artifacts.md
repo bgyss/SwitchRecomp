@@ -6,11 +6,13 @@ All real captures, keys, and proprietary inputs stay outside the repo.
 ## Artifact Index (JSON)
 The artifact index ties together intake outputs, recompiled outputs, and validation captures.
 It is consumed by `recomp-validation artifacts`.
+Schema reference: `docs/artifact-index-schema.json`.
 
 Required or common fields:
 - `label`: short name for the run (for example, `title-a24b9e807b456252-first-level`).
 - `xci_intake_manifest`: absolute path to `manifest.json` from XCI intake.
 - `pipeline_manifest`: absolute path to `manifest.json` from the pipeline output.
+- `run_manifest`: optional absolute path to `run-manifest.json` from `recomp automate`.
 - `reference_config`: absolute path to `reference_video.toml`.
 - `capture_config`: absolute path to `capture_video.toml`.
 - `validation_config`: optional path to `validation_config.toml`.
@@ -67,3 +69,4 @@ recomp-validation hash-audio --audio-file /path/to/audio.wav --out /path/to/audi
 - `docs/validation-traces.md` (capture workflow details).
 - `docs/validation-video.md` (hash-based comparison workflow).
 - `docs/title-a24b9e807b456252-first-level.md` (title-a24b9e807b456252-specific validation notes).
+- `docs/run-manifest-schema.md` (automation run metadata schema).

@@ -1,63 +1,72 @@
 # SPEC-110: Target Title Selection Criteria
 
 ## Status
-Draft v0.3
+Draft v0.4
 
 ## Purpose
-Define criteria for choosing an initial preservation‑safe target title for static recompilation.
+Define a dual-track title policy for static recompilation: a deterministic homebrew baseline and a hashed retail pilot.
 
 ## Goals
-- Select a title that is legally and ethically suitable for preservation research.
-- Minimize technical complexity for the first end‑to‑end milestone.
-- Ensure the selection yields high learning value for the pipeline and runtime.
+- Keep a preservation-safe baseline track that can iterate quickly and legally.
+- Maintain a realistic retail pilot track that exercises XCI intake and first-level milestone workflows.
+- Ensure both tracks use shared automation and validation contracts.
 
 ## Non-Goals
-- Selecting a title based on commercial popularity.
-- Providing or distributing proprietary assets or binaries.
+- Selecting titles based on commercial popularity.
+- Distributing proprietary assets, keys, or copyrighted traces.
+
+## Track Policy
+### Track A: Homebrew Baseline
+- Must be legally redistributable and compatible with project policy.
+- Prioritizes deterministic iteration on intake, lift, runtime surface, and validation.
+- Serves as the first regression gate for automation and schema changes.
+
+### Track B: Hashed Retail Pilot
+- Uses user-supplied, lawful inputs in private workspaces only.
+- Uses hashed title identifiers and external artifact storage.
+- Validates retail-specific assumptions (XCI intake, service surface, first-level behavior) without storing proprietary content in-repo.
 
 ## Selection Criteria
 ### Legal and Preservation Fit
-- Title is no longer commercially available or has clear preservation value.
-- Community consensus supports preservation without enabling piracy.
-- The project can document lawful acquisition of required inputs.
-- Must comply with `docs/LEGAL-POLICY.md`.
+- Complies with `docs/LEGAL-POLICY.md`.
+- Provenance and acquisition path are documented.
+- Asset separation is enforceable by workflow and tooling.
 
 ### Technical Feasibility
-- Minimal use of online services and networking features.
-- Limited reliance on specialized peripherals.
-- Small to moderate code and asset footprint.
-- Uses standard service calls (hid, audout, fs, applet) with minimal extras.
+- Can reach meaningful validation anchors (boot/menu/first playable loop).
+- Uses a service surface that can be stubbed or implemented incrementally.
+- Has a tractable instruction and graphics feature profile for current roadmap phases.
 
-### Pipeline Learning Value
-- Exercises core instruction coverage without heavy use of obscure ISA extensions.
-- Has predictable startup flow to validate service stubs and timing.
-- Contains a renderable scene for early GPU validation.
-
-### Reproducibility
-- Stable version identifiers and clean region variants.
-- Availability of reference traces that can be collected privately.
+### Automation and Validation Fit
+- Works with deterministic input replay and video/audio comparison workflow.
+- Supports run-manifest and artifact-index based traceability.
+- Can be represented in the validation matrix and per-title run sheet templates.
 
 ## Evaluation Checklist
+- [ ] Track assignment recorded (`homebrew_baseline` or `retail_pilot`).
 - [ ] Legal and preservation rationale documented.
-- [ ] Minimal service dependency map created.
-- [ ] Required instruction coverage estimated.
-- [ ] GPU feature usage profiled.
-- [ ] Asset separation plan validated.
+- [ ] Service dependency map created.
+- [ ] ISA and GPU coverage estimate recorded.
+- [ ] Validation anchors and thresholds documented.
+- [ ] Asset separation and external artifact plan validated.
 
 ## Deliverables
-- A short-list of 2–3 candidate titles with pros/cons.
-- A final selection memo and rationale.
-- A baseline trace plan for validation.
+- 2-3 candidate shortlist with track assignment and rationale.
+- Selection memo identifying active Track A and Track B titles.
+- Private trace/reference capture plan with external artifact paths.
 
 ## Supporting Docs
 - `docs/title-selection/shortlist.md`
 - `docs/title-selection/selection-memo.md`
 - `docs/title-selection/trace-plan.md`
+- `docs/title-run-sheet-template.md`
+- `docs/validation-matrix-template.md`
 
 ## Open Questions
-- What constitutes “preservation‑safe” for this project’s policy?
-- How to verify service usage without distributing traces?
+- What redaction profile defaults should apply by track when cloud automation is enabled?
+- Which retail pilot milestones should be required before adding additional retail titles?
 
 ## Acceptance Criteria
-- A documented selection that satisfies all checklist items.
-- A published plan for obtaining inputs legally and privately.
+- Active titles are documented for both tracks.
+- Both tracks map to shared automation + validation contracts.
+- Selection artifacts are sufficient to run deterministic validation without in-repo proprietary data.

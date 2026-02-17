@@ -35,6 +35,7 @@ This folder contains the project specs for the Switch static recompilation prese
 - SPEC-240-VALIDATION-ORCHESTRATION.md
 - SPEC-250-AUTOMATION-SERVICES.md
 - SPEC-260-AGENT-PIPELINE-SECURITY.md
+- SPEC-270-COMPREHENSIVE-AUTOMATED-SOLUTION.md
 
 ## Template
 - SPEC-TEMPLATE.md

@@ -28,6 +28,17 @@ capture = ["scripts/capture-video-macos.sh", "artifacts/capture"]
 extract_frames = ["ffmpeg", "-i", "artifacts/capture/capture.mp4", "artifacts/capture/frames/%08d.png"]
 extract_audio = ["ffmpeg", "-i", "artifacts/capture/capture.mp4", "-vn", "-acodec", "pcm_s16le", "artifacts/capture/audio.wav"]
 
+[analysis]
+command = ["echo", "analysis-stage-placeholder"]
+expected_outputs = []
+
+[policy]
+execution_mode = "local"
+requires_approval = false
+redaction_profile = "homebrew-default"
+allowed_models = ["gpt-5.2-codex"]
+run_windows = []
+
 [run]
 resume = true
 lift_entry = "entry"

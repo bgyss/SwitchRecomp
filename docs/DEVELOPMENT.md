@@ -80,6 +80,15 @@ cargo run -p recomp-cli -- run \
   --out-dir out/minimal
 ```
 
+- Run the local automation loop (single-command intake/build/capture/validation):
+
+```
+cargo run -p recomp-cli -- automate --config samples/automation.toml
+```
+
+`samples/automation.toml` now supports optional `[analysis]` and `[policy]` sections for
+research-stage outputs and policy metadata.
+
 - Build the emitted project:
 
 ```

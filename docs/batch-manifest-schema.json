@@ -122,7 +122,9 @@
       "properties": {
         "report_path": { "type": "string" },
         "metrics_dir": { "type": "string" },
-        "captures_dir": { "type": "string" }
+        "captures_dir": { "type": "string" },
+        "run_manifest_path": { "type": "string" },
+        "artifact_index_path": { "type": "string" }
       }
     },
     "title": {
