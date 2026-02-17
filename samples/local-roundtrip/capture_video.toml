@@ -1,0 +1,11 @@
+schema_version = "1"
+
+[video]
+path = "../../out/local-roundtrip-trial/artifacts/capture/capture.mp4"
+width = 1280
+height = 720
+fps = 30.0
+
+[hashes.frames]
+format = "list"
+path = "../../out/local-roundtrip-trial/artifacts/capture/frames.hashes"

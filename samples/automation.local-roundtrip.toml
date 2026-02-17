@@ -1,0 +1,48 @@
+schema_version = "2"
+
+[inputs]
+mode = "lifted"
+module_json = "minimal/module.json"
+provenance = "minimal/provenance.toml"
+config = "minimal/title.toml"
+runtime_path = "../crates/recomp-runtime"
+
+[outputs]
+work_root = "../out/local-roundtrip-trial/work"
+
+[reference]
+reference_video_toml = "local-roundtrip/reference_video.toml"
+capture_video_toml = "local-roundtrip/capture_video.toml"
+validation_config_toml = "local-roundtrip/validation_config.toml"
+input_script_toml = "local-roundtrip/input_script.toml"
+
+[capture]
+video_path = "../out/local-roundtrip-trial/artifacts/capture/capture.mp4"
+frames_dir = "../out/local-roundtrip-trial/artifacts/capture/frames"
+
+[commands]
+build = ["true"]
+run = ["true"]
+capture = ["scripts/local_roundtrip_trial.sh", "capture"]
+extract_frames = ["true"]
+
+[run]
+resume = false
+
+[loop]
+enabled = true
+max_retries = 1
+max_runtime_minutes = 30
+stop_on_first_pass = true
+strategy_order = ["input_timing_variant"]
+
+[gates.hash]
+frame_match_ratio_min = 1.0
+max_drift_frames = 0
+max_dropped_frames = 0
+
+[gates.perceptual]
+enabled = false
+
+[cloud]
+mode = "local"

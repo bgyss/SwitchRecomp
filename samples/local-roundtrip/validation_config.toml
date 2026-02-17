@@ -1,0 +1,9 @@
+schema_version = "1"
+name = "local-roundtrip-override"
+notes = "Local trial override to keep hash gate strict and audio optional."
+require_audio = false
+
+[thresholds]
+frame_match_ratio = 1.0
+max_drift_frames = 0
+max_dropped_frames = 0

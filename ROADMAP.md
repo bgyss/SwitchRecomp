@@ -66,7 +66,9 @@ Exit criteria:
 - Harden tooling, improve diagnostics, and expand coverage.
 - Establish a compatibility list for tested titles.
 - Publish a contributor guide and spec updates.
+- Operationalize long-tail mitigation loops (similarity-prioritized queues, cleanup passes, specialist task lanes, and strict hook gates).
 
 Exit criteria:
 - Regression suite is stable.
 - Clear compatibility reporting.
+- Stalled-function categories are tracked in automation metrics and trend downward across repeated runs.
