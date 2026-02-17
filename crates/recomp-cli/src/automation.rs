@@ -1613,7 +1613,7 @@ fn stage_cache_key(
         Some(argv) => {
             for arg in argv {
                 hasher.update(arg.as_bytes());
-                hasher.update(&[0]);
+                hasher.update([0]);
             }
         }
         None => hasher.update(b"<none>"),
