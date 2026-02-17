@@ -23,6 +23,10 @@ This file tracks implementation work derived from specs that do not yet have a c
 - SPEC-180 XCI Title Intake
 - SPEC-190 Video-Based Validation
 - SPEC-200 title-a24b9e807b456252 First-Level Milestone (macOS/aarch64)
+- SPEC-210 Automated Recompilation Loop
+- SPEC-240 Validation Orchestration and Triage
+- SPEC-250 Automation Services and Data Flow
+- SPEC-260 Agent Pipeline Security and Automation
 
 ## SPEC-000: Project Charter and Ethics
 Outcome
@@ -322,6 +326,24 @@ Exit criteria (from SPEC-200)
 - The macOS/aarch64 build boots and reaches the first playable level.
 - First-level gameplay matches the reference video within defined tolerances.
 - No proprietary assets or keys are stored in the repo or build outputs.
+
+## Cross-Cutting Intake: LLM-Assisted Long-Tail Decompilation (2026-02-16)
+Outcome
+- Reduce long-tail churn by ranking harder work using similarity and enforcing stronger unattended automation guardrails.
+
+Work items
+- [ ] Add similarity-based candidate ranking for unresolved functions (for example bounded opcode-sequence distance plus optional embedding retrieval) and record top references in run metadata.
+- [ ] Add periodic cleanup/documentation passes for already-matched functions so they remain high-quality exemplars for similarity-guided attempts.
+- [ ] Add specialist task lanes for graphics macro recovery, math-heavy functions, and mechanical cleanup/refactor work.
+- [ ] Add hard guardrails that block integrity-sentinel edits, generated-file edits, and skipped tests in unattended agent loops.
+- [ ] Capture long-tail metrics (`attempt_count`, `p85/p95 attempts`, `stall_reason`) in `run-manifest.json` and validation triage output.
+- [ ] Define escalation rules for outliers (for example very large functions or repeated failures) to prevent unbounded token burn.
+
+Related specs
+- SPEC-170 Function Discovery and Control-Flow Graph
+- SPEC-210 Automated Recompilation Loop
+- SPEC-250 Automation Services and Data Flow
+- SPEC-260 Agent Pipeline Security and Automation
 
 ## Future Work Notes: title-a24b9e807b456252 Video Validation (SPEC-190/200)
 Requirements to finalize:

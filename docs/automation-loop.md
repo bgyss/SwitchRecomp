@@ -79,6 +79,12 @@ The title-a24b9e807b456252 validation run requires external reference and captur
 paths and timecodes in `docs/title-a24b9e807b456252-validation-prereqs.md` before wiring a title-a24b9e807b456252-specific
 `automation.toml`.
 
+## Next Steps
+- Iterate on capture automation and tighten determinism for external tools.
+- Add long-tail controls (similarity-guided candidate ordering, specialist task lanes, and stricter unattended guardrails).
+
+## Related Notes
+- `docs/llm-assisted-decompilation-long-tail.md` captures extracted long-tail workflow findings and proposed integration points for this repo.
 ## Notes
 - Ghidra headless evidence export is optional via `[tools.ghidra]`.
 - Perceptual validation requires `python3` and `ffmpeg` (see skill scripts under

@@ -1,12 +1,13 @@
 # SPEC-210: Automated Recompilation Loop
 
 ## Status
-Draft v0.2
+Draft v0.3
 
 ## Rationale
 - Added an automation.toml schema and validator for end-to-end runs.
 - Added a CLI orchestrator that drives intake, lift, build, capture, hash, and validation steps.
 - Added deterministic run-manifest emission with artifact hashes and step summaries.
+- Added long-tail orchestration requirements: similarity-guided candidate ordering, specialist lanes, and stricter unattended guardrails.
 
 ## Purpose
 Define an automated loop that drives intake, recompilation, execution, capture, and validation in a repeatable pipeline.
@@ -36,6 +37,15 @@ Validation depends on comparing a captured run against a reference video with us
   - capture video/audio output into an external artifact root
   - generate frame/audio hashes and run validation
   - emit a run manifest with step timings and artifact paths
+- The loop must support deterministic long-tail candidate ordering for unresolved functions:
+  - Compute and store similarity references to matched functions (for example opcode-sequence distance and/or embedding neighbors).
+  - Record the selected candidate inputs in `run-manifest.json` so retries are reproducible.
+- The loop must support specialist task lanes (`general`, `gfx`, `math`, `cleanup`) with explicit lane selection recorded per attempt.
+- The loop must enforce hard unattended guardrails:
+  - stop on first failed build/test/hook step
+  - block skipped-test commits and integrity-sentinel edits
+  - block edits to generated files outside approved generation commands
+- The loop must emit long-tail metrics for triage (`attempt_count`, percentile summaries, and `stall_reason` tags).
 - The loop must allow resuming from intermediate stages when inputs are unchanged.
 - The loop must never copy proprietary assets into the repo or build outputs.
 
@@ -48,6 +58,11 @@ Validation depends on comparing a captured run against a reference video with us
   - `[run]` command overrides for build/run/capture.
 - Output:
   - `run-manifest.json` (step results, hashes, timings)
+  - `run-manifest.json.long_tail`:
+    - candidate selection trace
+    - task lane
+    - attempt count
+    - stall reason (if any)
   - `validation-report.json` from the validation step
 
 ## Deliverables
@@ -58,15 +73,18 @@ Validation depends on comparing a captured run against a reference video with us
 ## Open Questions
 - How should caching be keyed (full input hash, partial stage hash)?
 - How should partial failures be recorded for rerun?
+- What blend of similarity signals should be default for candidate ranking?
 
 ## Acceptance Criteria
 - A single command runs intake, build, capture, and validation in sequence.
 - The run manifest lists all artifacts with hashes and sizes.
 - Re-running with identical inputs yields identical artifacts and validation results.
+- Long-tail metadata is emitted deterministically for the same inputs and candidate pool.
 
 ## Risks
 - External tool versions can break determinism.
 - Capture timing jitter can cause false validation failures.
+- Poor similarity anchors can amplify brittle code patterns if cleanup lanes lag behind.
 
 ## References
 - SPEC-180 XCI Intake

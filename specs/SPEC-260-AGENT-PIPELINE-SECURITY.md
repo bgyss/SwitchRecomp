@@ -1,7 +1,7 @@
 # SPEC-260: Agent Pipeline Security and Automation
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
 Define security, governance, and automation requirements for the agent-managed recompilation pipeline using GPT-5.2-Codex.
@@ -30,6 +30,11 @@ Define security, governance, and automation requirements for the agent-managed r
 - High-cost stages MUST support optional human approval gates.
 - Secrets MUST be stored in managed secret stores and never in logs.
 - Encryption MUST be enforced for all artifact storage and transport.
+- Policy-enforced hooks MUST block edits to integrity sentinels and generated files unless an approved generator command is used.
+- The pipeline MUST verify required build/test commands ran successfully before allowing commit or artifact publication.
+- Agent tasks MUST include explicit file/function scope, and out-of-scope diffs MUST fail closed pending review.
+- Retry budgets MUST be enforced per task lane to prevent unbounded unattended loops.
+- Model routing MAY use lower-cost models for mechanical cleanup lanes, but routing decisions MUST be policy-driven and auditable.
 
 ## Interfaces and Data
 - Model request envelope (minimal JSON schema):
@@ -42,7 +47,11 @@ Define security, governance, and automation requirements for the agent-managed r
   "reasoning_effort": "low|medium|high|xhigh",
   "input_artifacts": ["artifact://hash"],
   "redaction_profile": "policy-id",
-  "response_schema": "schema-id"
+  "response_schema": "schema-id",
+  "task_scope": {
+    "kind": "function|file|stage",
+    "target": "string"
+  }
 }
 ```
 
@@ -54,7 +63,10 @@ Define security, governance, and automation requirements for the agent-managed r
   "requires_approval": true,
   "max_cost_usd": 500,
   "allowed_models": ["gpt-5.2-codex", "gpt-5.2"],
-  "run_windows": ["weekday:09:00-18:00"]
+  "run_windows": ["weekday:09:00-18:00"],
+  "required_checks": ["build-and-verify", "test-suite"],
+  "protected_targets": ["manifest-hashes", "generated-files"],
+  "max_retries_per_task": 30
 }
 ```
 
@@ -66,15 +78,18 @@ Define security, governance, and automation requirements for the agent-managed r
 ## Open Questions
 - What redaction profiles are required for homebrew vs research inputs?
 - What is the default reasoning_effort for each pipeline stage?
+- Which guarded files should be globally protected versus lane-specific exceptions?
 
 ## Acceptance Criteria
 - Every model call is routed through the Model Gateway with a stored audit record.
 - Every automated run can be paused for approval when policy requires.
 - A complete run can be replayed with the same prompts and artifacts.
+- Out-of-scope edits, skipped checks, and protected-target edits are blocked with auditable policy failures.
 
 ## Risks
 - Overly strict gating could slow iteration.
 - Inconsistent redaction could leak sensitive data.
+- Poorly tuned retry budgets may block legitimate tail-end progress.
 
 ## References
 - SPEC-020-INPUTS-PROVENANCE.md
