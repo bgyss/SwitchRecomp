@@ -77,6 +77,17 @@ Needed research:
 - Video/audio similarity metrics and drift analysis.
 - Operational checklist for title-a24b9e807b456252 validation artifacts (see `docs/title-a24b9e807b456252-validation-prereqs.md`).
 
+### 9) LLM-Assisted Decompilation Long-Tail Strategy
+- Define when similarity-guided scheduling beats difficulty-only scheduling for unresolved functions.
+- Identify specialist lanes where domain tools materially improve output quality (graphics macros, math transforms, mechanical cleanup).
+- Determine guardrails needed to keep unattended agent loops policy-compliant and reproducible.
+
+Needed research:
+- Compare opcode-sequence distance tools (for example Coddog-style bounded Levenshtein) against embedding-based retrieval for candidate ranking.
+- Measure whether cleanup/documentation passes improve downstream success on similar unresolved functions.
+- Track attempt distributions and outlier classes (for example large functions, graphics-heavy functions, matrix/vector math).
+- Define retry budgets and escalation rules that reduce token burn without masking hard blockers.
+
 ## Seed Resources (Reviewed)
 - Jamulator write-up on static recompilation pitfalls and concurrency: https://andrewkelley.me/post/jamulator.html
 - N64Recomp repository for pipeline patterns: https://github.com/N64Recomp/N64Recomp
@@ -98,6 +109,7 @@ Needed research:
 - Ghidra SLEIGH language reference (p-code semantics): https://github.com/NationalSecurityAgency/ghidra/blob/master/GhidraDocs/languages/html/sleigh.html
 - sleigh library (p-code lifting implementation): https://github.com/lifting-bits/sleigh
 - Resurrecting Crimsonland (banteg, 2026-02-01): headless Ghidra pipeline with evidence-backed rename map and regen loop, plus runtime instrumentation (WinDbg/cdb, Frida) for behavior capture; useful automation and validation ideas. https://banteg.xyz/posts/crimsonland/
+- The Long Tail of LLM-Assisted Decompilation (Chris Lewis, 2026-02-16): reports that similarity-guided candidate scheduling, specialist skills, cleanup loops, and strict hooks materially improved decomp throughput before hard tail limits (large functions, graphics macros, math transforms) dominated. https://blog.chrislewis.au/the-long-tail-of-llm-assisted-decompilation/
 - FFmpeg filter reference for SSIM/PSNR/EBU R128 audio analysis: https://manpages.debian.org/bookworm/ffmpeg/ffmpeg-filters.1.en.html
 - FFmpeg libvmaf filter usage notes: https://manpages.opensuse.org/Tumbleweed/ffmpeg/ffmpeg-filters.1.en.html
 - EBU R 128 loudness recommendation (audio loudness measurement): https://tech.ebu.ch/publications/r128

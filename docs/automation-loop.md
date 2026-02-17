@@ -52,3 +52,7 @@ paths and timecodes in `docs/title-a24b9e807b456252-validation-prereqs.md` befor
 
 ## Next Steps
 - Iterate on capture automation and tighten determinism for external tools.
+- Add long-tail controls (similarity-guided candidate ordering, specialist task lanes, and stricter unattended guardrails).
+
+## Related Notes
+- `docs/llm-assisted-decompilation-long-tail.md` captures extracted long-tail workflow findings and proposed integration points for this repo.
