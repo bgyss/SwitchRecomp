@@ -1,0 +1,33 @@
+schema_version = "2"
+
+[video]
+path = "../../out/local-roundtrip-trial/artifacts/reference/reference.mp4"
+width = 1280
+height = 720
+fps = 30.0
+
+[timeline]
+start = "00:00:00.000"
+end = "00:00:00.100"
+
+[[timeline.events]]
+name = "boot"
+time = "00:00:00.000"
+
+[[timeline.events]]
+name = "menu"
+time = "00:00:00.067"
+
+[hashes.frames]
+format = "list"
+path = "../../out/local-roundtrip-trial/artifacts/reference/frames.hashes"
+
+[validation]
+name = "local-roundtrip-trial"
+notes = "Deterministic local hash-gate trial config."
+require_audio = false
+
+[validation.thresholds]
+frame_match_ratio = 1.0
+max_drift_frames = 0
+max_dropped_frames = 0

@@ -20,6 +20,7 @@ struct Args {
 #[derive(Subcommand, Debug)]
 enum Command {
     Run(RunArgs),
+    Automate(AutomateArgs),
     Package(PackageArgs),
     HomebrewIntake(HomebrewIntakeArgs),
     HomebrewLift(HomebrewLiftArgs),
@@ -39,6 +40,12 @@ struct RunArgs {
     out_dir: PathBuf,
     #[arg(long, default_value = "../crates/recomp-runtime")]
     runtime_path: PathBuf,
+}
+
+#[derive(Parser, Debug)]
+struct AutomateArgs {
+    #[arg(long)]
+    config: PathBuf,
 }
 
 #[derive(Parser, Debug)]
@@ -173,6 +180,28 @@ fn main() {
                 }
             }
         }
+        Command::Automate(automate) => match automation::run_automation(&automate.config) {
+            Ok(report) => {
+                let status = report
+                    .final_status
+                    .unwrap_or(automation::RunFinalStatus::Passed);
+                println!(
+                    "Automation finished status={:?} attempts={}",
+                    status,
+                    report.attempts.len()
+                );
+                if let Some(summary) = &report.run_summary {
+                    println!("Run summary: {summary}");
+                }
+                if status != automation::RunFinalStatus::Passed {
+                    std::process::exit(1);
+                }
+            }
+            Err(err) => {
+                eprintln!("Automation error: {err}");
+                std::process::exit(1);
+            }
+        },
         Command::Package(package) => {
             let options = PackageOptions {
                 project_dir: package.project_dir,

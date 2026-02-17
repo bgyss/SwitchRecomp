@@ -1,0 +1,80 @@
+{
+  "Comment": "SwitchRecomp round-trip automation workflow (AWS hybrid scaffold)",
+  "StartAt": "SubmitRun",
+  "States": {
+    "SubmitRun": {
+      "Type": "Pass",
+      "ResultPath": "$.submission",
+      "Next": "ExecuteAttempt"
+    },
+    "ExecuteAttempt": {
+      "Type": "Task",
+      "Resource": "arn:aws:states:::ecs:runTask.sync",
+      "Parameters": {
+        "LaunchType": "FARGATE",
+        "Cluster.$": "$.clusterArn",
+        "TaskDefinition.$": "$.taskDefinitionArn",
+        "NetworkConfiguration": {
+          "AwsvpcConfiguration": {
+            "AssignPublicIp": "ENABLED",
+            "Subnets.$": "$.subnetIds",
+            "SecurityGroups.$": "$.securityGroupIds"
+          }
+        },
+        "Overrides": {
+          "ContainerOverrides": [
+            {
+              "Name": "recomp-worker",
+              "Environment": [
+                { "Name": "RECOMP_RUN_REQUEST_PATH", "Value.$": "$.runRequestPath" },
+                { "Name": "RECOMP_ARTIFACT_URI", "Value.$": "$.artifactUri" }
+              ]
+            }
+          ]
+        }
+      },
+      "Retry": [
+        {
+          "ErrorEquals": ["States.Timeout", "States.TaskFailed"],
+          "IntervalSeconds": 10,
+          "BackoffRate": 2.0,
+          "MaxAttempts": 3
+        }
+      ],
+      "Catch": [
+        {
+          "ErrorEquals": ["States.ALL"],
+          "Next": "MarkFailed"
+        }
+      ],
+      "Next": "EvaluateResult"
+    },
+    "EvaluateResult": {
+      "Type": "Choice",
+      "Choices": [
+        {
+          "Variable": "$.workerOutput.final_status",
+          "StringEquals": "passed",
+          "Next": "MarkPassed"
+        },
+        {
+          "Variable": "$.workerOutput.final_status",
+          "StringEquals": "needs_review",
+          "Next": "MarkNeedsReview"
+        }
+      ],
+      "Default": "MarkFailed"
+    },
+    "MarkPassed": {
+      "Type": "Succeed"
+    },
+    "MarkNeedsReview": {
+      "Type": "Succeed"
+    },
+    "MarkFailed": {
+      "Type": "Fail",
+      "Error": "RoundTripAutomationFailed",
+      "Cause": "Attempt lifecycle terminated without a passing validation gate"
+    }
+  }
+}

@@ -60,7 +60,8 @@ scripts/validation_artifacts_init.sh --out artifacts/title-a24b9e807b456252/arti
 scripts/validate_artifacts.sh --artifact-index artifacts/title-a24b9e807b456252/artifacts.json
 ```
 
-Note: The automated validation loop is paused until SPEC-210/220/230/240 are implemented.
+Note: The `recomp automate` loop is available for iterative runs; use
+`samples/automation.toml` as a starting point and adjust paths for private assets.
 
 ## External Assets
 - RomFS assets are expected at `game-data/title-a24b9e807b456252/romfs`.
