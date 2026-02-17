@@ -21,6 +21,7 @@ struct Args {
 enum Command {
     Run(RunArgs),
     Package(PackageArgs),
+    Automate(AutomateArgs),
     HomebrewIntake(HomebrewIntakeArgs),
     HomebrewLift(HomebrewLiftArgs),
     XciIntake(XciIntakeArgs),
@@ -51,6 +52,12 @@ struct PackageArgs {
     out_dir: PathBuf,
     #[arg(long)]
     assets_dir: Option<PathBuf>,
+}
+
+#[derive(Parser, Debug)]
+struct AutomateArgs {
+    #[arg(long)]
+    config: PathBuf,
 }
 
 #[derive(Parser, Debug)]
@@ -195,6 +202,26 @@ fn main() {
                 }
             }
         }
+        Command::Automate(automate) => match automation::run_automation(&automate.config) {
+            Ok(report) => {
+                let cache_hits = report.steps.iter().filter(|step| step.cache_hit).count();
+                println!(
+                    "Automation run {} completed ({}/{} cache hits)",
+                    report.run_id,
+                    cache_hits,
+                    report.steps.len()
+                );
+                println!("Execution mode: {}", report.execution_mode);
+                println!("Input fingerprint: {}", report.input_fingerprint);
+                if let Some(path) = report.validation_report {
+                    println!("Validation report: {}", path);
+                }
+            }
+            Err(err) => {
+                eprintln!("Automation error: {err}");
+                std::process::exit(1);
+            }
+        },
         Command::HomebrewIntake(intake) => {
             let options = IntakeOptions {
                 module_path: intake.module,
@@ -302,5 +329,19 @@ fn main() {
                 std::process::exit(1);
             }
         },
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use clap::CommandFactory;
+
+    #[test]
+    fn cli_includes_automate_subcommand() {
+        let command = Args::command();
+        assert!(command
+            .get_subcommands()
+            .any(|subcommand| subcommand.get_name() == "automate"));
     }
 }

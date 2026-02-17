@@ -1,0 +1,144 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://switchrecomp.local/schemas/run-manifest.schema.json",
+  "title": "Run Manifest Schema (v1)",
+  "type": "object",
+  "required": [
+    "schema_version",
+    "run_id",
+    "execution_mode",
+    "host_fingerprint",
+    "tool_versions",
+    "input_fingerprint",
+    "inputs",
+    "steps",
+    "artifacts"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "run_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": ["local", "cloud", "hybrid"]
+    },
+    "host_fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "tool_versions": {
+      "type": "object",
+      "required": ["recomp_cli"],
+      "properties": {
+        "recomp_cli": {
+          "type": "string"
+        },
+        "rustc": {
+          "type": ["string", "null"]
+        },
+        "ffmpeg": {
+          "type": ["string", "null"]
+        },
+        "xci_tool": {
+          "type": ["string", "null"]
+        }
+      },
+      "additionalProperties": false
+    },
+    "input_fingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "inputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["name", "path", "sha256", "size"],
+        "properties": {
+          "name": { "type": "string" },
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "size": { "type": "integer", "minimum": 0 }
+        },
+        "additionalProperties": false
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": [
+          "name",
+          "status",
+          "duration_ms",
+          "stage_attempt",
+          "cache_hit",
+          "cache_key"
+        ],
+        "properties": {
+          "name": { "type": "string" },
+          "status": {
+            "type": "string",
+            "enum": ["succeeded", "failed"]
+          },
+          "duration_ms": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "stage_attempt": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "cache_hit": {
+            "type": "boolean"
+          },
+          "cache_key": {
+            "type": "string",
+            "pattern": "^[a-f0-9]{64}$"
+          },
+          "command": {
+            "type": ["array", "null"],
+            "items": { "type": "string" }
+          },
+          "stdout_path": {
+            "type": ["string", "null"]
+          },
+          "stderr_path": {
+            "type": ["string", "null"]
+          },
+          "outputs": {
+            "type": "array",
+            "items": { "type": "string" }
+          },
+          "notes": {
+            "type": ["string", "null"]
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "artifacts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["path", "sha256", "size", "role"],
+        "properties": {
+          "path": { "type": "string" },
+          "sha256": { "type": "string", "pattern": "^[a-f0-9]{64}$" },
+          "size": { "type": "integer", "minimum": 0 },
+          "role": { "type": "string" }
+        },
+        "additionalProperties": false
+      }
+    },
+    "validation_report": {
+      "type": ["string", "null"]
+    }
+  },
+  "additionalProperties": false
+}

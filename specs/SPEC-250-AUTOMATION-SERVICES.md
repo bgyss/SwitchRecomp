@@ -1,86 +1,92 @@
 # SPEC-250: Automation Services and Data Flow
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
-Define the service architecture and data flow for fully automated static recompilation across local and AWS environments.
+Define local-first service boundaries and data flow contracts for automated static recompilation, with cloud interfaces staged behind explicit readiness gates.
 
 ## Goals
-- Describe the core services and their responsibilities.
-- Define the run lifecycle and required data flow events.
-- Provide minimal interface schemas for run submission and status.
+- Standardize the run lifecycle event model and service responsibilities.
+- Keep local and cloud execution contract-compatible.
+- Ensure immutable artifact and provenance traceability across all stages.
 
 ## Non-Goals
-- Detailed runtime ABI or module formats (covered elsewhere).
-- UI or operator console requirements.
+- Full infrastructure templates for AWS deployment.
+- Detailed UI/console design.
 
 ## Background
-- The pipeline must be fully automated while preserving strict input and output separation.
-- Hybrid deployment is required to support local testing and cloud scale.
+The implementation priority is deterministic local execution. Cloud orchestration should reuse the same manifests and stage contracts rather than introducing divergent behavior.
 
 ## Requirements
-- The architecture MUST support both local-only and AWS-backed execution.
-- Each run MUST be traceable from intake to output with immutable provenance records.
-- Artifact storage MUST be content-addressed and immutable once written.
-- The orchestration layer MUST support retries and resumable stages.
-- Workers MUST be stateless and operate on explicit inputs and outputs.
-- The model interface MUST be isolated behind a Model Gateway service.
+- Execution modes:
+  - `local` is required and first-class.
+  - `cloud` and `hybrid` are schema-defined and gated.
+- Run state requirements:
+  - every run has immutable IDs and stage transitions
+  - every stage emits deterministic logs and artifact references
+- Artifact requirements:
+  - content-addressed and immutable once written
+  - external asset separation preserved
+- Worker requirements:
+  - stateless stage execution with explicit input/output contracts
+  - deterministic retries and resumable stages
+- Event model requirements:
+  - `recomp.run.requested`
+  - `recomp.run.started`
+  - `recomp.run.stage.completed`
+  - `recomp.run.validation.completed`
+  - `recomp.run.completed`
 
 ## Interfaces and Data
-- Run submission request (minimal JSON schema):
+- Run submission schema (v1):
 
 ```json
 {
-  "run_id": "uuid",
+  "run_id": "uuid-or-run-id",
+  "execution_mode": "local|cloud|hybrid",
   "module_manifest": "artifact://hash",
   "config_manifest": "artifact://hash",
   "provenance_manifest": "artifact://hash",
   "requested_by": "principal_id",
-  "priority": "standard",
-  "execution_mode": "local|cloud|hybrid"
+  "priority": "standard"
 }
 ```
 
-- Run status record (minimal JSON schema):
+- Run status schema (v1):
 
 ```json
 {
-  "run_id": "uuid",
+  "run_id": "uuid-or-run-id",
   "state": "queued|running|blocked|failed|succeeded",
   "current_stage": "string",
+  "stage_attempt": 1,
   "artifacts": ["artifact://hash"],
   "started_at": "rfc3339",
   "updated_at": "rfc3339"
 }
 ```
 
-Required events:
-- `recomp.run.requested`
-- `recomp.run.planned`
-- `recomp.run.stage.completed`
-- `recomp.run.validation.completed`
-- `recomp.run.completed`
-
 ## Deliverables
-- Service inventory with ownership and run-time responsibilities.
-- Run lifecycle state machine definition.
-- Documented data flow with required events and artifacts.
+- Service inventory mapped to local and cloud execution responsibilities.
+- Run lifecycle state machine with transition rules.
+- Event and schema docs for submission, state, and artifact indexing.
 
 ## Open Questions
-- Should run state be sourced from a single metadata store or event log only?
-- What is the minimum artifact retention policy for failed runs?
+- Should cloud run state be source-of-truth in a single metadata store or reconstructed from event logs?
+- What minimum retention policy is required for failed run artifacts and logs?
 
 ## Acceptance Criteria
-- A run can be submitted using the minimal schema and observed end-to-end.
-- Every stage emits an event with deterministic artifacts and logs.
-- The architecture supports running the same input locally or in AWS without changing manifests.
+- Same manifest contracts support local runs and cloud-ready state records.
+- Stage events and artifact references are deterministic and auditable.
+- Local-first implementation does not require cloud infrastructure to run end to end.
 
 ## Risks
-- Overly granular services could increase operational complexity.
-- Divergent local and cloud behavior could reduce determinism.
+- Service granularity that is too fine can complicate operations.
+- Drift between local and cloud orchestration can break reproducibility.
 
 ## References
-- SPEC-030-RECOMP-PIPELINE.md
 - SPEC-210-AUTOMATED-RECOMP-LOOP.md
 - SPEC-240-VALIDATION-ORCHESTRATION.md
+- SPEC-260-AGENT-PIPELINE-SECURITY.md
+- SPEC-270-COMPREHENSIVE-AUTOMATED-SOLUTION.md

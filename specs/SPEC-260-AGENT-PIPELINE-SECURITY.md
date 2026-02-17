@@ -1,42 +1,47 @@
 # SPEC-260: Agent Pipeline Security and Automation
 
 ## Status
-Draft v0.1
+Draft v0.2
 
 ## Purpose
-Define security, governance, and automation requirements for the agent-managed recompilation pipeline using GPT-5.2-Codex.
+Define security and governance controls for model-assisted automation, with local dry-run metadata support now and cloud enforcement later.
 
 ## Goals
-- Establish security controls for model usage and artifact handling.
-- Define automation triggers, approvals, and auditability.
-- Provide guardrails for deterministic, policy-compliant agent behavior.
+- Keep model usage policy-compliant and auditable.
+- Define redaction and approval controls before cloud rollout.
+- Ensure model-facing interfaces are schema-validated and reproducible.
 
 ## Non-Goals
-- Network topology diagrams or detailed infrastructure templates.
-- Model evaluation or benchmark methodology.
+- Full network topology or IAM implementation details.
+- Immediate mandatory model execution in local pipelines.
 
 ## Background
-- Automated recompilation requires using an LLM to plan and supervise stages.
-- The pipeline must keep inputs and outputs cleanly separated while preserving provenance.
+Local-first automation does not require live model calls, but must still produce metadata and schema contracts that prevent policy drift when cloud/agent execution is enabled.
 
 ## Requirements
-- The Model Gateway MUST be the only egress path for model requests.
-- The pipeline MUST use the OpenAI Responses API for GPT-5.2-Codex.
-- Prompts and responses MUST be logged with run-id correlation.
-- Inputs MUST be redacted to remove sensitive content before any model request.
-- Model responses MUST be validated against schemas before execution.
-- All agent actions MUST be reproducible from stored prompts and artifacts.
-- Automation triggers MUST support both manual and scheduled execution.
-- High-cost stages MUST support optional human approval gates.
-- Secrets MUST be stored in managed secret stores and never in logs.
-- Encryption MUST be enforced for all artifact storage and transport.
+- Model gateway contract:
+  - Model egress must route through a gateway in cloud/hybrid modes.
+  - Local mode records policy metadata without requiring gateway infrastructure.
+- Audit requirements:
+  - Prompt/response records correlate to `run_id` and `stage`.
+  - Approval decisions and policy settings are captured in run metadata.
+- Redaction requirements:
+  - Redaction profile ID must be recorded per model request envelope.
+  - Homebrew and hashed retail tracks can use different profile defaults.
+- Validation requirements:
+  - model outputs must be schema-validated before action execution.
+  - action replay must be reproducible from stored prompts/artifacts.
+- Secret handling requirements:
+  - no key material in repo-tracked files
+  - no secret values in logs
 
 ## Interfaces and Data
-- Model request envelope (minimal JSON schema):
+- Model request envelope schema (v1):
 
 ```json
 {
-  "run_id": "uuid",
+  "schema_version": "1",
+  "run_id": "uuid-or-run-id",
   "stage": "string",
   "model": "gpt-5.2-codex",
   "reasoning_effort": "low|medium|high|xhigh",
@@ -46,38 +51,41 @@ Define security, governance, and automation requirements for the agent-managed r
 }
 ```
 
-- Automation policy record (minimal JSON schema):
+- Automation policy schema (v1):
 
 ```json
 {
+  "schema_version": "1",
   "policy_id": "string",
+  "execution_mode": "local|cloud|hybrid",
   "requires_approval": true,
   "max_cost_usd": 500,
+  "max_runtime_minutes": 240,
   "allowed_models": ["gpt-5.2-codex", "gpt-5.2"],
   "run_windows": ["weekday:09:00-18:00"]
 }
 ```
 
 ## Deliverables
-- Security control checklist for model usage and artifact handling.
-- Automation policy definitions for scheduled and manual runs.
-- Audit log format covering prompts, responses, and approvals.
+- Security control checklist for local, hybrid, and cloud modes.
+- Versioned JSON schemas for model request envelopes and automation policies.
+- Audit-log format requirements covering prompts, responses, policy, and approvals.
 
 ## Open Questions
-- What redaction profiles are required for homebrew vs research inputs?
-- What is the default reasoning_effort for each pipeline stage?
+- What baseline redaction profiles should be shipped for homebrew and hashed retail tracks?
+- Which stages should be approval-gated by default in `hybrid` execution mode?
 
 ## Acceptance Criteria
-- Every model call is routed through the Model Gateway with a stored audit record.
-- Every automated run can be paused for approval when policy requires.
-- A complete run can be replayed with the same prompts and artifacts.
+- Local runs can record policy metadata without live model dependency.
+- Cloud/hybrid interfaces are schema-complete for gated enforcement.
+- Security artifacts are sufficient to replay and audit model-assisted actions.
 
 ## Risks
-- Overly strict gating could slow iteration.
-- Inconsistent redaction could leak sensitive data.
+- Weak redaction defaults could leak sensitive context in future cloud mode.
+- Overly strict approval defaults could degrade iteration speed without clear risk reduction.
 
 ## References
 - SPEC-020-INPUTS-PROVENANCE.md
-- SPEC-095-BUILD-MANIFEST-INTEGRITY.md
-- SPEC-096-BUNDLE-MANIFEST-INTEGRITY.md
 - SPEC-210-AUTOMATED-RECOMP-LOOP.md
+- SPEC-250-AUTOMATION-SERVICES.md
+- SPEC-270-COMPREHENSIVE-AUTOMATED-SOLUTION.md

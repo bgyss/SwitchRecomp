@@ -51,7 +51,18 @@ Exit criteria:
 - Performance targets met on baseline host.
 - Automated validation produces a report with stable metrics.
 
-## Phase 5: Stabilization
+## Phase 5: Automation + Security Hardening
+- Expose and stabilize the single-command automation loop (`recomp automate`).
+- Extend run-manifest and artifact-index schemas for deterministic lifecycle traceability.
+- Reconcile homebrew baseline and hashed retail pilot under shared automation contracts.
+- Add local-first policy/redaction metadata and cloud-ready security envelope schemas.
+
+Exit criteria:
+- One command runs intake-through-validation for supported local modes.
+- Stage cache invalidation is deterministic and scoped to affected downstream stages.
+- Security/policy schemas are documented and audit-ready for cloud rollout.
+
+## Phase 6: Stabilization
 - Harden tooling, improve diagnostics, and expand coverage.
 - Establish a compatibility list for tested titles.
 - Publish a contributor guide and spec updates.

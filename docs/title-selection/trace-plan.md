@@ -3,6 +3,10 @@
 ## Goal
 Collect baseline traces from a legally obtained title without distributing proprietary assets or raw traces.
 
+Track alignment:
+- Homebrew baseline traces are used for deterministic regression gates.
+- Retail pilot traces/captures are stored externally and linked by hashed identifiers.
+
 ## Acquisition and Setup
 - Acquire the target title through lawful means.
 - Record tool versions used for extraction and tracing in `provenance.toml`.

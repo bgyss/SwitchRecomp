@@ -2,6 +2,7 @@
   "label": "title-a24b9e807b456252-first-level",
   "xci_intake_manifest": "/Volumes/External/inputs/title-a24b9e807b456252-intake/manifest.json",
   "pipeline_manifest": "/Volumes/External/outputs/title-a24b9e807b456252/manifest.json",
+  "run_manifest": "/Volumes/External/outputs/title-a24b9e807b456252/run-manifest.json",
   "reference_config": "/Volumes/External/validation/reference_video.toml",
   "capture_config": "/Volumes/External/validation/capture_video.toml",
   "validation_config": "/Volumes/External/validation/validation_config.toml",

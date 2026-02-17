@@ -1,54 +1,59 @@
 # Automated Recompilation Loop
 
-This document describes the intended automation loop for static recompilation. The goal is a
-single command that runs intake, build, capture, and validation without copying proprietary
-assets into the repo.
+This document describes the implemented local-first automation loop for static recompilation.
+The loop is exposed through `recomp automate --config <automation.toml>`.
 
 ## Loop Overview
-1. Validate provenance and input formats.
-2. Intake (XCI or homebrew) and lift to `module.json`.
-3. Build the emitted Rust project.
-4. Run the rebuilt binary with deterministic runtime settings.
-5. Capture video/audio output to an external artifact root.
-6. Generate hashes and run validation.
-7. Emit `run-manifest.json` and `validation-report.json`.
+1. Validate inputs, config, and provenance.
+2. Intake (homebrew or XCI) when required.
+3. Analysis (optional) for headless export and evidence artifacts.
+4. Lift (homebrew decoder or external lift command for XCI).
+5. Run pipeline + build + runtime/capture commands.
+6. Hash capture outputs and run validation.
+7. Emit and finalize `run-manifest.json` plus `validation-report.json`.
 
 ## Core Inputs
-- `automation.toml` (config schema implemented in `recomp automate`).
-- `reference_video.toml` and `capture_video.toml`.
-- `input_script.toml` for deterministic input replay.
+- `automation.toml`
+- `reference_video.toml`
+- `capture_video.toml`
+- optional `validation_config.toml`
+- optional `input_script.toml`
 
 ## Outputs
-- Build artifacts under `out/<title>/`.
-- Capture artifacts under `artifacts/<title>/capture/`.
-- Validation artifacts under `artifacts/<title>/validation/`.
-- `run-manifest.json` for per-step timing, hashes, and provenance.
-- `artifacts.json` to link intake manifests, capture configs, and validation reports.
+- stage artifacts under configured work roots
+- per-step logs under `logs/`
+- `run-manifest.json`
+- `validation-report.json`
 
 ## Asset Separation
-All assets (RomFS, reference video, capture output) remain outside the repo. Only hashes and
-metadata should be committed.
+All proprietary assets (RomFS, reference media, capture outputs, keys) must remain outside repo-tracked paths.
+Only metadata, hashes, and non-proprietary configs should be committed.
 
-## Automation Config
-`automation.toml` defines inputs, outputs, capture paths, and commands. Start from
-`samples/automation.toml` and update the paths for your environment. Key sections:
+## Automation Config Sections
+Start from `samples/automation.toml`.
+
 - `schema_version`
-- `[inputs]` mode (`homebrew`, `xci`, `lifted`), provenance, title config, and inputs.
-- `[outputs]` work root and optional overrides for intake/lift/build dirs.
-- `[reference]` reference/capture video config paths (plus optional validation config).
-- `[capture]` capture video path and extracted frames/audio locations.
-- `[commands]` build/run/capture/extract commands (plus optional lift command for XCI).
-- `[run]` resume and lift settings (optional).
+- `[inputs]`: mode (`homebrew`, `xci`, `lifted`) and required input paths.
+- `[outputs]`: work root and optional stage output overrides.
+- `[reference]`: reference/capture/validation/input replay config paths.
+- `[capture]`: capture output paths used for hashing and validation.
+- `[commands]`: build/run/capture/extract commands (plus optional `lift` for XCI mode).
+- `[analysis]` (optional): analysis command, expected outputs, and optional `name_map_json`/trace manifest.
+- `[policy]` (optional): execution mode and governance metadata (`requires_approval`, cost/runtime bounds, redaction profile, allowed models, run windows).
+- `[run]` (optional): resume behavior and homebrew lift settings.
 
-Invoke the loop with:
+## Run Manifest Notes
+`run-manifest.json` records:
+- run metadata (`run_id`, `execution_mode`, host fingerprint, tool versions)
+- deterministic input fingerprint
+- per-step status, stage attempt, cache-hit state, and cache key
+- artifact hashes and sizes
+
+## Invocation
 ```bash
-recomp automate --config automation.toml
+cargo run -p recomp-cli -- automate --config samples/automation.toml
 ```
 
 ## title-a24b9e807b456252 Validation Inputs
-The title-a24b9e807b456252 validation run requires external reference and capture artifacts. Track the required
-paths and timecodes in `docs/title-a24b9e807b456252-validation-prereqs.md` before wiring a title-a24b9e807b456252-specific
-`automation.toml`.
-
-## Next Steps
-- Iterate on capture automation and tighten determinism for external tools.
+For retail pilot runs, gather external artifacts listed in
+`docs/title-a24b9e807b456252-validation-prereqs.md` and use absolute local paths in automation config.

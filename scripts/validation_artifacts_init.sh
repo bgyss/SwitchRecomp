@@ -55,6 +55,7 @@ cat <<JSON > "$OUT"
   "label": "${LABEL}",
   "xci_intake_manifest": "/Volumes/External/inputs/intake/manifest.json",
   "pipeline_manifest": "/Volumes/External/outputs/recompiled/manifest.json",
+  "run_manifest": "/Volumes/External/outputs/recompiled/run-manifest.json",
   "reference_config": "/Volumes/External/validation/reference_video.toml",
   "capture_config": "/Volumes/External/validation/capture_video.toml",
   "validation_config": "/Volumes/External/validation/validation_config.toml",

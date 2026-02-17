@@ -1,6 +1,3 @@
-#![allow(dead_code)]
-// Automation scaffolding is intentionally compiled but not yet wired into the CLI.
-
 use recomp_pipeline::homebrew::{
     intake_homebrew, lift_homebrew, IntakeOptions, LiftMode, LiftOptions,
 };
@@ -31,6 +28,10 @@ pub struct AutomationConfig {
     pub commands: CommandConfig,
     #[serde(default)]
     pub tools: ToolsConfig,
+    #[serde(default)]
+    pub analysis: AnalysisConfig,
+    #[serde(default)]
+    pub policy: PolicyConfig,
     #[serde(default)]
     pub run: RunConfig,
 }
@@ -143,7 +144,7 @@ impl From<AutomationXciTool> for XciToolPreference {
     }
 }
 
-#[derive(Debug, Deserialize, Clone, Default)]
+#[derive(Debug, Deserialize, Clone)]
 pub struct RunConfig {
     #[serde(default = "default_resume")]
     pub resume: bool,
@@ -151,6 +152,70 @@ pub struct RunConfig {
     pub lift_entry: Option<String>,
     #[serde(default)]
     pub lift_mode: Option<LiftModeConfig>,
+}
+
+impl Default for RunConfig {
+    fn default() -> Self {
+        Self {
+            resume: default_resume(),
+            lift_entry: None,
+            lift_mode: None,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct AnalysisConfig {
+    #[serde(default)]
+    pub command: Option<Vec<String>>,
+    #[serde(default)]
+    pub expected_outputs: Vec<PathBuf>,
+    #[serde(default)]
+    pub name_map_json: Option<PathBuf>,
+    #[serde(default)]
+    pub runtime_trace_manifest: Option<PathBuf>,
+}
+
+#[derive(Debug, Deserialize, Clone, Default)]
+pub struct PolicyConfig {
+    #[serde(default)]
+    pub requires_approval: bool,
+    #[serde(default)]
+    pub max_cost_usd: Option<f64>,
+    #[serde(default)]
+    pub max_runtime_minutes: Option<u64>,
+    #[serde(default)]
+    pub execution_mode: Option<ExecutionMode>,
+    #[serde(default)]
+    pub redaction_profile: Option<String>,
+    #[serde(default)]
+    pub allowed_models: Vec<String>,
+    #[serde(default)]
+    pub run_windows: Vec<String>,
+}
+
+#[derive(Debug, Deserialize, Serialize, Clone, Copy, PartialEq, Eq)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionMode {
+    Local,
+    Cloud,
+    Hybrid,
+}
+
+impl std::fmt::Display for ExecutionMode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ExecutionMode::Local => f.write_str("local"),
+            ExecutionMode::Cloud => f.write_str("cloud"),
+            ExecutionMode::Hybrid => f.write_str("hybrid"),
+        }
+    }
+}
+
+impl Default for ExecutionMode {
+    fn default() -> Self {
+        Self::Local
+    }
 }
 
 #[derive(Debug, Deserialize, Clone, Copy)]
@@ -191,6 +256,14 @@ struct ResolvedPaths {
 #[derive(Debug, Serialize, Deserialize, Clone)]
 pub struct RunManifest {
     pub schema_version: String,
+    #[serde(default)]
+    pub run_id: String,
+    #[serde(default)]
+    pub execution_mode: ExecutionMode,
+    #[serde(default)]
+    pub host_fingerprint: String,
+    #[serde(default)]
+    pub tool_versions: ToolVersions,
     pub input_fingerprint: String,
     pub inputs: Vec<RunInput>,
     pub steps: Vec<RunStep>,
@@ -212,6 +285,12 @@ pub struct RunStep {
     pub name: String,
     pub status: StepStatus,
     pub duration_ms: u128,
+    #[serde(default)]
+    pub stage_attempt: u32,
+    #[serde(default)]
+    pub cache_hit: bool,
+    #[serde(default)]
+    pub cache_key: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub command: Option<Vec<String>>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -239,11 +318,31 @@ pub struct RunArtifact {
     pub role: String,
 }
 
+#[derive(Debug, Serialize, Deserialize, Clone)]
+pub struct ToolVersions {
+    pub recomp_cli: String,
+    pub rustc: Option<String>,
+    pub ffmpeg: Option<String>,
+    pub xci_tool: Option<String>,
+}
+
+impl Default for ToolVersions {
+    fn default() -> Self {
+        Self {
+            recomp_cli: env!("CARGO_PKG_VERSION").to_string(),
+            rustc: None,
+            ffmpeg: None,
+            xci_tool: None,
+        }
+    }
+}
+
 #[derive(Debug)]
 struct RunState {
     manifest: RunManifest,
     artifacts: BTreeMap<String, RunArtifact>,
     previous_steps: HashMap<String, RunStep>,
+    attempts: HashMap<String, u32>,
     cache_valid: bool,
 }
 
@@ -275,6 +374,10 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
 
     let inputs = gather_inputs(&config, &config_path, &paths)?;
     let input_fingerprint = fingerprint_inputs(&inputs);
+    let execution_mode = config.policy.execution_mode.unwrap_or_default();
+    let tool_versions = gather_tool_versions(&config);
+    let host_fingerprint = fingerprint_host();
+    let run_id = derive_run_id(&input_fingerprint, execution_mode, &paths.work_root);
 
     let previous_manifest = if config.run.resume && paths.run_manifest.exists() {
         Some(load_run_manifest(&paths.run_manifest)?)
@@ -282,20 +385,9 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
         None
     };
 
-    if let Some(previous) = &previous_manifest {
-        if previous.input_fingerprint == input_fingerprint
-            && previous
-                .steps
-                .iter()
-                .all(|step| step.status == StepStatus::Succeeded)
-            && manifest_outputs_exist(&paths, previous)
-        {
-            return Ok(previous.clone());
-        }
-    }
-
     let mut artifacts = BTreeMap::new();
     let mut previous_steps = HashMap::new();
+    let mut attempts = HashMap::new();
     if let Some(previous) = &previous_manifest {
         if previous.input_fingerprint == input_fingerprint {
             for artifact in &previous.artifacts {
@@ -303,6 +395,7 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
             }
             for step in &previous.steps {
                 previous_steps.insert(step.name.clone(), step.clone());
+                attempts.insert(step.name.clone(), step.stage_attempt);
             }
         }
     }
@@ -310,6 +403,10 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
     let mut state = RunState {
         manifest: RunManifest {
             schema_version: RUN_MANIFEST_SCHEMA_VERSION.to_string(),
+            run_id,
+            execution_mode,
+            host_fingerprint,
+            tool_versions,
             input_fingerprint: input_fingerprint.clone(),
             inputs,
             steps: Vec::new(),
@@ -318,6 +415,7 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
         },
         artifacts,
         previous_steps,
+        attempts,
         cache_valid: config.run.resume,
     };
 
@@ -395,6 +493,70 @@ pub fn run_automation(config_path: &Path) -> Result<RunManifest, String> {
                 };
             Ok(outcome)
         })?;
+    }
+
+    let has_analysis_contract = config.analysis.command.is_some()
+        || !config.analysis.expected_outputs.is_empty()
+        || config.analysis.name_map_json.is_some()
+        || config.analysis.runtime_trace_manifest.is_some();
+    if has_analysis_contract {
+        let analysis_command = config.analysis.command.clone();
+        run_cached_step(
+            "analysis",
+            &paths,
+            &config,
+            &mut state,
+            analysis_command.clone(),
+            |state| {
+                let (stdout, stderr) = match &analysis_command {
+                    Some(command) => run_command(command, &paths, &config)?,
+                    None => (
+                        "analysis command not configured; validating analysis contracts only"
+                            .to_string(),
+                        String::new(),
+                    ),
+                };
+                let mut outputs = Vec::new();
+                for output in &config.analysis.expected_outputs {
+                    if !output.exists() {
+                        return Err(format!(
+                            "analysis expected output not found: {}",
+                            output.display()
+                        ));
+                    }
+                    outputs.push(record_artifact(state, &paths, output, "analysis_output")?);
+                }
+                if let Some(path) = &config.analysis.name_map_json {
+                    if !path.exists() {
+                        return Err(format!(
+                            "analysis name_map_json not found: {}",
+                            path.display()
+                        ));
+                    }
+                    outputs.push(record_artifact(state, &paths, path, "analysis_name_map")?);
+                }
+                if let Some(path) = &config.analysis.runtime_trace_manifest {
+                    if !path.exists() {
+                        return Err(format!(
+                            "analysis runtime_trace_manifest not found: {}",
+                            path.display()
+                        ));
+                    }
+                    outputs.push(record_artifact(
+                        state,
+                        &paths,
+                        path,
+                        "analysis_runtime_trace_manifest",
+                    )?);
+                }
+                Ok(StepOutcome {
+                    status: StepStatus::Succeeded,
+                    stdout,
+                    stderr,
+                    outputs,
+                })
+            },
+        )?;
     }
 
     if matches!(config.inputs.mode, InputMode::Homebrew | InputMode::Xci) {
@@ -769,6 +931,15 @@ impl AutomationConfig {
         if let Some(path) = &self.capture.audio_file {
             self.capture.audio_file = Some(resolve_path(base_dir, path));
         }
+        for path in &mut self.analysis.expected_outputs {
+            *path = resolve_path(base_dir, path);
+        }
+        if let Some(path) = &self.analysis.name_map_json {
+            self.analysis.name_map_json = Some(resolve_path(base_dir, path));
+        }
+        if let Some(path) = &self.analysis.runtime_trace_manifest {
+            self.analysis.runtime_trace_manifest = Some(resolve_path(base_dir, path));
+        }
 
         if let Some(path) = &self.tools.xci_tool_path {
             self.tools.xci_tool_path = Some(resolve_path(base_dir, path));
@@ -879,6 +1050,35 @@ impl AutomationConfig {
                 "commands.extract_audio is required when capture.audio_file is set".to_string(),
             );
         }
+        if let Some(command) = &self.analysis.command {
+            if command.is_empty() {
+                return Err("analysis.command must be non-empty when set".to_string());
+            }
+        }
+        if self.analysis.command.is_none()
+            && (self.analysis.name_map_json.is_some()
+                || self.analysis.runtime_trace_manifest.is_some())
+            && self.analysis.expected_outputs.is_empty()
+        {
+            let name_map_missing = self
+                .analysis
+                .name_map_json
+                .as_ref()
+                .map(|path| !path.exists())
+                .unwrap_or(false);
+            let trace_missing = self
+                .analysis
+                .runtime_trace_manifest
+                .as_ref()
+                .map(|path| !path.exists())
+                .unwrap_or(false);
+            if name_map_missing || trace_missing {
+                return Err(
+                    "analysis contract paths must exist when analysis.command is not configured"
+                        .to_string(),
+                );
+            }
+        }
         Ok(())
     }
 }
@@ -947,7 +1147,7 @@ impl ResolvedPaths {
 fn run_cached_step<F>(
     name: &str,
     paths: &ResolvedPaths,
-    _config: &AutomationConfig,
+    config: &AutomationConfig,
     state: &mut RunState,
     command: Option<Vec<String>>,
     action: F,
@@ -955,15 +1155,31 @@ fn run_cached_step<F>(
 where
     F: FnOnce(&mut RunState) -> Result<StepOutcome, String>,
 {
+    let cache_key = stage_cache_key(
+        name,
+        &state.manifest.input_fingerprint,
+        &command,
+        state,
+        config,
+    );
     if state.cache_valid {
         if let Some(previous) = state.previous_steps.get(name) {
-            if previous.status == StepStatus::Succeeded && outputs_exist(paths, previous) {
-                state.manifest.steps.push(previous.clone());
+            if previous.status == StepStatus::Succeeded
+                && outputs_exist(paths, previous)
+                && previous.cache_key == cache_key
+            {
+                let mut cached = previous.clone();
+                cached.cache_hit = true;
+                cached.command = command.clone();
+                state.manifest.steps.push(cached);
                 return Ok(());
             }
         }
         state.cache_valid = false;
     }
+
+    let stage_attempt = state.attempts.get(name).copied().unwrap_or(0) + 1;
+    state.attempts.insert(name.to_string(), stage_attempt);
 
     let start = Instant::now();
     let outcome = action(state);
@@ -984,6 +1200,9 @@ where
                 name: name.to_string(),
                 status: outcome.status,
                 duration_ms,
+                stage_attempt,
+                cache_hit: false,
+                cache_key,
                 command,
                 stdout_path: stdout_path.map(|path| format_path(paths, &path)),
                 stderr_path: stderr_path.map(|path| format_path(paths, &path)),
@@ -1016,6 +1235,9 @@ where
                 name: name.to_string(),
                 status: StepStatus::Failed,
                 duration_ms,
+                stage_attempt,
+                cache_hit: false,
+                cache_key,
                 command,
                 stdout_path: stdout_path.map(|path| format_path(paths, &path)),
                 stderr_path: stderr_path.map(|path| format_path(paths, &path)),
@@ -1123,6 +1345,56 @@ fn command_env(paths: &ResolvedPaths, config: &AutomationConfig) -> BTreeMap<Str
         "RECOMP_LIFTED_MODULE_JSON".to_string(),
         paths.lifted_module_json.display().to_string(),
     );
+    env.insert(
+        "RECOMP_EXECUTION_MODE".to_string(),
+        config.policy.execution_mode.unwrap_or_default().to_string(),
+    );
+    env.insert(
+        "RECOMP_POLICY_REQUIRES_APPROVAL".to_string(),
+        config.policy.requires_approval.to_string(),
+    );
+    if let Some(max_cost_usd) = config.policy.max_cost_usd {
+        env.insert(
+            "RECOMP_POLICY_MAX_COST_USD".to_string(),
+            max_cost_usd.to_string(),
+        );
+    }
+    if let Some(max_runtime_minutes) = config.policy.max_runtime_minutes {
+        env.insert(
+            "RECOMP_POLICY_MAX_RUNTIME_MINUTES".to_string(),
+            max_runtime_minutes.to_string(),
+        );
+    }
+    if let Some(name_map) = &config.analysis.name_map_json {
+        env.insert(
+            "RECOMP_ANALYSIS_NAME_MAP_JSON".to_string(),
+            name_map.display().to_string(),
+        );
+    }
+    if let Some(trace_manifest) = &config.analysis.runtime_trace_manifest {
+        env.insert(
+            "RECOMP_ANALYSIS_RUNTIME_TRACE_MANIFEST".to_string(),
+            trace_manifest.display().to_string(),
+        );
+    }
+    if let Some(profile) = &config.policy.redaction_profile {
+        env.insert(
+            "RECOMP_POLICY_REDACTION_PROFILE".to_string(),
+            profile.clone(),
+        );
+    }
+    if !config.policy.allowed_models.is_empty() {
+        env.insert(
+            "RECOMP_POLICY_ALLOWED_MODELS".to_string(),
+            config.policy.allowed_models.join(","),
+        );
+    }
+    if !config.policy.run_windows.is_empty() {
+        env.insert(
+            "RECOMP_POLICY_RUN_WINDOWS".to_string(),
+            config.policy.run_windows.join(","),
+        );
+    }
     if let Some(validation) = &config.reference.validation_config_toml {
         env.insert(
             "RECOMP_VALIDATION_CONFIG_TOML".to_string(),
@@ -1199,13 +1471,6 @@ fn outputs_exist(paths: &ResolvedPaths, step: &RunStep) -> bool {
     })
 }
 
-fn manifest_outputs_exist(paths: &ResolvedPaths, manifest: &RunManifest) -> bool {
-    manifest.artifacts.iter().all(|artifact| {
-        let path = resolve_path(&paths.config_dir, Path::new(&artifact.path));
-        path.exists()
-    })
-}
-
 fn write_run_manifest(path: &Path, manifest: &RunManifest) -> Result<(), String> {
     if let Some(parent) = path.parent() {
         fs::create_dir_all(parent)
@@ -1239,6 +1504,16 @@ fn gather_inputs(
     }
     if let Some(input_script) = &config.reference.input_script_toml {
         inputs.push(run_input("input_script", input_script)?);
+    }
+    if let Some(path) = &config.analysis.name_map_json {
+        if path.exists() {
+            inputs.push(run_input("analysis_name_map_json", path)?);
+        }
+    }
+    if let Some(path) = &config.analysis.runtime_trace_manifest {
+        if path.exists() {
+            inputs.push(run_input("analysis_runtime_trace_manifest", path)?);
+        }
     }
     if let Some(path) = &config.inputs.module_json {
         inputs.push(run_input("module_json", path)?);
@@ -1292,6 +1567,9 @@ fn hash_file(path: &Path) -> Result<(String, u64), String> {
 fn fingerprint_inputs(inputs: &[RunInput]) -> String {
     let mut hasher = Sha256::new();
     for input in inputs {
+        if input.name == "automation_config" {
+            continue;
+        }
         hasher.update(input.name.as_bytes());
         hasher.update(b":");
         hasher.update(input.sha256.as_bytes());
@@ -1301,6 +1579,234 @@ fn fingerprint_inputs(inputs: &[RunInput]) -> String {
     }
     let digest = hasher.finalize();
     format!("{:x}", digest)
+}
+
+fn stage_cache_key(
+    name: &str,
+    input_fingerprint: &str,
+    command: &Option<Vec<String>>,
+    state: &RunState,
+    config: &AutomationConfig,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(name.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(input_fingerprint.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(state.manifest.execution_mode.to_string().as_bytes());
+    hasher.update(b"\n");
+    hasher.update(state.manifest.tool_versions.recomp_cli.as_bytes());
+    hasher.update(b"\n");
+    if let Some(rustc) = &state.manifest.tool_versions.rustc {
+        hasher.update(rustc.as_bytes());
+    }
+    hasher.update(b"\n");
+    if let Some(ffmpeg) = &state.manifest.tool_versions.ffmpeg {
+        hasher.update(ffmpeg.as_bytes());
+    }
+    hasher.update(b"\n");
+    if let Some(xci_tool) = &state.manifest.tool_versions.xci_tool {
+        hasher.update(xci_tool.as_bytes());
+    }
+    hasher.update(b"\n");
+    match command {
+        Some(argv) => {
+            for arg in argv {
+                hasher.update(arg.as_bytes());
+                hasher.update(&[0]);
+            }
+        }
+        None => hasher.update(b"<none>"),
+    }
+    hasher.update(b"\n");
+    hasher.update(stage_config_signature(name, config).as_bytes());
+    let digest = hasher.finalize();
+    format!("{:x}", digest)
+}
+
+fn stage_config_signature(name: &str, config: &AutomationConfig) -> String {
+    match name {
+        "intake" => format!(
+            "mode={:?};nro={};nso={:?};xci={};keys={};xci_tool={:?};xci_tool_path={}",
+            config.inputs.mode,
+            config
+                .inputs
+                .nro
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            config
+                .inputs
+                .nso
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>(),
+            config
+                .inputs
+                .xci
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            config
+                .inputs
+                .keys
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            config.tools.xci_tool,
+            config
+                .tools
+                .xci_tool_path
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+        ),
+        "analysis" => format!(
+            "command={:?};expected_outputs={:?};name_map_json={};runtime_trace_manifest={}",
+            config.analysis.command,
+            config
+                .analysis
+                .expected_outputs
+                .iter()
+                .map(|p| p.display().to_string())
+                .collect::<Vec<_>>(),
+            config
+                .analysis
+                .name_map_json
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default(),
+            config
+                .analysis
+                .runtime_trace_manifest
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+        ),
+        "lift" => format!(
+            "entry={};mode={:?};lift_command={:?}",
+            config
+                .run
+                .lift_entry
+                .clone()
+                .unwrap_or_else(|| "entry".to_string()),
+            config.run.lift_mode.unwrap_or(LiftModeConfig::Decode),
+            config.commands.lift
+        ),
+        "pipeline" => format!(
+            "runtime_path={};title_config={};provenance={}",
+            config
+                .inputs
+                .runtime_path
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_else(|| "default-runtime".to_string()),
+            config.inputs.config.display(),
+            config.inputs.provenance.display()
+        ),
+        "build" => format!("build={:?}", config.commands.build),
+        "run" => format!("run={:?}", config.commands.run),
+        "capture" => format!(
+            "capture={:?};video_path={};frames_dir={};audio_file={}",
+            config.commands.capture,
+            config.capture.video_path.display(),
+            config.capture.frames_dir.display(),
+            config
+                .capture
+                .audio_file
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+        ),
+        "extract_frames" => format!("extract_frames={:?}", config.commands.extract_frames),
+        "extract_audio" => format!("extract_audio={:?}", config.commands.extract_audio),
+        "hash_frames" => format!(
+            "capture_video_toml={};frames_dir={}",
+            config.reference.capture_video_toml.display(),
+            config.capture.frames_dir.display()
+        ),
+        "hash_audio" => format!(
+            "capture_video_toml={};audio_file={}",
+            config.reference.capture_video_toml.display(),
+            config
+                .capture
+                .audio_file
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+        ),
+        "validate" => format!(
+            "reference={};capture={};validation={}",
+            config.reference.reference_video_toml.display(),
+            config.reference.capture_video_toml.display(),
+            config
+                .reference
+                .validation_config_toml
+                .as_ref()
+                .map(|p| p.display().to_string())
+                .unwrap_or_default()
+        ),
+        _ => String::new(),
+    }
+}
+
+fn gather_tool_versions(config: &AutomationConfig) -> ToolVersions {
+    let rustc = Command::new("rustc")
+        .arg("--version")
+        .output()
+        .ok()
+        .and_then(|output| {
+            if output.status.success() {
+                Some(String::from_utf8_lossy(&output.stdout).trim().to_string())
+            } else {
+                None
+            }
+        });
+    ToolVersions {
+        recomp_cli: env!("CARGO_PKG_VERSION").to_string(),
+        rustc,
+        ffmpeg: config
+            .tools
+            .ffmpeg_path
+            .as_ref()
+            .map(|path| path.display().to_string()),
+        xci_tool: config.tools.xci_tool.map(|tool| match tool {
+            AutomationXciTool::Auto => "auto".to_string(),
+            AutomationXciTool::Hactool => "hactool".to_string(),
+            AutomationXciTool::Hactoolnet => "hactoolnet".to_string(),
+            AutomationXciTool::Mock => "mock".to_string(),
+        }),
+    }
+}
+
+fn fingerprint_host() -> String {
+    let host = std::env::var("HOSTNAME")
+        .or_else(|_| std::env::var("COMPUTERNAME"))
+        .unwrap_or_default();
+    let mut hasher = Sha256::new();
+    hasher.update(host.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(std::env::consts::OS.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(std::env::consts::ARCH.as_bytes());
+    let digest = hasher.finalize();
+    format!("{:x}", digest)
+}
+
+fn derive_run_id(
+    input_fingerprint: &str,
+    execution_mode: ExecutionMode,
+    work_root: &Path,
+) -> String {
+    let mut hasher = Sha256::new();
+    hasher.update(input_fingerprint.as_bytes());
+    hasher.update(b"\n");
+    hasher.update(execution_mode.to_string().as_bytes());
+    hasher.update(b"\n");
+    hasher.update(work_root.display().to_string().as_bytes());
+    let digest = hasher.finalize();
+    let full = format!("{:x}", digest);
+    format!("run-{}", &full[..16])
 }
 
 fn resolve_path(base_dir: &Path, path: &Path) -> PathBuf {
@@ -1425,15 +1931,297 @@ extract_frames = ["/usr/bin/true"]
             capture_video_path.display(),
             frames_dir.display()
         );
-        fs::write(&automation_path, automation_toml).expect("write automation config");
+        fs::write(&automation_path, &automation_toml).expect("write automation config");
 
         let manifest = run_automation(&automation_path).expect("run automation");
         assert_eq!(manifest.input_fingerprint.len(), 64);
+        assert!(manifest.run_id.starts_with("run-"));
+        assert_eq!(manifest.execution_mode, ExecutionMode::Local);
+        assert_eq!(manifest.host_fingerprint.len(), 64);
         assert!(manifest.steps.iter().any(|step| step.name == "pipeline"));
+        assert!(manifest.steps.iter().all(|step| !step.cache_hit));
+        assert!(manifest.steps.iter().all(|step| step.stage_attempt >= 1));
         assert!(paths_exist(&manifest, temp.path()));
 
         let manifest_again = run_automation(&automation_path).expect("run automation again");
         assert_eq!(manifest.input_fingerprint, manifest_again.input_fingerprint);
+        let cache_misses: Vec<_> = manifest_again
+            .steps
+            .iter()
+            .filter(|step| !step.cache_hit)
+            .map(|step| step.name.clone())
+            .collect();
+        assert!(
+            cache_misses.is_empty(),
+            "expected all cache hits, misses: {cache_misses:?}"
+        );
+    }
+
+    #[test]
+    fn automation_command_change_invalidates_dependent_stages_only() {
+        let repo_root = repo_root();
+        let temp = tempdir().expect("tempdir");
+        let work_root = temp.path().join("work");
+        let capture_dir = temp.path().join("capture");
+        let frames_dir = capture_dir.join("frames");
+        fs::create_dir_all(&frames_dir).expect("frames dir");
+
+        let frame_a = frames_dir.join("00000001.png");
+        let frame_b = frames_dir.join("00000002.png");
+        fs::write(&frame_a, b"frame-one").expect("write frame a");
+        fs::write(&frame_b, b"frame-two").expect("write frame b");
+
+        let reference_hashes = hash_frames_dir(&frames_dir).expect("hash frames");
+        let reference_hash_path = temp.path().join("reference_frames.hashes");
+        write_hash_list(&reference_hash_path, &reference_hashes).expect("write ref hashes");
+
+        let capture_hash_path = capture_dir.join("frames.hashes");
+        let capture_video_path = capture_dir.join("capture.mp4");
+        fs::write(&capture_video_path, b"").expect("write capture video");
+
+        let reference_toml = format!(
+            r#"schema_version = "2"
+
+[video]
+path = "reference.mp4"
+width = 1280
+height = 720
+fps = 30.0
+
+[timeline]
+start = "00:00:00.000"
+end = "00:00:00.067"
+
+[hashes.frames]
+format = "list"
+path = "{}"
+"#,
+            reference_hash_path.display()
+        );
+        let capture_toml = format!(
+            r#"schema_version = "1"
+
+[video]
+path = "{}"
+width = 1280
+height = 720
+fps = 30.0
+
+[hashes.frames]
+format = "list"
+path = "{}"
+"#,
+            capture_video_path.display(),
+            capture_hash_path.display()
+        );
+        let reference_path = temp.path().join("reference_video.toml");
+        let capture_path = temp.path().join("capture_video.toml");
+        fs::write(&reference_path, reference_toml).expect("write reference config");
+        fs::write(&capture_path, capture_toml).expect("write capture config");
+
+        let automation_path = temp.path().join("automation.toml");
+        let automation_toml = format!(
+            r#"schema_version = "1"
+
+[inputs]
+mode = "lifted"
+module_json = "{}"
+provenance = "{}"
+config = "{}"
+runtime_path = "{}"
+
+[outputs]
+work_root = "{}"
+
+[reference]
+reference_video_toml = "{}"
+capture_video_toml = "{}"
+
+[capture]
+video_path = "{}"
+frames_dir = "{}"
+
+[commands]
+build = ["/usr/bin/true"]
+run = ["/usr/bin/true"]
+capture = ["/usr/bin/true"]
+extract_frames = ["/usr/bin/true"]
+"#,
+            repo_root.join("samples/minimal/module.json").display(),
+            repo_root.join("samples/minimal/provenance.toml").display(),
+            repo_root.join("samples/minimal/title.toml").display(),
+            repo_root.join("crates/recomp-runtime").display(),
+            work_root.display(),
+            reference_path.display(),
+            capture_path.display(),
+            capture_video_path.display(),
+            frames_dir.display()
+        );
+        fs::write(&automation_path, &automation_toml).expect("write automation config");
+
+        let manifest_first = run_automation(&automation_path).expect("first automation run");
+        assert!(manifest_first.steps.iter().all(|step| !step.cache_hit));
+
+        let updated = automation_toml.replace(
+            "run = [\"/usr/bin/true\"]",
+            "run = [\"/usr/bin/printf\", \"\"]",
+        );
+        fs::write(&automation_path, updated).expect("update automation config");
+
+        let manifest_second = run_automation(&automation_path).expect("second automation run");
+        let mut by_name = HashMap::new();
+        for step in &manifest_second.steps {
+            by_name.insert(step.name.clone(), step.cache_hit);
+        }
+        assert_eq!(by_name.get("pipeline"), Some(&true));
+        assert_eq!(by_name.get("build"), Some(&true));
+        assert_eq!(by_name.get("run"), Some(&false));
+        assert_eq!(by_name.get("capture"), Some(&false));
+        assert_eq!(by_name.get("extract_frames"), Some(&false));
+        assert_eq!(by_name.get("hash_frames"), Some(&false));
+        assert_eq!(by_name.get("validate"), Some(&false));
+    }
+
+    #[test]
+    fn automation_failure_then_resume_reuses_upstream_steps() {
+        let repo_root = repo_root();
+        let temp = tempdir().expect("tempdir");
+        let work_root = temp.path().join("work");
+        let capture_dir = temp.path().join("capture");
+        let frames_dir = capture_dir.join("frames");
+        fs::create_dir_all(&frames_dir).expect("frames dir");
+
+        let frame_a = frames_dir.join("00000001.png");
+        let frame_b = frames_dir.join("00000002.png");
+        fs::write(&frame_a, b"frame-one").expect("write frame a");
+        fs::write(&frame_b, b"frame-two").expect("write frame b");
+
+        let reference_hashes = hash_frames_dir(&frames_dir).expect("hash frames");
+        let reference_hash_path = temp.path().join("reference_frames.hashes");
+        write_hash_list(&reference_hash_path, &reference_hashes).expect("write ref hashes");
+
+        let capture_hash_path = capture_dir.join("frames.hashes");
+        let capture_video_path = capture_dir.join("capture.mp4");
+        fs::write(&capture_video_path, b"").expect("write capture video");
+
+        let reference_toml = format!(
+            r#"schema_version = "2"
+
+[video]
+path = "reference.mp4"
+width = 1280
+height = 720
+fps = 30.0
+
+[timeline]
+start = "00:00:00.000"
+end = "00:00:00.067"
+
+[hashes.frames]
+format = "list"
+path = "{}"
+"#,
+            reference_hash_path.display()
+        );
+        let capture_toml = format!(
+            r#"schema_version = "1"
+
+[video]
+path = "{}"
+width = 1280
+height = 720
+fps = 30.0
+
+[hashes.frames]
+format = "list"
+path = "{}"
+"#,
+            capture_video_path.display(),
+            capture_hash_path.display()
+        );
+        let reference_path = temp.path().join("reference_video.toml");
+        let capture_path = temp.path().join("capture_video.toml");
+        fs::write(&reference_path, reference_toml).expect("write reference config");
+        fs::write(&capture_path, capture_toml).expect("write capture config");
+
+        let automation_path = temp.path().join("automation.toml");
+        let failing_automation_toml = format!(
+            r#"schema_version = "1"
+
+[inputs]
+mode = "lifted"
+module_json = "{}"
+provenance = "{}"
+config = "{}"
+runtime_path = "{}"
+
+[outputs]
+work_root = "{}"
+
+[reference]
+reference_video_toml = "{}"
+capture_video_toml = "{}"
+
+[capture]
+video_path = "{}"
+frames_dir = "{}"
+
+[commands]
+build = ["/usr/bin/true"]
+run = ["/usr/bin/false"]
+capture = ["/usr/bin/true"]
+extract_frames = ["/usr/bin/true"]
+"#,
+            repo_root.join("samples/minimal/module.json").display(),
+            repo_root.join("samples/minimal/provenance.toml").display(),
+            repo_root.join("samples/minimal/title.toml").display(),
+            repo_root.join("crates/recomp-runtime").display(),
+            work_root.display(),
+            reference_path.display(),
+            capture_path.display(),
+            capture_video_path.display(),
+            frames_dir.display()
+        );
+        fs::write(&automation_path, &failing_automation_toml).expect("write failing config");
+
+        let err = run_automation(&automation_path).expect_err("first run should fail");
+        assert!(err.contains("command failed"), "unexpected error: {err}");
+
+        let failed_manifest =
+            load_run_manifest(&work_root.join("run-manifest.json")).expect("load failed manifest");
+        assert_eq!(
+            failed_manifest
+                .steps
+                .last()
+                .expect("at least one step")
+                .name,
+            "run"
+        );
+        assert_eq!(
+            failed_manifest
+                .steps
+                .last()
+                .expect("at least one step")
+                .status,
+            StepStatus::Failed
+        );
+
+        let fixed = failing_automation_toml
+            .replace("run = [\"/usr/bin/false\"]", "run = [\"/usr/bin/true\"]");
+        fs::write(&automation_path, fixed).expect("write fixed config");
+
+        let resumed_manifest = run_automation(&automation_path).expect("resume run");
+        let mut by_name = HashMap::new();
+        for step in &resumed_manifest.steps {
+            by_name.insert(step.name.clone(), step.cache_hit);
+        }
+        assert_eq!(by_name.get("pipeline"), Some(&true));
+        assert_eq!(by_name.get("build"), Some(&true));
+        assert_eq!(by_name.get("run"), Some(&false));
+        assert_eq!(by_name.get("capture"), Some(&false));
+        assert_eq!(by_name.get("extract_frames"), Some(&false));
+        assert_eq!(by_name.get("hash_frames"), Some(&false));
+        assert_eq!(by_name.get("validate"), Some(&false));
     }
 
     fn paths_exist(manifest: &RunManifest, base: &Path) -> bool {

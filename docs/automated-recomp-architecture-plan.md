@@ -62,6 +62,9 @@ Draft v0.1
 - Encrypt data at rest and in transit with KMS-managed keys.
 - Maintain immutable audit logs for all run requests and model prompts.
 - Enforce redaction rules before any model request leaves the environment.
+- Version model and policy contracts with JSON schemas:
+  - `docs/schemas/model-request-envelope.schema.json`
+  - `docs/schemas/automation-policy.schema.json`
 
 ## Agent-Managed Pipeline Using GPT-5.2-Codex
 - Use the OpenAI Responses API as the sole model interface for GPT-5.2-Codex.

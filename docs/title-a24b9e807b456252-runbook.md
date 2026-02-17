@@ -1,68 +1,54 @@
 # title-a24b9e807b456252 macOS/aarch64 Runbook (Scaffold)
 
-This runbook documents a reproducible build and run loop for the SPEC-200 scaffold on
-macOS/aarch64. It uses placeholder inputs and does not bundle any retail assets.
+This runbook documents a reproducible automation-first flow for SPEC-200 on macOS/aarch64.
+It uses placeholders and does not bundle any retail assets.
 
 ## Prerequisites
 - macOS on Apple Silicon (aarch64).
 - Rust toolchain installed via `rustup`.
-- Optional: Nix + devenv for the repo dev shell.
+- Optional: `nix develop --impure`.
+- External private workspace for XCI/key/reference/capture assets.
 
-## Build and Run
-1. Enter the dev shell (optional).
+## Preferred Path: Automation Command
+1. Prepare an automation config based on `samples/automation.toml` with title-specific paths.
+2. Point inputs/outputs to private external roots.
+3. Run:
 
-```
-nix develop --impure
-```
-
-2. Run the pipeline for the title-a24b9e807b456252 sample.
-
-```
-cargo run -p recomp-cli -- run \
-  --module samples/title-a24b9e807b456252/module.json \
-  --config samples/title-a24b9e807b456252/title.toml \
-  --provenance samples/title-a24b9e807b456252/provenance.toml \
-  --out-dir out/title-a24b9e807b456252
+```bash
+cargo run -p recomp-cli -- automate --config /absolute/path/to/title-a24b9e807b456252-automation.toml
 ```
 
-3. Build the emitted project.
+Outputs:
+- `run-manifest.json`
+- `validation-report.json`
+- per-stage logs under configured log dir
 
+## Manual Path (Fallback)
+Use this only when debugging individual stages.
+
+1. Intake:
+```bash
+cargo run -p recomp-cli -- xci-intake --xci ... --keys ... --provenance ... --out-dir ... --assets-dir ...
 ```
+
+2. Lift/pipeline/build/run:
+```bash
+cargo run -p recomp-cli -- run --module ... --config ... --provenance ... --out-dir ...
 cargo build --manifest-path out/title-a24b9e807b456252/Cargo.toml
 ```
 
-4. Run the emitted binary.
-
+3. Capture and validate:
+```bash
+scripts/capture-validation.sh --out-dir /absolute/capture/root --duration 360 --fps 60 --video-device 1 --audio-device 0 --resolution 1920x1080
+cargo run -p recomp-validation -- artifacts --artifact-index /absolute/path/to/artifacts.json
 ```
-cargo run --manifest-path out/title-a24b9e807b456252/Cargo.toml
-```
-
-5. Capture a validation run and compare against the reference timeline.
-
-```
-scripts/capture-video-macos.sh artifacts/title-a24b9e807b456252
-ffmpeg -i artifacts/title-a24b9e807b456252/capture.mp4 artifacts/title-a24b9e807b456252/frames/%08d.png
-ffmpeg -i artifacts/title-a24b9e807b456252/capture.mp4 -vn -acodec pcm_s16le artifacts/title-a24b9e807b456252/audio.wav
-
-recomp-validation hash-frames --frames-dir artifacts/title-a24b9e807b456252/frames --out artifacts/title-a24b9e807b456252/frames.hashes
-recomp-validation hash-audio --audio-file artifacts/title-a24b9e807b456252/audio.wav --out artifacts/title-a24b9e807b456252/audio.hashes
-
-cp samples/capture_video.toml artifacts/title-a24b9e807b456252/capture.toml
-# Edit artifacts/title-a24b9e807b456252/capture.toml to point at the capture hashes above.
-
-recomp-validation video \
-  --reference samples/reference_video.toml \
-  --capture artifacts/title-a24b9e807b456252/capture.toml \
-  --out-dir artifacts/title-a24b9e807b456252/validation
-
-scripts/validation_artifacts_init.sh --out artifacts/title-a24b9e807b456252/artifacts.json
-# Edit artifacts/title-a24b9e807b456252/artifacts.json to point at intake/pipeline manifests.
-scripts/validate_artifacts.sh --artifact-index artifacts/title-a24b9e807b456252/artifacts.json
-```
-
-Note: The automated validation loop is paused until SPEC-210/220/230/240 are implemented.
 
 ## External Assets
-- RomFS assets are expected at `game-data/title-a24b9e807b456252/romfs`.
-- Replace placeholder inputs under `samples/title-a24b9e807b456252/inputs/` with real artifacts in a
-  private workspace before attempting full title-a24b9e807b456252 validation.
+- RomFS and reference/capture media remain external.
+- Keep title IDs and paths hashed where possible.
+- Do not commit raw captures, keys, or proprietary binaries.
+
+## Related Docs
+- `docs/automation-loop.md`
+- `docs/validation-artifacts.md`
+- `docs/title-a24b9e807b456252-validation-prereqs.md`
