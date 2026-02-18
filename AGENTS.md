@@ -11,6 +11,7 @@ SwitchRecomp is a preservation-focused static recompilation research project. Th
 - `crates/` contains the exploratory Rust pipeline/runtime scaffolding.
 - `samples/` contains small, non-proprietary inputs to exercise the pipeline.
 - `docs/` holds development and design notes.
+- `docs/SPECS-CHANGELOG.md` is the detailed, commit-level history of spec changes.
 - `README.md` is the project overview and contribution entry point.
 
 ## Build, Test, and Development Commands
@@ -61,6 +62,9 @@ No established commit conventions are present yet. Until standards are set:
 ## Agent-Specific Instructions
 - Keep edits small and focused per change.
 - Update the appropriate spec status when making substantive changes.
+- Aggressively maintain `docs/SPECS-CHANGELOG.md` whenever any file under `specs/` is added, modified, renamed, or removed.
+- Aggressively update `README.md` `Specs Update Log` with high-level milestones that correspond to spec changes.
+- Aggressively update relevant `docs/` content whenever specs, plans, or completed work units change project behavior, scope, or process.
 - Do not add proprietary binaries, keys, or assets to the repository.
 - Always test changes, update relevant documentation, and commit all code you modify or add.
 - Push all commits after creating them.
