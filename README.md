@@ -16,6 +16,7 @@ This repository contains a draft specification set for a Nintendo Switch static 
 - Read `specs/README.md` for ordering.
 - Each spec starts as Draft and should be updated as research is completed.
 - Open questions are explicitly listed at the end of each spec.
+- Use `docs/SPECS-CHANGELOG.md` for the detailed, commit-level history of spec changes.
 
 ## Contribution Notes
 - Do not add or link to proprietary assets, keys, or copyrighted binaries.
@@ -56,10 +57,15 @@ Configured hooks:
 - Pre-push: `cargo clippy --workspace --all-targets --all-features -D warnings`, `cargo test --workspace`.
 
 ## Specs Update Log
-- 2026-01-29: v0.2 pass started; added hardware baseline details, input/binary format research, OS/services surface notes, and timing/interrupts refinements across specs.
-- 2026-01-29: Added `SPEC-TEMPLATE.md` and expanded `RESEARCH.md` with seed sources.
-- 2026-01-29: Added exploratory pipeline/runtime crates, a minimal sample, and dev environment scaffolding.
-- 2026-01-29: Added ISA, services, graphics, and timing scaffolds plus build manifest output.
+- Detailed commit-by-commit spec history: `docs/SPECS-CHANGELOG.md`.
+- 2026-02-16: Ingested long-tail LLM decomp findings into `SPEC-210`, `SPEC-250`, and `SPEC-260`.
+- 2026-02-07: Migrated title references to hash IDs, updated validation details, and renamed `SPEC-200` to `SPEC-200-TITLE-A24B9E807B456252-FIRST-LEVEL.md`.
+- 2026-02-04: Expanded XCI intake and validation artifact plumbing across `SPEC-100`, `SPEC-180`, `SPEC-190`, and `SPEC-200`.
+- 2026-02-03: Added automation loop and orchestration/security spec set (`SPEC-210` through `SPEC-260`) and related plan/status updates.
+- 2026-02-02: Added decode/CFG and runtime-memory specs (`SPEC-045`, `SPEC-046`, `SPEC-047`, `SPEC-160`, `SPEC-170`) plus XCI/video milestone specs (`SPEC-180`, `SPEC-190`, `SPEC-200`).
+- 2026-01-31 to 2026-02-01: Added and refined homebrew end-to-end intake/extraction/runtime/asset specs (`SPEC-120` through `SPEC-150`).
+- 2026-01-30: Added manifest integrity specs (`SPEC-095`, `SPEC-096`) and updated charter/validation/title-selection details.
+- 2026-01-29: Bootstrapped the initial spec series (`SPEC-000` through `SPEC-110`) and iterative ISA/services/graphics/timing scaffold updates.
 
 ## Status
 Early draft. Expect frequent revisions as research progresses.
