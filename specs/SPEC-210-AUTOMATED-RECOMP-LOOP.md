@@ -4,89 +4,81 @@
 Draft v0.3
 
 ## Rationale
-- Added an automation.toml schema and validator for end-to-end runs.
-- Added a CLI orchestrator that drives intake, lift, build, capture, hash, and validation steps.
-- Added deterministic run-manifest emission with artifact hashes and step summaries.
-- Added long-tail orchestration requirements: similarity-guided candidate ordering, specialist lanes, and stricter unattended guardrails.
+- Automation engine internals exist in `recomp-cli` with deterministic stage execution, resume, and run-manifest output.
+- This revision closes the former CLI surface gap by standardizing `recomp automate --config ...`.
+- Adds optional analysis and policy contracts for local-first rollout.
 
 ## Purpose
-Define an automated loop that drives intake, recompilation, execution, capture, and validation in a repeatable pipeline.
+Define a single-command, deterministic automation loop that drives intake through validation and archive metadata generation.
 
 ## Goals
-- Provide a single entry point that runs the full static recompilation loop.
-- Generate deterministic artifacts and a run manifest for every attempt.
-- Support incremental iteration while keeping proprietary assets external.
+- Provide one CLI entrypoint for intake, lift, build, run/capture, and validation.
+- Emit deterministic lifecycle metadata with stage-level cache semantics.
+- Support homebrew and retail pilot inputs while preserving strict asset separation.
 
 ## Non-Goals
-- Fully automated legal intake of retail assets.
-- Replacing human review of subjective rendering issues.
+- Fully automatic legal acquisition of retail assets.
+- Immediate cloud orchestration enforcement.
 
 ## Background
-Validation depends on comparing a captured run against a reference video with user inputs. The project needs a stable automation loop so iteration is fast and reproducible while asset separation stays intact.
+Automation must stay deterministic and resumable while allowing iterative command and config changes without re-running unaffected stages.
 
 ## Requirements
-- The loop must accept a config that points to:
-  - input artifacts (XCI, keyset, module.json, etc.)
-  - output roots (build, capture, validation)
-  - reference timeline and input script paths
-  - toolchain paths (hactool/hactoolnet, ffmpeg)
-- The loop must:
-  - validate provenance and input formats before running
-  - run intake/lift/build steps and capture stdout/stderr per step
-  - execute the rebuilt binary with a deterministic runtime config
-  - capture video/audio output into an external artifact root
-  - generate frame/audio hashes and run validation
-  - emit a run manifest with step timings and artifact paths
-- The loop must support deterministic long-tail candidate ordering for unresolved functions:
-  - Compute and store similarity references to matched functions (for example opcode-sequence distance and/or embedding neighbors).
-  - Record the selected candidate inputs in `run-manifest.json` so retries are reproducible.
-- The loop must support specialist task lanes (`general`, `gfx`, `math`, `cleanup`) with explicit lane selection recorded per attempt.
-- The loop must enforce hard unattended guardrails:
-  - stop on first failed build/test/hook step
-  - block skipped-test commits and integrity-sentinel edits
-  - block edits to generated files outside approved generation commands
-- The loop must emit long-tail metrics for triage (`attempt_count`, percentile summaries, and `stall_reason` tags).
-- The loop must allow resuming from intermediate stages when inputs are unchanged.
-- The loop must never copy proprietary assets into the repo or build outputs.
+- CLI surface:
+  - `recomp automate --config <automation.toml>`
+- Stage lifecycle:
+  1. intake
+  2. analysis (optional contract stage)
+  3. lift
+  4. pipeline
+  5. build
+  6. run
+  7. capture
+  8. extract/hash
+  9. validate
+  10. archive (manifest finalization)
+- `automation.toml` supports:
+  - existing sections (`inputs`, `outputs`, `reference`, `capture`, `commands`, `tools`, `run`)
+  - optional `[analysis]` for headless analysis command + expected outputs
+  - optional `[policy]` for execution mode and governance metadata
+- Stage caching:
+  - cache keys include input fingerprint + stage command/config signature + tool version tuple
+  - command change invalidates only affected stage and downstream stages
+- `run-manifest.json` includes:
+  - run-level metadata (`run_id`, `execution_mode`, `tool_versions`, `host_fingerprint`)
+  - per-step metadata (`stage_attempt`, `cache_hit`, `cache_key`)
+- Pipeline never copies proprietary assets into repo-tracked roots.
 
 ## Interfaces and Data
-- `automation.toml` (example fields):
-  - `[inputs]` paths for XCI, keyset, module.json, provenance.
-  - `[outputs]` build_root, capture_root, validation_root.
-  - `[tools]` hactool_path, ffmpeg_path.
-  - `[reference]` reference_video_toml, input_script_toml.
-  - `[run]` command overrides for build/run/capture.
+- Input: `automation.toml`
 - Output:
-  - `run-manifest.json` (step results, hashes, timings)
-  - `run-manifest.json.long_tail`:
-    - candidate selection trace
-    - task lane
-    - attempt count
-    - stall reason (if any)
-  - `validation-report.json` from the validation step
+  - `run-manifest.json`
+  - `validation-report.json`
+  - per-step stdout/stderr logs
+- Env contracts for stage commands:
+  - `RECOMP_*` variables for work roots, config paths, and policy metadata
 
 ## Deliverables
-- Automation config schema and validator.
-- Orchestrator CLI command (or script) that runs the full loop.
-- Run manifest format with deterministic ordering.
+- Exposed CLI command for automation loop.
+- Updated automation config and run-manifest schemas/docs.
+- Tests for deterministic resume, cache invalidation behavior, and failure recording.
 
 ## Open Questions
-- How should caching be keyed (full input hash, partial stage hash)?
-- How should partial failures be recorded for rerun?
-- What blend of similarity signals should be default for candidate ranking?
+- Which stage-level policies should become hard gates when execution mode is `cloud`?
+- Should archive stage also emit a batch-manifest status update by default?
 
 ## Acceptance Criteria
-- A single command runs intake, build, capture, and validation in sequence.
-- The run manifest lists all artifacts with hashes and sizes.
-- Re-running with identical inputs yields identical artifacts and validation results.
-- Long-tail metadata is emitted deterministically for the same inputs and candidate pool.
+- `recomp --help` lists `automate`.
+- Valid lifted-mode config runs end to end with deterministic outputs.
+- Invalid config fails with explicit actionable diagnostics.
+- Stage-level cache behavior preserves upstream work when downstream commands change.
 
 ## Risks
-- External tool versions can break determinism.
-- Capture timing jitter can cause false validation failures.
-- Poor similarity anchors can amplify brittle code patterns if cleanup lanes lag behind.
+- External tools can still introduce non-determinism if versions drift.
+- Overly broad cache signatures can mask intended stage reuse.
 
 ## References
-- SPEC-180 XCI Intake
-- SPEC-190 Video-Based Validation
-- SPEC-220 Input Replay
+- SPEC-220-INPUT-REPLAY.md
+- SPEC-230-REFERENCE-MEDIA-NORMALIZATION.md
+- SPEC-240-VALIDATION-ORCHESTRATION.md
+- SPEC-270-COMPREHENSIVE-AUTOMATED-SOLUTION.md

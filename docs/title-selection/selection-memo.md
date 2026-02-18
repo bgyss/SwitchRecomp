@@ -1,21 +1,28 @@
 # Title Selection Memo
 
-## Selected Title (Provisional)
-- Open-source 2048-style homebrew (e.g., 2048NX).
+## Active Tracks
+- Homebrew baseline track: open-source 2048-style homebrew (provisional).
+- Hashed retail pilot track: `title-a24b9e807b456252` first-level milestone.
 
 ## Rationale
-- Preservation-safe profile with open-source code and minimal assets.
-- Exercises core input + graphics without large service surface.
-- Small binary size enables fast iteration and validation.
+- Homebrew baseline keeps deterministic iteration fast and legally straightforward.
+- Retail pilot exercises XCI intake, service surface growth, and first-level validation constraints.
+- Both tracks share the same automation and validation lifecycle contracts.
 
 ## Checklist Coverage
-- Legal/preservation rationale: open-source codebase; requires license verification and asset redistribution confirmation.
-- Minimal service dependency map: input (hid), graphics (vi/nv), optional filesystem for settings.
-- Instruction coverage estimate: primarily integer + branch operations, modest SIMD usage.
-- GPU feature usage: basic 2D/texture rendering, minimal shader complexity.
-- Asset separation plan: assets are either embedded as open-source data or supplied separately by the user.
+- Legal/preservation rationale:
+  - homebrew track uses redistributable inputs.
+  - retail pilot uses user-supplied lawful assets in private external workspaces.
+- Service dependency map:
+  - homebrew: hid + basic gfx/runtime services.
+  - retail pilot: expanded service surface tracked in SPEC-070/SPEC-200.
+- ISA/GPU profile:
+  - homebrew validates core decode and deterministic flow.
+  - retail pilot validates first-level shader/render/service deltas.
+- Asset separation:
+  - both tracks keep assets external and commit hashes/metadata only.
 
 ## Follow-ups
-- Verify candidate license and asset redistribution terms.
-- Collect private traces on a legally obtained binary.
-- Expand service map once the title is confirmed.
+- Finalize homebrew candidate license/asset checks.
+- Continue retail pilot service and shader gap tracking.
+- Keep per-track validation matrix and run-sheet artifacts updated.

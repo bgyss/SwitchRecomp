@@ -22,6 +22,8 @@ workspace/
         build.log
   runs/
     TID-0001/
+      run-manifest.json
+      artifacts.json
       captures/
         recomp.mp4
       metrics/

@@ -1,0 +1,54 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://switchrecomp.local/schemas/automation-policy.schema.json",
+  "title": "Automation Policy Record (v1)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema_version",
+    "policy_id",
+    "execution_mode",
+    "requires_approval",
+    "allowed_models"
+  ],
+  "properties": {
+    "schema_version": {
+      "type": "string",
+      "const": "1"
+    },
+    "policy_id": {
+      "type": "string",
+      "minLength": 1
+    },
+    "execution_mode": {
+      "type": "string",
+      "enum": ["local", "cloud", "hybrid"]
+    },
+    "requires_approval": {
+      "type": "boolean"
+    },
+    "max_cost_usd": {
+      "type": ["number", "null"],
+      "minimum": 0
+    },
+    "max_runtime_minutes": {
+      "type": ["integer", "null"],
+      "minimum": 0
+    },
+    "allowed_models": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "run_windows": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "redaction_profile": {
+      "type": ["string", "null"]
+    }
+  }
+}

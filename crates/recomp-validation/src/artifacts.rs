@@ -13,6 +13,8 @@ pub struct ArtifactIndex {
     #[serde(default)]
     pub pipeline_manifest: Option<PathBuf>,
     #[serde(default)]
+    pub run_manifest: Option<PathBuf>,
+    #[serde(default)]
     pub reference_config: Option<PathBuf>,
     #[serde(default)]
     pub capture_config: Option<PathBuf>,
@@ -50,6 +52,16 @@ pub fn run_artifact_validation(index: &ArtifactIndex) -> ValidationReport {
                 .map_err(|err| format!("read pipeline manifest {}: {err}", path.display()))?;
             let _: serde_json::Value =
                 serde_json::from_str(&text).map_err(|err| format!("parse manifest json: {err}"))?;
+            Ok(())
+        }));
+    }
+
+    if let Some(path) = &index.run_manifest {
+        cases.push(run_case("run_manifest", || {
+            let text = fs::read_to_string(path)
+                .map_err(|err| format!("read run manifest {}: {err}", path.display()))?;
+            let _: serde_json::Value = serde_json::from_str(&text)
+                .map_err(|err| format!("parse run manifest json: {err}"))?;
             Ok(())
         }));
     }

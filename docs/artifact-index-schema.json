@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://switchrecomp.local/schemas/artifact-index.schema.json",
+  "title": "Validation Artifact Index Schema (v1)",
+  "type": "object",
+  "properties": {
+    "label": {
+      "type": "string"
+    },
+    "xci_intake_manifest": {
+      "type": "string"
+    },
+    "pipeline_manifest": {
+      "type": "string"
+    },
+    "run_manifest": {
+      "type": "string"
+    },
+    "reference_config": {
+      "type": "string"
+    },
+    "capture_config": {
+      "type": "string"
+    },
+    "validation_config": {
+      "type": "string"
+    },
+    "out_dir": {
+      "type": "string"
+    }
+  },
+  "additionalProperties": true
+}

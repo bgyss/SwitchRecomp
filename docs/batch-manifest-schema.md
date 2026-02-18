@@ -56,6 +56,8 @@ validation targets, and status. Store as JSON or TOML; keys below are canonical.
 - `report_path` (string, optional)
 - `metrics_dir` (string, optional)
 - `captures_dir` (string, optional)
+- `run_manifest_path` (string, optional)
+- `artifact_index_path` (string, optional)
 
 ## Example (JSON)
 ```json
@@ -107,7 +109,9 @@ validation targets, and status. Store as JSON or TOML; keys below are canonical.
       "artifacts": {
         "report_path": "reports/TID-0001/summary.json",
         "metrics_dir": "reports/TID-0001/metrics",
-        "captures_dir": "captures/TID-0001"
+        "captures_dir": "captures/TID-0001",
+        "run_manifest_path": "runs/TID-0001/run-manifest.json",
+        "artifact_index_path": "runs/TID-0001/artifacts.json"
       }
     }
   ]
