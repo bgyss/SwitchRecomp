@@ -1,5 +1,6 @@
 use crate::homebrew::util::{hex_bytes, parse_error, read_bytes, read_u32};
 use lz4_flex::block::decompress;
+use sha2::{Digest, Sha256};
 use std::fs;
 use std::path::{Path, PathBuf};
 
@@ -38,6 +39,8 @@ pub struct NsoSegment {
     pub size: u32,
     pub file_size: u32,
     pub compressed: bool,
+    /// SHA-256 of the decompressed segment, when the header asks for it to be checked.
+    pub expected_sha256: Option<[u8; 32]>,
     pub permissions: NsoSegmentPermissions,
 }
 
@@ -78,7 +81,8 @@ pub fn parse_nso(path: &Path) -> Result<NsoModule, String> {
         return Err(format!("NSO magic mismatch: {magic:#x}"));
     }
 
-    let flags = read_u32(&bytes, 0x8).map_err(|err| err.to_string())?;
+    // Header layout: magic (0x0), version (0x4), reserved (0x8), flags (0xC).
+    let flags = read_u32(&bytes, 0xC).map_err(|err| err.to_string())?;
     let text = read_segment(&bytes, 0x10, NsoSegmentKind::Text)?;
     let rodata = read_segment(&bytes, 0x20, NsoSegmentKind::Rodata)?;
     let data = read_segment(&bytes, 0x30, NsoSegmentKind::Data)?;
@@ -89,14 +93,19 @@ pub fn parse_nso(path: &Path) -> Result<NsoModule, String> {
         read_u32(&bytes, 0x68).map_err(|err| err.to_string())?,
     ];
 
+    // Flag bits 0..2 mark text, rodata, data as LZ4-compressed; bits 3..5
+    // ask for the segment hash at 0xA0 + 0x20 * index to be checked.
     let mut segments = vec![text, rodata, data];
-    for (segment, file_size) in segments.iter_mut().zip(file_sizes) {
+    for (index, (segment, file_size)) in segments.iter_mut().zip(file_sizes).enumerate() {
         segment.file_size = file_size;
-        segment.compressed = match segment.kind {
-            NsoSegmentKind::Text => flags & 0x1 != 0,
-            NsoSegmentKind::Rodata => flags & 0x2 != 0,
-            NsoSegmentKind::Data => flags & 0x4 != 0,
-        };
+        segment.compressed = flags & (1 << index) != 0;
+        if flags & (8 << index) != 0 {
+            let hash = read_bytes(&bytes, 0xA0 + 0x20 * index, 0x20)
+                .map_err(|err| err.to_string())?
+                .try_into()
+                .map_err(|_| "NSO segment hash length mismatch".to_string())?;
+            segment.expected_sha256 = Some(hash);
+        }
     }
 
     let bss_size = read_u32(&bytes, 0x3C).map_err(|err| err.to_string())?;
@@ -160,6 +169,16 @@ pub fn extract_segments(module: &NsoModule) -> Result<Vec<NsoSegmentData>, Strin
                 decoded.len()
             ));
         }
+        if let Some(expected) = segment.expected_sha256 {
+            let mut hasher = Sha256::new();
+            hasher.update(&decoded);
+            if hasher.finalize().as_slice() != expected {
+                return Err(format!(
+                    "NSO {:?} segment does not match the SHA-256 in the header",
+                    segment.kind
+                ));
+            }
+        }
         out.push(NsoSegmentData {
             segment: segment.clone(),
             data: decoded,
@@ -185,6 +204,72 @@ fn read_segment(bytes: &[u8], offset: usize, kind: NsoSegmentKind) -> Result<Nso
         size,
         file_size: 0,
         compressed: false,
+        expected_sha256: None,
         permissions,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A minimal NSO with LZ4-compressed text and hash checking for all three
+    /// segments. `corrupt_hash` flips one byte of the rodata hash.
+    fn write_nso(dir: &Path, corrupt_hash: bool) -> PathBuf {
+        let segments: [&[u8]; 3] = [b"TEXTTEXTTEXTTEXT", b"RODATA", b"DATA"];
+        let stored = [
+            lz4_flex::block::compress(segments[0]),
+            segments[1].to_vec(),
+            segments[2].to_vec(),
+        ];
+        let mut bytes = vec![0u8; NSO_HEADER_SIZE];
+        bytes[0..4].copy_from_slice(b"NSO0");
+        // Flags live at 0xC: bit 0 = text compressed, bits 3..5 = check hashes.
+        bytes[0xC..0x10].copy_from_slice(&0x39u32.to_le_bytes());
+        let mut offset = NSO_HEADER_SIZE as u32;
+        for (index, (plain, blob)) in segments.iter().zip(&stored).enumerate() {
+            let entry = 0x10 + index * 0x10;
+            bytes[entry..entry + 4].copy_from_slice(&offset.to_le_bytes());
+            bytes[entry + 4..entry + 8].copy_from_slice(&(index as u32 * 0x1000).to_le_bytes());
+            bytes[entry + 8..entry + 12].copy_from_slice(&(plain.len() as u32).to_le_bytes());
+            let size_entry = 0x60 + index * 4;
+            bytes[size_entry..size_entry + 4].copy_from_slice(&(blob.len() as u32).to_le_bytes());
+            let mut hasher = Sha256::new();
+            hasher.update(plain);
+            let hash_entry = 0xA0 + index * 0x20;
+            bytes[hash_entry..hash_entry + 0x20].copy_from_slice(&hasher.finalize());
+            offset += blob.len() as u32;
+        }
+        if corrupt_hash {
+            bytes[0xC0] ^= 0xFF;
+        }
+        for blob in &stored {
+            bytes.extend_from_slice(blob);
+        }
+        let path = dir.join("module.nso");
+        fs::write(&path, bytes).expect("write nso");
+        path
+    }
+
+    #[test]
+    fn segments_are_decompressed_and_match_the_header_hashes() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let module = parse_nso(&write_nso(temp.path(), false)).expect("parse");
+        assert!(module.segments[0].compressed);
+        assert!(!module.segments[1].compressed);
+        assert!(module.segments.iter().all(|s| s.expected_sha256.is_some()));
+
+        let segments = extract_segments(&module).expect("extract");
+        assert_eq!(segments[0].data, b"TEXTTEXTTEXTTEXT");
+        assert_eq!(segments[1].data, b"RODATA");
+        assert_eq!(segments[2].data, b"DATA");
+    }
+
+    #[test]
+    fn segment_hash_mismatch_is_rejected() {
+        let temp = tempfile::tempdir().expect("tempdir");
+        let module = parse_nso(&write_nso(temp.path(), true)).expect("parse");
+        let err = extract_segments(&module).unwrap_err();
+        assert!(err.contains("does not match the SHA-256"), "{err}");
+    }
 }

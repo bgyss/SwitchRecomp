@@ -103,7 +103,7 @@ def build_nso(path: Path) -> None:
     buf = bytearray(total)
 
     buf[0x0:0x4] = b"NSO0"
-    write_u32(buf, 0x8, 0x0)
+    write_u32(buf, 0xC, 0x0)
     write_u32(buf, 0x10, text_off)
     write_u32(buf, 0x14, 0x0)
     write_u32(buf, 0x18, len(text))

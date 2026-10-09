@@ -183,7 +183,7 @@ fn build_nso() -> Vec<u8> {
     let mut bytes = vec![0u8; total];
 
     bytes[0x0..0x4].copy_from_slice(b"NSO0");
-    write_u32(&mut bytes, 0x8, 0x1);
+    write_u32(&mut bytes, 0xC, 0x1);
     write_u32(&mut bytes, 0x10, text_off);
     write_u32(&mut bytes, 0x14, 0);
     write_u32(&mut bytes, 0x18, text.len() as u32);
